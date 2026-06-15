@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
-from app.routers import db_test
+from app.routers import db_test, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,6 +38,7 @@ if settings.BACKEND_CORS_ORIGINS:
 
 # Đăng ký các router
 app.include_router(db_test.router, prefix=f"{settings.API_V1_STR}/db", tags=["Database"])
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 
 @app.get("/")
 def read_root():
