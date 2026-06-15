@@ -7,6 +7,11 @@ class UserRegister(BaseModel):
     full_name: str
     password: str = Field(..., min_length=6, description="Mật khẩu chứa ít nhất 6 ký tự")
 
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class UserResponse(BaseModel):
     id: str
     email: EmailStr

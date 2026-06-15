@@ -2,17 +2,16 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
 
 from app.core.config import settings
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.security import verify_password, get_password_hash, create_access_token, decode_access_token
 from app.database.mongodb import get_database
-from app.schemas.auth import UserRegister, UserResponse, Token, TokenPayload
+from app.schemas.auth import UserRegister, UserLogin, UserResponse, Token, TokenPayload
 
 router = APIRouter()
 
-# OAuth2PasswordBearer sẽ lấy token từ header Authorization
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+# Swagger UI Authorize sẽ sử dụng endpoint login-swagger
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login-swagger")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
     credentials_exception = HTTPException(
@@ -20,14 +19,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-        token_data = TokenPayload(sub=user_id)
-    except JWTError:
+    payload = decode_access_token(token)
+    if payload is None:
         raise credentials_exception
+    user_id: str = payload.get("sub")
+    if user_id is None:
+        raise credentials_exception
+    token_data = TokenPayload(sub=user_id)
         
     db = get_database()
     try:
@@ -74,9 +72,23 @@ async def register(user_in: UserRegister):
     )
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(user_in: UserLogin):
+    """Endpoint đăng nhập chính thức sử dụng JSON Body (UserLogin schema)"""
     db = get_database()
-    # OAuth2PasswordRequestForm gửi email qua trường username
+    user = await db["users"].find_one({"email": user_in.email})
+    if not user or not verify_password(user_in.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+        
+    access_token = create_access_token(subject=str(user["_id"]))
+    return Token(access_token=access_token, token_type="bearer")
+
+@router.post("/login-swagger", response_model=Token, include_in_schema=True)
+async def login_swagger(form_data: OAuth2PasswordRequestForm = Depends()):
+    """Endpoint phụ trợ giúp Swagger UI tương thích với nút Authorize dùng Form Data"""
+    db = get_database()
     user = await db["users"].find_one({"email": form_data.username})
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
