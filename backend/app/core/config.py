@@ -23,6 +23,20 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # Cloudinary configurations
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
+    # ChromaDB configurations
+    CHROMA_PERSIST_DIR: str = "./chroma_db"
+
+    # Gemini configurations
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+
+
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

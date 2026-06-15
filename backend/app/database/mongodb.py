@@ -1,4 +1,5 @@
 import logging
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ConnectionFailure
 
@@ -19,7 +20,8 @@ async def connect_to_mongo():
     try:
         db_manager.client = AsyncIOMotorClient(
             settings.MONGODB_URI,
-            serverSelectionTimeoutMS=5000
+            serverSelectionTimeoutMS=5000,
+            tlsCAFile=certifi.where()
         )
         # Kiểm tra thử kết nối
         await db_manager.client.admin.command('ping')
