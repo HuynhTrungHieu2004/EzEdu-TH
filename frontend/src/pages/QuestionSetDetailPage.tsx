@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { questionApi } from '../api/questionApi';
 import type { QuestionSetResponse } from '../api/questionApi';
-import { authApi } from '../api/authApi';
-import type { UserResponse } from '../types/auth';
 import QuestionCard from '../components/QuestionCard';
 
 const QuestionSetDetailPage: React.FC = () => {
   const { questionSetId } = useParams<{ questionSetId: string }>();
   const [questionSet, setQuestionSet] = useState<QuestionSetResponse | null>(null);
-  const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,9 +25,6 @@ const QuestionSetDetailPage: React.FC = () => {
       try {
         const response = await questionApi.get(questionSetId);
         setQuestionSet(response);
-        
-        const userData = await authApi.getMe();
-        setUser(userData);
       } catch (err: any) {
         if (err.response?.status === 401) {
           localStorage.removeItem('access_token');
@@ -45,11 +39,6 @@ const QuestionSetDetailPage: React.FC = () => {
 
     fetchData();
   }, [questionSetId, navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    navigate('/login');
-  };
 
   if (loading) {
     return (
@@ -73,28 +62,6 @@ const QuestionSetDetailPage: React.FC = () => {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div onClick={() => navigate('/dashboard')} style={{ ...styles.logoGroup, cursor: 'pointer' }}>
-          <div style={styles.logoBadge}>AI</div>
-          <div>
-            <h1 style={styles.headerTitle}>Hệ Thống Sinh Câu Hỏi</h1>
-            <p style={styles.headerSubtitle}>Đánh giá năng lực tự động từ học liệu điện tử</p>
-          </div>
-        </div>
-
-        {user && (
-          <div style={styles.userSection}>
-            <div style={styles.userInfo}>
-              <span style={styles.userName}>{user.full_name}</span>
-              <span style={styles.userEmail}>{user.email}</span>
-            </div>
-            <button onClick={handleLogout} style={styles.logoutButton}>
-              Đăng Xuất
-            </button>
-          </div>
-        )}
-      </header>
 
       {/* Main Content */}
       <main style={styles.mainContent}>

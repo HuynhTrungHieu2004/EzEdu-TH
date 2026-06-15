@@ -56,28 +56,6 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.logoGroup}>
-          <div style={styles.logoBadge}>AI</div>
-          <div>
-            <h1 style={styles.headerTitle}>Hệ Thống Sinh Câu Hỏi</h1>
-            <p style={styles.headerSubtitle}>Đánh giá năng lực tự động từ học liệu điện tử</p>
-          </div>
-        </div>
-
-        {user && (
-          <div style={styles.userSection}>
-            <div style={styles.userInfo}>
-              <span style={styles.userName}>{user.full_name}</span>
-              <span style={styles.userEmail}>{user.email}</span>
-            </div>
-            <button onClick={handleLogout} style={styles.logoutButton}>
-              Đăng Xuất
-            </button>
-          </div>
-        )}
-      </header>
 
       {/* Main Content Dashboard */}
       <main style={styles.mainContent}>

@@ -77,19 +77,63 @@ function WelcomeScreen() {
   );
 }
 
+import AppLayout from './components/AppLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<WelcomeScreen />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/documents/:documentId" element={<DocumentDetailPage />} />
-        <Route path="/documents/:documentId/questions" element={<QuestionGeneratePage />} />
-        <Route path="/question-sets/:questionSetId" element={<QuestionSetDetailPage />} />
-      </Routes>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<WelcomeScreen />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Protected routes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/documents" 
+            element={
+              <ProtectedRoute>
+                <DocumentsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/documents/:documentId" 
+            element={
+              <ProtectedRoute>
+                <DocumentDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/documents/:documentId/questions" 
+            element={
+              <ProtectedRoute>
+                <QuestionGeneratePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/question-sets/:questionSetId" 
+            element={
+              <ProtectedRoute>
+                <QuestionSetDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route path="*" element={<WelcomeScreen />} />
+        </Routes>
+      </AppLayout>
     </BrowserRouter>
   );
 }

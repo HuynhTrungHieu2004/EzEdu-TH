@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse, SearchResultItem } from '../api/documentApi';
-import { authApi } from '../api/authApi';
-import type { UserResponse } from '../types/auth';
 
 import ChatBox from '../components/ChatBox';
 
 const DocumentDetailPage: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
   const [document, setDocument] = useState<DocumentResponse | null>(null);
-  const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [indexLoading, setIndexLoading] = useState(false);
   
@@ -48,12 +45,6 @@ const DocumentDetailPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       await fetchDocument();
-      try {
-        const userData = await authApi.getMe();
-        setUser(userData);
-      } catch (err) {
-        console.error('Failed to load user info:', err);
-      }
       setLoading(false);
     };
 
@@ -105,10 +96,6 @@ const DocumentDetailPage: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    navigate('/login');
-  };
 
   if (loading) {
     return (
@@ -132,29 +119,6 @@ const DocumentDetailPage: React.FC = () => {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div onClick={() => navigate('/dashboard')} style={{ ...styles.logoGroup, cursor: 'pointer' }}>
-
-          <div style={styles.logoBadge}>AI</div>
-          <div>
-            <h1 style={styles.headerTitle}>Hệ Thống Sinh Câu Hỏi</h1>
-            <p style={styles.headerSubtitle}>Đánh giá năng lực tự động từ học liệu điện tử</p>
-          </div>
-        </div>
-
-        {user && (
-          <div style={styles.userSection}>
-            <div style={styles.userInfo}>
-              <span style={styles.userName}>{user.full_name}</span>
-              <span style={styles.userEmail}>{user.email}</span>
-            </div>
-            <button onClick={handleLogout} style={styles.logoutButton}>
-              Đăng Xuất
-            </button>
-          </div>
-        )}
-      </header>
 
       {/* Main Content */}
       <main style={styles.mainContent}>
