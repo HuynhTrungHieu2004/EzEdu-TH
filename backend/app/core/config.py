@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     BACKEND_CORS_ORIGINS: List[str] = []
 
+    # MongoDB configurations
+    MONGODB_URI: str = ""
+    MONGODB_DB_NAME: str = "ai_question_generator"
+
+    # JWT configurations
+    JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:

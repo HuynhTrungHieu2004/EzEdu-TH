@@ -1,0 +1,45 @@
+# Environment files
+backend/.env
+frontend/.env
+.env
+.env.local
+.env.*.local
+
+# Virtual environments
+backend/.venv/
+.venv/
+env/
+venv/
+ENV/
+
+# Dependency directories
+frontend/node_modules/
+node_modules/
+
+# Uploads & database directories
+backend/uploads/
+backend/chroma_db/
+chroma_db/
+
+# Python cache & compiler files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
