@@ -70,8 +70,9 @@ const RegisterPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Họ và tên</label>
+            <label htmlFor="register-full-name" style={styles.label}>Họ và tên</label>
             <input
+              id="register-full-name"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -83,8 +84,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Email</label>
+            <label htmlFor="register-email" style={styles.label}>Email</label>
             <input
+              id="register-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -96,8 +98,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Mật khẩu (tối thiểu 6 ký tự)</label>
+            <label htmlFor="register-password" style={styles.label}>Mật khẩu (tối thiểu 6 ký tự)</label>
             <input
+              id="register-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -109,8 +112,9 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Xác nhận mật khẩu</label>
+            <label htmlFor="register-confirm-password" style={styles.label}>Xác nhận mật khẩu</label>
             <input
+              id="register-confirm-password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

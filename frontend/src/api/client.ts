@@ -1,9 +1,8 @@
 import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { buildApiUrl, createApiConfigError, isApiBaseUrlConfigured } from '../config/api';
 
 const client = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
+  baseURL: isApiBaseUrlConfigured ? buildApiUrl('/api/v1') : undefined,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,6 +11,10 @@ const client = axios.create({
 // Interceptor to add Authorization header automatically
 client.interceptors.request.use(
   (config) => {
+    if (!isApiBaseUrlConfigured) {
+      return Promise.reject(createApiConfigError());
+    }
+
     const token = localStorage.getItem('access_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;

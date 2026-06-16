@@ -8,6 +8,9 @@ import DocumentsPage from './pages/DocumentsPage';
 import DocumentDetailPage from './pages/DocumentDetailPage';
 import QuestionGeneratePage from './pages/QuestionGeneratePage';
 import QuestionSetDetailPage from './pages/QuestionSetDetailPage';
+import AppLayout from './components/AppLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import { buildApiUrl, isApiBaseUrlConfigured } from './config/api';
 
 // Welcome landing page retaining original check logic but styled nicely
 function WelcomeScreen() {
@@ -16,9 +19,14 @@ function WelcomeScreen() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    if (!isApiBaseUrlConfigured) {
+      setBackendStatus('Thiếu cấu hình VITE_API_BASE_URL');
+      setIsConnected('disconnected');
+      return;
+    }
+
     axios
-      .get(`${apiBaseUrl}/health`)
+      .get(buildApiUrl('/health'))
       .then((res) => {
         setBackendStatus(`Kết nối backend thành công (Trạng thái: ${res.data.status})`);
         setIsConnected('connected');
@@ -76,9 +84,6 @@ function WelcomeScreen() {
     </main>
   );
 }
-
-import AppLayout from './components/AppLayout';
-import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (

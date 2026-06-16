@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse } from '../api/documentApi';
@@ -10,7 +10,9 @@ const DocumentsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const fetchData = async () => {
+  const fetchDocuments = async () => {
+    setError(null);
+
     try {
       const docs = await documentApi.list();
       setDocuments(docs);
@@ -18,9 +20,15 @@ const DocumentsPage: React.FC = () => {
       if (err.response?.status === 401) {
         localStorage.removeItem('access_token');
         navigate('/login');
-      } else {
-        setError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+        return;
       }
+
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === 'string'
+          ? detail
+          : 'Không thể tải danh sách tài liệu. Vui lòng thử lại sau.'
+      );
     } finally {
       setLoading(false);
     }
@@ -32,53 +40,86 @@ const DocumentsPage: React.FC = () => {
       navigate('/login');
       return;
     }
-    fetchData();
+
+    fetchDocuments();
   }, [navigate]);
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / Math.pow(1024, index);
+    return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
+  };
+
+  const getStatusMeta = (status: string) => {
+    switch (status) {
+      case 'uploaded':
+        return {
+          label: 'Đã tải lên',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          color: '#3b82f6',
+        };
+      case 'processed':
+        return {
+          label: 'Đã xử lý',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          color: '#22c55e',
+        };
+      case 'indexed':
+        return {
+          label: 'Đã lập chỉ mục',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          color: '#6366f1',
+        };
+      case 'failed':
+        return {
+          label: 'Lỗi xử lý',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          color: '#ef4444',
+        };
+      default:
+        return {
+          label: status || 'Không xác định',
+          backgroundColor: 'rgba(148, 163, 184, 0.12)',
+          color: '#64748b',
+        };
+    }
   };
 
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.spinner}></div>
-        <p style={{ marginTop: '16px', color: 'var(--text)' }}>Đang tải danh sách tài liệu...</p>
+        <p style={styles.loadingText}>Đang tải danh sách tài liệu...</p>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-
-      {/* Main Content */}
       <main style={styles.mainContent}>
         <div style={styles.pageHeader}>
           <div>
             <h2 style={styles.pageTitle}>Quản lý Học liệu Điện tử</h2>
-            <p style={styles.pageSubtitle}>Tải lên và chuẩn bị tài liệu phục vụ sinh câu hỏi tự động và hỏi đáp AI.</p>
+            <p style={styles.pageSubtitle}>Tải lên và quản lý các tài liệu PDF, DOCX, PPTX của riêng bạn.</p>
           </div>
           <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
             ← Quay lại Dashboard
           </button>
         </div>
 
-        {/* File Upload Component */}
-        <FileUpload onUploadSuccess={fetchData} />
+        <FileUpload onUploadSuccess={fetchDocuments} />
 
         {error && <div style={styles.errorAlert}>{error}</div>}
 
-        {/* Documents Table */}
         <div style={styles.tableCard}>
-          <h3 style={styles.tableTitle}>Danh sách tài liệu học tập của bạn</h3>
-          
+          <h3 style={styles.tableTitle}>Danh sách tài liệu của bạn</h3>
+
           {documents.length === 0 ? (
             <div style={styles.emptyState}>
-              Bạn chưa tải lên tài liệu nào. Vui lòng chọn tài liệu PDF/DOCX/PPTX phía trên để bắt đầu!
+              Bạn chưa tải lên tài liệu nào. Hãy chọn file PDF, DOCX hoặc PPTX ở phần trên để bắt đầu.
             </div>
           ) : (
             <div style={styles.tableWrapper}>
@@ -86,36 +127,16 @@ const DocumentsPage: React.FC = () => {
                 <thead>
                   <tr style={styles.thRow}>
                     <th style={styles.th}>Tên tài liệu</th>
-                    <th style={styles.th}>Định dạng</th>
+                    <th style={styles.th}>Loại file</th>
                     <th style={styles.th}>Dung lượng</th>
                     <th style={styles.th}>Trạng thái</th>
-                    <th style={styles.th}>Ngày tải lên</th>
+                    <th style={styles.th}>Thời gian upload</th>
                     <th style={{ ...styles.th, textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {documents.map((doc) => {
-                    const isIndexed = doc.status === 'indexed';
-                    const isProcessed = doc.status === 'processed';
-                    const isFailed = doc.status === 'failed';
-                    
-                    let statusLabel = 'Đang xử lý';
-                    let statusBg = 'rgba(234, 179, 8, 0.1)';
-                    let statusColor = '#eab308';
-                    
-                    if (isIndexed) {
-                      statusLabel = 'Đã lập chỉ mục';
-                      statusBg = 'rgba(59, 130, 246, 0.1)';
-                      statusColor = '#3b82f6';
-                    } else if (isProcessed) {
-                      statusLabel = 'Đã trích xuất text';
-                      statusBg = 'rgba(34, 197, 94, 0.1)';
-                      statusColor = '#22c55e';
-                    } else if (isFailed) {
-                      statusLabel = 'Lỗi phân tích';
-                      statusBg = 'rgba(239, 68, 68, 0.1)';
-                      statusColor = '#ef4444';
-                    }
+                    const statusMeta = getStatusMeta(doc.status);
 
                     return (
                       <tr key={doc.id} style={styles.tr}>
@@ -127,31 +148,23 @@ const DocumentsPage: React.FC = () => {
                         </td>
                         <td style={styles.td}>{formatSize(doc.file_size)}</td>
                         <td style={styles.td}>
-                          <span style={{ ...styles.statusTag, backgroundColor: statusBg, color: statusColor }}>
-                            {statusLabel}
+                          <span
+                            style={{
+                              ...styles.statusTag,
+                              backgroundColor: statusMeta.backgroundColor,
+                              color: statusMeta.color,
+                            }}
+                          >
+                            {statusMeta.label}
                           </span>
                         </td>
-                        <td style={styles.td}>
-                          {new Date(doc.created_at).toLocaleDateString('vi-VN')}
-                        </td>
+                        <td style={styles.td}>{new Date(doc.created_at).toLocaleString('vi-VN')}</td>
                         <td style={styles.tdActions}>
                           <button
                             onClick={() => navigate(`/documents/${doc.id}`)}
                             style={styles.detailButton}
                           >
-                            Chi tiết & RAG Q&A
-                          </button>
-                          
-                          <button
-                            onClick={() => navigate(`/documents/${doc.id}/questions`)}
-                            disabled={!isIndexed}
-                            style={{
-                              ...styles.generateButton,
-                              opacity: isIndexed ? 1 : 0.5,
-                              cursor: isIndexed ? 'pointer' : 'not-allowed',
-                            }}
-                          >
-                            Sinh Câu hỏi
+                            Xem chi tiết
                           </button>
                         </td>
                       </tr>
@@ -191,76 +204,9 @@ const styles = {
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px 40px',
-    borderBottom: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    flexWrap: 'wrap' as const,
-    gap: '16px',
-    textAlign: 'left' as const,
-  },
-  logoGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  logoBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: '1px solid var(--accent-border)',
-  },
-  headerTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    margin: 0,
-    color: 'var(--text-h)',
-    lineHeight: '1.2',
-  },
-  headerSubtitle: {
-    fontSize: '13px',
+  loadingText: {
+    marginTop: '16px',
     color: 'var(--text)',
-    margin: 0,
-  },
-  userSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'flex-end',
-  },
-  userName: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-  },
-  userEmail: {
-    fontSize: '12px',
-    color: 'var(--text)',
-  },
-  logoutButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
   },
   mainContent: {
     flexGrow: 1,
@@ -350,14 +296,11 @@ const styles = {
   },
   tr: {
     borderBottom: '1px solid var(--border)',
-    transition: 'background-color 0.2s ease',
-    ':hover': {
-      backgroundColor: 'var(--code-bg)',
-    },
   },
   td: {
     padding: '16px',
     color: 'var(--text)',
+    verticalAlign: 'middle' as const,
   },
   tdName: {
     padding: '16px',
@@ -365,47 +308,37 @@ const styles = {
     color: 'var(--accent)',
     cursor: 'pointer',
     textDecoration: 'underline',
+    verticalAlign: 'middle' as const,
   },
   typeTag: {
     fontSize: '11px',
-    fontWeight: 'bold',
+    fontWeight: '700',
     backgroundColor: 'var(--code-bg)',
-    padding: '4px 6px',
-    borderRadius: '4px',
+    padding: '4px 8px',
+    borderRadius: '999px',
     border: '1px solid var(--border)',
   },
   statusTag: {
     fontSize: '12px',
-    fontWeight: '500',
-    padding: '4px 8px',
-    borderRadius: '12px',
+    fontWeight: '600',
+    padding: '5px 10px',
+    borderRadius: '999px',
     display: 'inline-block',
   },
   tdActions: {
     padding: '16px',
     textAlign: 'right' as const,
-    display: 'flex',
-    gap: '8px',
-    justifyContent: 'flex-end',
+    whiteSpace: 'nowrap' as const,
   },
   detailButton: {
-    padding: '6px 12px',
+    padding: '8px 14px',
     fontSize: '12px',
     fontWeight: '600',
     color: 'var(--text-h)',
     backgroundColor: 'var(--bg)',
     border: '1px solid var(--border)',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer',
-  },
-  generateButton: {
-    padding: '6px 12px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: 'var(--accent)',
-    border: 'none',
-    borderRadius: '4px',
   },
 };
 

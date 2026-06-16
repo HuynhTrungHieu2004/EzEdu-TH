@@ -13,6 +13,19 @@ export interface DocumentResponse {
   updated_at: string;
 }
 
+export interface DocumentUploadResponse {
+  document_id: string;
+  user_id: string;
+  original_filename: string;
+  file_type: string;
+  file_size: number;
+  cloudinary_url: string;
+  cloudinary_public_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChunkResponse {
   id: string;
   document_id: string;
@@ -46,10 +59,10 @@ export const documentApi = {
     return response.data;
   },
 
-  upload: async (file: File): Promise<DocumentResponse> => {
+  upload: async (file: File): Promise<DocumentUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await client.post<DocumentResponse>('/documents/upload', formData, {
+    const response = await client.post<DocumentUploadResponse>('/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

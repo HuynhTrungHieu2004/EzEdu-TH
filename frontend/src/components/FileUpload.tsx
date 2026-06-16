@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { documentApi } from '../api/documentApi';
 
 interface FileUploadProps {
-  onUploadSuccess: () => void;
+  onUploadSuccess: () => Promise<void> | void;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
@@ -10,6 +10,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -48,7 +49,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       await documentApi.upload(file);
       setSuccess(true);
       setFile(null);
-      onUploadSuccess();
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+      await onUploadSuccess();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       setError(
@@ -66,6 +70,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       <form onSubmit={handleUpload} style={styles.form}>
         <div style={styles.dropZone}>
           <input
+            ref={inputRef}
             type="file"
             onChange={handleFileChange}
             accept=".pdf,.docx,.pptx"
@@ -85,7 +90,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
         </div>
 
         {error && <div style={styles.errorAlert}>{error}</div>}
-        {success && <div style={styles.successAlert}>Tải tài liệu lên và trích xuất thành công!</div>}
+        {success && <div style={styles.successAlert}>Tải tài liệu lên thành công.</div>}
 
         <button
           type="submit"
@@ -96,7 +101,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
             cursor: !file || loading ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Đang tải lên & trích xuất text...' : 'Tải lên Hệ thống'}
+          {loading ? 'Đang tải tài liệu lên...' : 'Tải lên Hệ thống'}
         </button>
       </form>
     </div>

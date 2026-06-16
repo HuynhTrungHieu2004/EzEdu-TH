@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.database.mongodb import ping_database
+from app.database.mongodb import is_using_mock_database, ping_database
 
 router = APIRouter()
 
@@ -10,7 +10,7 @@ async def ping_db():
     if is_connected:
         return {
             "status": "ok",
-            "message": "MongoDB connected successfully"
+            "message": "MongoDB mock connected successfully" if is_using_mock_database() else "MongoDB connected successfully"
         }
     else:
         raise HTTPException(

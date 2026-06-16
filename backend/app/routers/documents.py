@@ -1,31 +1,44 @@
 import os
 import uuid
-import aiofiles
-from pathlib import Path
 from datetime import datetime, timezone
-from typing import List
-from bson import ObjectId
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+import aiofiles
+import httpx
+from bson import ObjectId
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.database.mongodb import get_database
-from app.schemas.auth import UserResponse
-from app.schemas.document import DocumentResponse
 from app.routers.auth import get_current_user
-from app.services.cloudinary_service import upload_file_to_cloudinary
+from app.schemas.auth import UserResponse
+from app.schemas.document import (
+    DocumentContentResponse,
+    DocumentExtractResponse,
+    DocumentResponse,
+    DocumentUploadResponse,
+)
+from app.services.cloudinary_service import delete_file_from_cloudinary, upload_file_to_cloudinary
 from app.services.document_parser import extract_text
-from app.services.text_chunking_service import split_text_into_chunks
 from app.services.rag_service import add_document_chunks, search_relevant_chunks
+from app.services.text_chunking_service import split_text_into_chunks
 
 router = APIRouter()
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+UPLOAD_DIR = BACKEND_DIR / "uploads"
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 ALLOWED_EXTENSIONS = {"pdf", "docx", "pptx"}
+CONTENT_PREVIEW_LENGTH = 1000
+DOWNLOAD_TIMEOUT_SECONDS = 60.0
+ALREADY_EXTRACTED_STATUSES = {"processed", "indexed"}
+
 
 class SearchRequest(BaseModel):
     query: str
     n_results: int = Field(5, ge=1, le=20)
+
 
 class SearchResultItem(BaseModel):
     id: str
@@ -33,10 +46,6 @@ class SearchResultItem(BaseModel):
     metadata: dict
     distance: float
 
-class DocumentContentResponse(BaseModel):
-    document_id: str
-    filename: str
-    extracted_text: str
 
 class ChunkResponse(BaseModel):
     id: str
@@ -44,121 +53,369 @@ class ChunkResponse(BaseModel):
     chunk_index: int
     content: str
 
-@router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+
+class DocumentProcessingError(Exception):
+    def __init__(self, message: str, http_status: int):
+        super().__init__(message)
+        self.message = message
+        self.http_status = http_status
+
+
+def cleanup_temp_file(file_path: Path) -> None:
+    if file_path.exists():
+        os.remove(file_path)
+
+
+def build_temp_file_path(filename: str) -> Path:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    return UPLOAD_DIR / f"{uuid.uuid4()}_{Path(filename).name}"
+
+
+def ensure_valid_document_id(document_id: str) -> ObjectId:
+    if not ObjectId.is_valid(document_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+    return ObjectId(document_id)
+
+
+def serialize_document(document: dict) -> DocumentResponse:
+    return DocumentResponse(
+        id=str(document["_id"]),
+        user_id=document["user_id"],
+        original_filename=document["original_filename"],
+        file_type=document["file_type"],
+        file_size=document["file_size"],
+        cloudinary_url=document.get("cloudinary_url", ""),
+        cloudinary_public_id=document.get("cloudinary_public_id", ""),
+        status=document.get("status", "uploaded"),
+        error_message=document.get("error_message"),
+        created_at=document["created_at"],
+        updated_at=document["updated_at"],
+    )
+
+
+def build_content_response(
+    document: dict,
+    content_doc: dict,
+    include_full_text: bool,
+) -> DocumentContentResponse:
+    extracted_text = content_doc.get("extracted_text", "")
+    preview = extracted_text[:CONTENT_PREVIEW_LENGTH]
+    document_id = str(document["_id"])
+    original_filename = document.get("original_filename", "")
+
+    return DocumentContentResponse(
+        document_id=document_id,
+        original_filename=original_filename,
+        filename=original_filename,
+        file_type=document.get("file_type", ""),
+        status=document.get("status", "uploaded"),
+        preview=preview,
+        extracted_text=extracted_text if include_full_text else None,
+        text_length=content_doc.get("text_length", len(extracted_text)),
+    )
+
+
+def build_extract_response(
+    document: dict,
+    message: str,
+    text_length: Optional[int],
+) -> DocumentExtractResponse:
+    return DocumentExtractResponse(
+        document_id=str(document["_id"]),
+        original_filename=document.get("original_filename", ""),
+        file_type=document.get("file_type", ""),
+        status=document.get("status", "uploaded"),
+        message=message,
+        text_length=text_length,
+        error_message=document.get("error_message"),
+        updated_at=document["updated_at"],
+    )
+
+
+async def get_owned_document(document_id: str, current_user: UserResponse) -> dict:
+    object_id = ensure_valid_document_id(document_id)
+    db = get_database()
+    document = await db["documents"].find_one({"_id": object_id})
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+
+    if document["user_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this document.",
+        )
+
+    return document
+
+
+async def update_document_status(
+    document: dict,
+    *,
+    status_value: str,
+    error_message: Optional[str] = None,
+) -> None:
+    now = datetime.now(timezone.utc)
+    db = get_database()
+    await db["documents"].update_one(
+        {"_id": document["_id"]},
+        {
+            "$set": {
+                "status": status_value,
+                "error_message": error_message,
+                "updated_at": now,
+            }
+        },
+    )
+    document["status"] = status_value
+    document["error_message"] = error_message
+    document["updated_at"] = now
+
+
+async def save_document_content(document: dict, extracted_text: str) -> dict:
+    now = datetime.now(timezone.utc)
+    document_id = str(document["_id"])
+    text_length = len(extracted_text)
+    db = get_database()
+
+    await db["document_contents"].update_one(
+        {"document_id": document_id},
+        {
+            "$set": {
+                "user_id": document["user_id"],
+                "extracted_text": extracted_text,
+                "text_length": text_length,
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "document_id": document_id,
+                "created_at": now,
+            },
+        },
+        upsert=True,
+    )
+
+    await update_document_status(document, status_value="processed", error_message=None)
+    return await db["document_contents"].find_one({"document_id": document_id})
+
+
+async def download_document_to_tempfile(cloudinary_url: str, destination: Path) -> None:
+    if cloudinary_url.startswith("local://") or os.path.exists(cloudinary_url.replace("local://", "")):
+        import shutil
+        local_path = cloudinary_url.replace("local://", "")
+        if os.path.exists(local_path):
+            try:
+                shutil.copy(local_path, destination)
+                return
+            except Exception as exc:
+                raise DocumentProcessingError(
+                    f"Failed to copy local file: {str(exc)}",
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                ) from exc
+        
+        filename = os.path.basename(local_path)
+        possible_path = UPLOAD_DIR / filename
+        if possible_path.exists():
+            try:
+                shutil.copy(possible_path, destination)
+                return
+            except Exception as exc:
+                raise DocumentProcessingError(
+                    f"Failed to copy local file from uploads: {str(exc)}",
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+                ) from exc
+
+        raise DocumentProcessingError(
+            f"Local file does not exist: {local_path}",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=DOWNLOAD_TIMEOUT_SECONDS,
+        ) as client:
+            async with client.stream("GET", cloudinary_url) as response:
+                response.raise_for_status()
+                async with aiofiles.open(destination, "wb") as output_file:
+                    async for chunk in response.aiter_bytes():
+                        if chunk:
+                            await output_file.write(chunk)
+    except httpx.HTTPStatusError as exc:
+        raise DocumentProcessingError(
+            f"Could not download file from Cloudinary (HTTP {exc.response.status_code}).",
+            status.HTTP_502_BAD_GATEWAY,
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise DocumentProcessingError(
+            "Could not download file from Cloudinary.",
+            status.HTTP_502_BAD_GATEWAY,
+        ) from exc
+
+
+async def extract_and_store_document_content(document: dict, file_path: Path) -> dict:
+    try:
+        extracted_text = extract_text(str(file_path), document["file_type"])
+    except FileNotFoundError as exc:
+        raise DocumentProcessingError(
+            "Could not find the file to extract text.",
+            status.HTTP_404_NOT_FOUND,
+        ) from exc
+    except ValueError as exc:
+        raise DocumentProcessingError(
+            str(exc),
+            status.HTTP_400_BAD_REQUEST,
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive catch for unexpected parser errors
+        raise DocumentProcessingError(
+            f"Could not read the {document['file_type'].upper()} file.",
+            status.HTTP_400_BAD_REQUEST,
+        ) from exc
+
+    try:
+        return await save_document_content(document, extracted_text)
+    except Exception as exc:
+        raise DocumentProcessingError(
+            "Failed to save extracted text to the database.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ) from exc
+
+
+async def fail_document_processing(document: dict, error_message: str) -> None:
+    short_error_message = error_message.strip()[:300]
+    now = datetime.now(timezone.utc)
+    document["status"] = "failed"
+    document["error_message"] = short_error_message
+    document["updated_at"] = now
+    try:
+        db = get_database()
+        await db["documents"].update_one(
+            {"_id": document["_id"]},
+            {
+                "$set": {
+                    "status": "failed",
+                    "error_message": short_error_message,
+                    "updated_at": now,
+                }
+            },
+        )
+    except Exception:
+        pass
+
+
+@router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Upload a document (PDF, DOCX, PPTX) up to 20MB.
-    Uploads to Cloudinary, extracts text contents, and updates status.
+    Upload a document, store metadata, and extract its text content without OCR.
     """
-    # 1. Validate file extension
-    filename = file.filename or "unnamed_file"
+    filename = Path(file.filename or "unnamed_file").name
     file_ext = filename.split(".")[-1].lower() if "." in filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only PDF, DOCX, and PPTX files are allowed. Got type: {file_ext}"
+            detail=f"Only PDF, DOCX, and PPTX files are allowed. Got type: {file_ext}",
         )
 
-    # 2. Setup local uploads folder
-    upload_dir = Path("uploads")
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    temp_filename = f"{uuid.uuid4()}_{filename}"
-    temp_file_path = upload_dir / temp_filename
-
-    # 3. Save file locally while verifying maximum size
+    temp_file_path = build_temp_file_path(filename)
     file_size = 0
+
     try:
-        async with aiofiles.open(temp_file_path, "wb") as out_file:
-            while chunk := await file.read(1024 * 1024):  # Read in 1MB chunks
+        async with aiofiles.open(temp_file_path, "wb") as output_file:
+            while chunk := await file.read(1024 * 1024):
                 file_size += len(chunk)
                 if file_size > MAX_FILE_SIZE:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="File size exceeds the limit of 20MB."
+                        detail="File size exceeds the limit of 20MB.",
                     )
-                await out_file.write(chunk)
+                await output_file.write(chunk)
     except HTTPException:
-        if temp_file_path.exists():
-            os.remove(temp_file_path)
+        cleanup_temp_file(temp_file_path)
         raise
-    except Exception as e:
-        if temp_file_path.exists():
-            os.remove(temp_file_path)
+    except Exception as exc:
+        cleanup_temp_file(temp_file_path)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save temporary file locally: {str(e)}"
-        )
+            detail=f"Failed to save temporary file locally: {str(exc)}",
+        ) from exc
 
-    # 4. Upload to Cloudinary
-    try:
-        upload_result = upload_file_to_cloudinary(str(temp_file_path), folder="documents")
-    except ValueError as val_err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(val_err)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to upload file to Cloudinary: {str(e)}"
-        )
-
-    # 5. Extract text content & cleanup local temp file
     db = get_database()
     now = datetime.now(timezone.utc)
-    document_id = str(ObjectId())  # Pre-generate document ID
-    
-    extracted_text = ""
-    status_str = "uploaded"
-    
-    try:
-        extracted_text = extract_text(str(temp_file_path), file_ext)
-        status_str = "processed"
-        
-        # Save extracted text to MongoDB document_contents
-        content_metadata = {
-            "document_id": document_id,
-            "user_id": current_user.id,
-            "extracted_text": extracted_text,
-            "created_at": now
-        }
-        await db["document_contents"].insert_one(content_metadata)
-    except Exception as extract_err:
-        status_str = "failed"
-        print(f"Extraction failed for document: {extract_err}")
-    finally:
-        # Clean up temporary file locally in any case
-        if temp_file_path.exists():
-            os.remove(temp_file_path)
+    document_id = ObjectId()
+    content_doc = None
+    metadata_saved = False
 
-    # 6. Save metadata to MongoDB
     document_metadata = {
-        "_id": ObjectId(document_id),
+        "_id": document_id,
         "user_id": current_user.id,
         "original_filename": filename,
         "file_type": file_ext,
         "file_size": file_size,
-        "cloudinary_url": upload_result["secure_url"],
-        "cloudinary_public_id": upload_result["public_id"],
-        "status": status_str,
+        "cloudinary_url": "",
+        "cloudinary_public_id": "",
+        "status": "uploaded",
+        "error_message": None,
         "created_at": now,
-        "updated_at": now
+        "updated_at": now,
     }
 
     try:
+        try:
+            upload_result = upload_file_to_cloudinary(str(temp_file_path), folder="documents")
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(exc),
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to upload file to Cloudinary: {str(exc)}",
+            ) from exc
+
+        document_metadata["cloudinary_url"] = upload_result.get("secure_url", "")
+        document_metadata["cloudinary_public_id"] = upload_result.get("public_id", "")
+
         await db["documents"].insert_one(document_metadata)
-    except Exception as e:
+        metadata_saved = True
+
+        try:
+            content_doc = await extract_and_store_document_content(document_metadata, temp_file_path)
+        except DocumentProcessingError as exc:
+            await fail_document_processing(document_metadata, exc.message)
+    except HTTPException:
+        cloudinary_public_id = document_metadata.get("cloudinary_public_id")
+        if cloudinary_public_id and not metadata_saved:
+            try:
+                delete_file_from_cloudinary(cloudinary_public_id)
+            except Exception:
+                pass
+        raise
+    except Exception as exc:
+        cloudinary_public_id = document_metadata.get("cloudinary_public_id")
+        if cloudinary_public_id and not metadata_saved:
+            try:
+                delete_file_from_cloudinary(cloudinary_public_id)
+            except Exception:
+                pass
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save document metadata to database: {str(e)}"
-        )
+            detail=f"Failed to save document metadata to database: {str(exc)}",
+        ) from exc
+    finally:
+        cleanup_temp_file(temp_file_path)
 
-    return DocumentResponse(
-        id=document_id,
+    return DocumentUploadResponse(
+        document_id=str(document_id),
         user_id=document_metadata["user_id"],
         original_filename=document_metadata["original_filename"],
         file_type=document_metadata["file_type"],
@@ -166,9 +423,12 @@ async def upload_document(
         cloudinary_url=document_metadata["cloudinary_url"],
         cloudinary_public_id=document_metadata["cloudinary_public_id"],
         status=document_metadata["status"],
+        error_message=document_metadata.get("error_message"),
+        text_length=content_doc.get("text_length") if content_doc else None,
         created_at=document_metadata["created_at"],
-        updated_at=document_metadata["updated_at"]
+        updated_at=document_metadata["updated_at"],
     )
+
 
 @router.get("", response_model=List[DocumentResponse])
 async def list_documents(current_user: UserResponse = Depends(get_current_user)):
@@ -177,219 +437,163 @@ async def list_documents(current_user: UserResponse = Depends(get_current_user))
     """
     db = get_database()
     documents = []
-    
+
     try:
-        cursor = db["documents"].find({"user_id": current_user.id})
-        async for doc in cursor:
-            documents.append(
-                DocumentResponse(
-                    id=str(doc["_id"]),
-                    user_id=doc["user_id"],
-                    original_filename=doc["original_filename"],
-                    file_type=doc["file_type"],
-                    file_size=doc["file_size"],
-                    cloudinary_url=doc["cloudinary_url"],
-                    cloudinary_public_id=doc["cloudinary_public_id"],
-                    status=doc.get("status", "uploaded"),
-                    created_at=doc["created_at"],
-                    updated_at=doc["updated_at"]
-                )
-            )
-    except Exception as e:
+        cursor = db["documents"].find({"user_id": current_user.id}).sort("created_at", -1)
+        async for document in cursor:
+            documents.append(serialize_document(document))
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch documents: {str(e)}"
-        )
+            detail=f"Failed to fetch documents: {str(exc)}",
+        ) from exc
 
     return documents
+
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: str,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Retrieve details of a single document metadata if the authenticated user is the owner.
+    Retrieve metadata of a document owned by the authenticated user.
     """
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
+    document = await get_owned_document(document_id, current_user)
+    return serialize_document(document)
 
+
+@router.post("/{document_id}/extract", response_model=DocumentExtractResponse, status_code=status.HTTP_200_OK)
+async def extract_document_content(
+    document_id: str,
+    force: bool = Query(False, description="Set true to re-extract text even if it is already processed."),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Download the uploaded file from Cloudinary when needed and extract text for the owner.
+    """
+    document = await get_owned_document(document_id, current_user)
     db = get_database()
+
+    existing_content = await db["document_contents"].find_one({"document_id": document_id})
+    if (
+        document.get("status") in ALREADY_EXTRACTED_STATUSES
+        and existing_content
+        and existing_content.get("extracted_text")
+        and not force
+    ):
+        return build_extract_response(
+            document,
+            message="Document text has already been extracted.",
+            text_length=existing_content.get("text_length"),
+        )
+
+    cloudinary_url = document.get("cloudinary_url")
+    if not cloudinary_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cloudinary URL is missing for this document.",
+        )
+
+    temp_file_path = build_temp_file_path(document["original_filename"])
+
     try:
-        doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve document: {str(e)}"
-        )
+        await download_document_to_tempfile(cloudinary_url, temp_file_path)
+        content_doc = await extract_and_store_document_content(document, temp_file_path)
+    except DocumentProcessingError as exc:
+        await fail_document_processing(document, exc.message)
+        raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
+    finally:
+        cleanup_temp_file(temp_file_path)
 
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
-        )
-
-    return DocumentResponse(
-        id=str(doc["_id"]),
-        user_id=doc["user_id"],
-        original_filename=doc["original_filename"],
-        file_type=doc["file_type"],
-        file_size=doc["file_size"],
-        cloudinary_url=doc["cloudinary_url"],
-        cloudinary_public_id=doc["cloudinary_public_id"],
-        status=doc.get("status", "uploaded"),
-        created_at=doc["created_at"],
-        updated_at=doc["updated_at"]
+    return build_extract_response(
+        document,
+        message="Document text extracted successfully.",
+        text_length=content_doc.get("text_length"),
     )
+
 
 @router.get("/{document_id}/content", response_model=DocumentContentResponse)
 async def get_document_content(
     document_id: str,
-    current_user: UserResponse = Depends(get_current_user)
+    full_text: bool = Query(False, description="Set true to include the full extracted text."),
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Retrieve full extracted text of a document. Enforces ownership check.
+    Retrieve extracted content for a document. Returns preview by default to avoid huge payloads.
     """
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
+    document = await get_owned_document(document_id, current_user)
     db = get_database()
-    doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
-        )
-
     content_doc = await db["document_contents"].find_one({"document_id": document_id})
-    if not content_doc:
+
+    if not content_doc or not content_doc.get("extracted_text"):
+        if document.get("status") == "failed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=document.get("error_message") or "Text extraction failed for this document.",
+            )
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Extracted content not found or parsing failed for this document."
+            detail="Extracted content not found for this document.",
         )
 
-    return DocumentContentResponse(
-        document_id=document_id,
-        filename=doc.get("original_filename", ""),
-        extracted_text=content_doc.get("extracted_text", "")
-    )
+    return build_content_response(document, content_doc, include_full_text=full_text)
+
 
 @router.post("/{document_id}/index", status_code=status.HTTP_200_OK)
 async def index_document_api(
     document_id: str,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Splits the extracted document text into chunks, indexes them into vector storage and MongoDB,
-    and transitions the document state to "indexed".
+    Split extracted text into chunks, index them into vector storage, and mark the document as indexed.
     """
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
+    document = await get_owned_document(document_id, current_user)
     db = get_database()
-    doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
-        )
-
     content_doc = await db["document_contents"].find_one({"document_id": document_id})
+
     if not content_doc or not content_doc.get("extracted_text"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No extracted text found for this document. Please upload first or ensure parsing succeeded."
+            detail="No extracted text found for this document. Please upload first or ensure parsing succeeded.",
         )
 
-    # 1. Clean and split text into chunks
     raw_text = content_doc["extracted_text"]
     chunks = split_text_into_chunks(raw_text)
     if not chunks:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No text chunks could be generated from this document."
+            detail="No text chunks could be generated from this document.",
         )
 
-    # 2. Add chunks to vector database storage
     try:
         await add_document_chunks(document_id, current_user.id, chunks)
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add document chunks to index: {str(e)}"
-        )
+            detail=f"Failed to add document chunks to index: {str(exc)}",
+        ) from exc
 
-    # 3. Transition document status metadata
-    await db["documents"].update_one(
-        {"_id": ObjectId(document_id)},
-        {
-            "$set": {
-                "status": "indexed",
-                "updated_at": datetime.now(timezone.utc)
-            }
-        }
-    )
+    await update_document_status(document, status_value="indexed", error_message=None)
 
     return {
         "status": "indexed",
         "message": f"Successfully split and indexed {len(chunks)} chunks.",
-        "chunk_count": len(chunks)
+        "chunk_count": len(chunks),
     }
+
 
 @router.get("/{document_id}/chunks", response_model=List[ChunkResponse])
 async def get_document_chunks(
     document_id: str,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Retrieve list of raw chunks stored in database for the given document.
+    Retrieve raw text chunks stored in the database for the given document.
     """
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
+    await get_owned_document(document_id, current_user)
     db = get_database()
-    doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
-        )
 
     chunks = []
     cursor = db["document_chunks"].find({"document_id": document_id}).sort("chunk_index", 1)
@@ -399,59 +603,42 @@ async def get_document_chunks(
                 id=str(chunk["_id"]),
                 document_id=chunk["document_id"],
                 chunk_index=chunk["chunk_index"],
-                content=chunk["content"]
+                content=chunk["content"],
             )
         )
     return chunks
+
 
 @router.post("/{document_id}/search", response_model=List[SearchResultItem])
 async def search_document_chunks(
     document_id: str,
     payload: SearchRequest,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Search relevant semantic chunks within the target document using cosine vector similarity.
+    Search relevant semantic chunks within the target document using vector similarity.
     """
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    db = get_database()
-    doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
-        )
+    await get_owned_document(document_id, current_user)
 
     try:
         results = await search_relevant_chunks(
             document_id=document_id,
             user_id=current_user.id,
             query=payload.query,
-            n_results=payload.n_results
+            n_results=payload.n_results,
         )
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Semantic RAG search failed: {str(e)}"
-        )
+            detail=f"Semantic RAG search failed: {str(exc)}",
+        ) from exc
 
     return [
         SearchResultItem(
             id=item["id"],
             text=item["text"],
             metadata=item["metadata"],
-            distance=item["distance"]
+            distance=item["distance"],
         )
         for item in results
     ]

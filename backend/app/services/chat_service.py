@@ -31,7 +31,7 @@ async def ask_document_question(document_id: str, user_id: str, question: str) -
     and registers the interaction in the MongoDB 'chat_messages' collection.
     """
     # 1. Search relevant chunks using RAG
-    relevant_chunks = search_relevant_chunks(document_id, user_id, question, n_results=5)
+    relevant_chunks = await search_relevant_chunks(document_id, user_id, question, n_results=5)
     
     # Fallback to MongoDB direct lookup if ChromaDB did not index or returned empty
     if not relevant_chunks:

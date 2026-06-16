@@ -1,4 +1,5 @@
 import client from './client';
+import { buildApiUrl } from '../config/api';
 
 export interface QuestionItem {
   question: string;
@@ -44,12 +45,10 @@ export const questionApi = {
   },
 
   exportDocxUrl: (id: string): string => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-    return `${baseUrl}/api/v1/questions/${id}/export/docx`;
+    return buildApiUrl(`/api/v1/questions/${id}/export/docx`);
   },
 
   exportPdfUrl: (id: string): string => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-    return `${baseUrl}/api/v1/questions/${id}/export/pdf`;
+    return buildApiUrl(`/api/v1/questions/${id}/export/pdf`);
   },
 };

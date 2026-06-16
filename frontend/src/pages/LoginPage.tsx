@@ -63,8 +63,9 @@ const LoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Email đăng nhập</label>
+            <label htmlFor="login-email" style={styles.label}>Email đăng nhập</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -76,8 +77,9 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>Mật khẩu</label>
+            <label htmlFor="login-password" style={styles.label}>Mật khẩu</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
