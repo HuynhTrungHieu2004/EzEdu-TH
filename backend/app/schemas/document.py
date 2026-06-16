@@ -10,6 +10,8 @@ class DocumentMetadataBase(BaseModel):
     file_size: int
     cloudinary_url: str
     cloudinary_public_id: str
+    cloudinary_resource_type: str = "raw"
+    media_kind: str = "document"
     status: str = "uploaded"
     error_message: Optional[str] = None
     created_at: datetime

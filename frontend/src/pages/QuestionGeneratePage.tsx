@@ -112,7 +112,7 @@ const QuestionGeneratePage: React.FC = () => {
               <div style={styles.card}>
                 <h3 style={styles.cardTitle}>Cấu hình Ma trận đề thi</h3>
                 <p style={styles.cardSubtitle}>
-                  Tạo các câu hỏi kiểm tra năng lực bám sát nội dung của tài liệu: <strong>{document.original_filename}</strong>.
+                  Tạo các câu hỏi kiểm tra năng lực bám sát nội dung của {document.media_kind === 'video' ? 'video' : 'tài liệu'}: <strong>{document.original_filename}</strong>.
                 </p>
 
                 <form onSubmit={handleGenerate} style={styles.form}>

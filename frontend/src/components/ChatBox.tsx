@@ -1,149 +1,144 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { chatApi } from '../api/chatApi';
-import type { ChatAskResponse } from '../api/chatApi';
+import type { ChatMessageResponse } from '../api/chatApi';
 
 interface ChatBoxProps {
   documentId: string;
 }
 
 const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
-  const [messages, setMessages] = useState<ChatAskResponse[]>([]);
-  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchHistory = async () => {
+      setLoadingHistory(true);
+      setError(null);
       try {
         const history = await chatApi.getHistory(documentId);
         setMessages(history);
-      } catch (err) {
-        console.error('Failed to load chat history:', err);
+      } catch (err: any) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('access_token');
+          navigate('/login');
+          return;
+        }
+        const detail = err.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Không thể tải lịch sử hỏi đáp.');
+      } finally {
+        setLoadingHistory(false);
       }
     };
-    
+
     fetchHistory();
-  }, [documentId]);
+  }, [documentId, navigate]);
 
   useEffect(() => {
-    // Scroll to bottom
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!question.trim() || loading) {
+      return;
+    }
 
-    const userQuery = input.trim();
-    setInput('');
+    const userQuestion = question.trim();
+    setQuestion('');
     setLoading(true);
     setError(null);
 
-    // Append temporary message for optimistic UI response
-    const tempUserMsg: ChatAskResponse = {
-      id: `temp_${Date.now()}`,
-      question: userQuery,
-      answer: '',
-      sources: [],
-      created_at: new Date().toISOString(),
-    };
-    
-    // We add user's query block
-    setMessages((prev) => [...prev, tempUserMsg]);
-
     try {
-      const response = await chatApi.ask(documentId, userQuery);
-      // Replace temporary message with actual response
-      setMessages((prev) => 
-        prev.map((m) => (m.id === tempUserMsg.id ? response : m))
-      );
+      const response = await chatApi.ask(documentId, userQuestion);
+      setMessages((prev) => [...prev, response]);
     } catch (err: any) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('access_token');
+        navigate('/login');
+        return;
+      }
       const detail = err.response?.data?.detail;
-      setError(
-        typeof detail === 'string'
-          ? detail
-          : 'Hỏi đáp thất bại. Hãy chắc chắn tài liệu của bạn đã được Index.'
-      );
-      // Remove temporary message on error
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      setError(typeof detail === 'string' ? detail : 'Không thể gửi câu hỏi lúc này.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.chatWrapper}>
-      <div style={styles.chatHeader}>
-        <span style={styles.headerIcon}>💬</span>
-        <strong>Trợ Lý AI Hỏi Đáp Học Liệu (RAG Chat)</strong>
+    <div style={styles.wrapper}>
+      <div style={styles.header}>
+        <div>
+          <h4 style={styles.title}>Hỏi đáp với tài liệu</h4>
+          <p style={styles.subtitle}>
+            Hệ thống sẽ truy xuất các đoạn liên quan trong tài liệu đã index rồi mới trả lời bằng AI.
+          </p>
+        </div>
       </div>
 
-      <div style={styles.messageList}>
-        {messages.length === 0 && !loading && (
-          <div style={styles.emptyState}>
-            Chưa có tin nhắn nào. Hãy hỏi bất kỳ câu hỏi nào liên quan đến tài liệu này!
-          </div>
-        )}
+      <div style={styles.history}>
+        {loadingHistory ? (
+          <p style={styles.placeholder}>Đang tải lịch sử hỏi đáp...</p>
+        ) : messages.length === 0 ? (
+          <p style={styles.placeholder}>Chưa có câu hỏi nào. Hãy bắt đầu với một câu hỏi liên quan đến tài liệu này.</p>
+        ) : (
+          messages.map((message) => (
+            <div key={message.id} style={styles.messageGroup}>
+              <div style={styles.userBubble}>
+                <div style={styles.label}>Bạn hỏi</div>
+                <div style={styles.messageText}>{message.question}</div>
+              </div>
 
-        {messages.map((msg) => (
-          <div key={msg.id} style={styles.msgGroup}>
-            {/* User message */}
-            <div style={styles.userBubble}>
-              <div style={styles.sender}>Bạn</div>
-              <div style={styles.text}>{msg.question}</div>
-            </div>
+              <div style={styles.answerCard}>
+                <div style={styles.labelAnswer}>Trợ lý học tập</div>
+                <div style={styles.messageText}>{message.answer}</div>
 
-            {/* AI Response */}
-            {msg.answer && (
-              <div style={styles.aiBubble}>
-                <div style={styles.senderAI}>Trợ Lý AI</div>
-                <div style={styles.text}>{msg.answer}</div>
-                
-                {/* Source trace items */}
-                {msg.sources && msg.sources.length > 0 && (
-                  <div style={styles.sourcesBox}>
-                    <div style={styles.sourcesHeader}>📌 Trích đoạn ngữ cảnh tham chiếu:</div>
-                    {msg.sources.map((src, sIdx) => (
-                      <div key={sIdx} style={styles.sourceItem}>
-                        <strong>Trích đoạn {src.chunk_index !== null ? src.chunk_index + 1 : sIdx + 1}:</strong> "{src.text}"
+                {message.source_chunks.length > 0 && (
+                  <div style={styles.sourcesBlock}>
+                    <div style={styles.sourcesTitle}>Nguồn tham chiếu</div>
+                    {message.source_chunks.map((source, index) => (
+                      <div key={`${message.id}-${index}`} style={styles.sourceItem}>
+                        <strong>
+                          Đoạn {source.chunk_index !== null && source.chunk_index !== undefined ? source.chunk_index + 1 : index + 1}
+                        </strong>
+                        <span style={styles.sourceText}>{source.text}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          ))
+        )}
 
         {loading && (
-          <div style={styles.aiBubble}>
-            <div style={styles.senderAI}>Trợ Lý AI</div>
-            <div style={styles.typingIndicator}>
-              <span style={styles.dot}>.</span>
-              <span style={styles.dot}>.</span>
-              <span style={styles.dot}>.</span>
-              <span style={styles.typingText}>AI đang suy nghĩ và tìm kiếm câu trả lời...</span>
-            </div>
+          <div style={styles.answerCard}>
+            <div style={styles.labelAnswer}>Trợ lý học tập</div>
+            <div style={styles.messageText}>Đang truy xuất nội dung tài liệu và soạn câu trả lời...</div>
           </div>
         )}
 
-        {error && <div style={styles.errorAlert}>{error}</div>}
-        <div ref={chatEndRef} />
+        {error && <div style={styles.error}>{error}</div>}
+        <div ref={endRef} />
       </div>
 
-      <form onSubmit={handleSend} style={styles.inputArea}>
+      <form onSubmit={handleSubmit} style={styles.form}>
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Nhập câu hỏi từ tài liệu học tập..."
-          disabled={loading}
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Nhập câu hỏi liên quan đến nội dung tài liệu..."
           style={styles.input}
+          disabled={loading}
         />
-        <button type="submit" disabled={!input.trim() || loading} style={styles.sendButton}>
-          Gửi
+        <button type="submit" disabled={!question.trim() || loading} style={styles.button}>
+          {loading ? 'Đang gửi...' : 'Gửi câu hỏi'}
         </button>
       </form>
     </div>
@@ -151,160 +146,149 @@ const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
 };
 
 const styles = {
-  chatWrapper: {
+  wrapper: {
     border: '1px solid var(--border)',
-    borderRadius: '12px',
+    borderRadius: '16px',
     backgroundColor: 'var(--bg)',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '520px',
     boxShadow: 'var(--shadow)',
     overflow: 'hidden',
   },
-  chatHeader: {
-    padding: '16px 20px',
-    backgroundColor: 'var(--accent-bg)',
-    borderBottom: '1px solid var(--accent-border)',
-    color: 'var(--text-h)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    fontSize: '15px',
+  header: {
+    padding: '20px 24px 12px',
+    borderBottom: '1px solid var(--border)',
   },
-  headerIcon: {
+  title: {
+    margin: 0,
     fontSize: '18px',
+    fontWeight: '600',
+    color: 'var(--text-h)',
   },
-  messageList: {
-    flexGrow: 1,
-    overflowY: 'auto' as const,
-    padding: '20px',
+  subtitle: {
+    margin: '8px 0 0',
+    fontSize: '14px',
+    lineHeight: 1.5,
+    color: 'var(--text)',
+  },
+  history: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '20px',
+    gap: '16px',
+    padding: '20px 24px',
+    maxHeight: '560px',
+    overflowY: 'auto' as const,
+    backgroundColor: 'var(--bg)',
   },
-  emptyState: {
-    textAlign: 'center' as const,
-    color: 'var(--text)',
+  placeholder: {
+    margin: 0,
     fontSize: '14px',
-    marginTop: '60px',
-    fontStyle: 'italic',
+    lineHeight: 1.6,
+    color: 'var(--text)',
   },
-  msgGroup: {
+  messageGroup: {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '12px',
   },
   userBubble: {
     alignSelf: 'flex-end',
+    maxWidth: '85%',
+    padding: '14px 16px',
+    borderRadius: '16px 16px 4px 16px',
     backgroundColor: 'var(--accent)',
     color: '#fff',
-    padding: '12px 16px',
-    borderRadius: '16px 16px 0 16px',
-    maxWidth: '85%',
-    marginLeft: 'auto',
-    textAlign: 'left' as const,
   },
-  aiBubble: {
+  answerCard: {
     alignSelf: 'flex-start',
+    maxWidth: '92%',
+    padding: '14px 16px',
+    borderRadius: '16px 16px 16px 4px',
+    border: '1px solid var(--border)',
     backgroundColor: 'var(--code-bg)',
     color: 'var(--text-h)',
-    padding: '12px 16px',
-    borderRadius: '16px 16px 16px 0',
-    maxWidth: '85%',
-    marginRight: 'auto',
-    textAlign: 'left' as const,
-    border: '1px solid var(--border)',
   },
-  sender: {
+  label: {
     fontSize: '11px',
-    fontWeight: 'bold',
-    opacity: 0.8,
-    marginBottom: '4px',
+    fontWeight: '700',
+    marginBottom: '6px',
+    opacity: 0.9,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.6px',
   },
-  senderAI: {
+  labelAnswer: {
     fontSize: '11px',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    marginBottom: '6px',
     color: 'var(--accent)',
-    marginBottom: '4px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.6px',
   },
-  text: {
+  messageText: {
     fontSize: '14px',
-    lineHeight: '1.5',
+    lineHeight: 1.65,
     whiteSpace: 'pre-wrap' as const,
   },
-  sourcesBox: {
+  sourcesBlock: {
     marginTop: '12px',
-    paddingTop: '10px',
+    paddingTop: '12px',
     borderTop: '1px dashed var(--border)',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '6px',
+    gap: '8px',
   },
-  sourcesHeader: {
+  sourcesTitle: {
     fontSize: '12px',
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: 'var(--text)',
   },
   sourceItem: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+    padding: '10px 12px',
+    borderRadius: '10px',
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--border)',
     fontSize: '12px',
     color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid var(--border)',
-    lineHeight: '1.4',
-    fontStyle: 'italic',
   },
-  typingIndicator: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
+  sourceText: {
+    lineHeight: 1.55,
   },
-  dot: {
-    animation: 'spin 1s infinite',
-    fontSize: '20px',
-    lineHeight: '1',
-  },
-  typingText: {
-    fontSize: '13px',
-    color: 'var(--text)',
-    marginLeft: '8px',
-  },
-  errorAlert: {
-    padding: '10px 14px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    color: '#ef4444',
-    borderRadius: '6px',
-    fontSize: '13px',
-    textAlign: 'center' as const,
-  },
-  inputArea: {
-    padding: '16px 20px',
-    borderTop: '1px solid var(--border)',
+  form: {
     display: 'flex',
     gap: '12px',
+    padding: '16px 24px 24px',
+    borderTop: '1px solid var(--border)',
     backgroundColor: 'var(--bg)',
   },
   input: {
-    flexGrow: 1,
-    padding: '12px 16px',
-    fontSize: '14px',
-    borderRadius: '8px',
+    flex: 1,
+    minWidth: 0,
+    padding: '12px 14px',
+    borderRadius: '10px',
     border: '1px solid var(--border)',
     backgroundColor: 'var(--bg)',
     color: 'var(--text-h)',
-    outline: 'none',
+    fontSize: '14px',
   },
-  sendButton: {
-    padding: '12px 24px',
+  button: {
+    padding: '12px 18px',
+    borderRadius: '10px',
+    border: 'none',
+    backgroundColor: 'var(--accent)',
+    color: '#fff',
     fontSize: '14px',
     fontWeight: '600',
-    color: '#fff',
-    backgroundColor: 'var(--accent)',
-    border: 'none',
-    borderRadius: '8px',
     cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  error: {
+    padding: '12px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    color: '#ef4444',
+    fontSize: '14px',
   },
 };
 

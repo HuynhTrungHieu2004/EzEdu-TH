@@ -8,7 +8,10 @@ export interface DocumentResponse {
   file_size: number;
   cloudinary_url: string;
   cloudinary_public_id: string;
+  cloudinary_resource_type?: string;
+  media_kind?: 'document' | 'video';
   status: string;
+  error_message?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,9 +24,23 @@ export interface DocumentUploadResponse {
   file_size: number;
   cloudinary_url: string;
   cloudinary_public_id: string;
+  cloudinary_resource_type?: string;
+  media_kind?: 'document' | 'video';
   status: string;
+  error_message?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DocumentContentResponse {
+  document_id: string;
+  original_filename: string;
+  filename: string;
+  file_type: string;
+  status: string;
+  preview: string;
+  extracted_text?: string | null;
+  text_length: number;
 }
 
 export interface ChunkResponse {
@@ -31,6 +48,8 @@ export interface ChunkResponse {
   document_id: string;
   chunk_index: number;
   content: string;
+  text_preview?: string;
+  created_at?: string;
 }
 
 export interface SearchResultItem {
@@ -39,6 +58,8 @@ export interface SearchResultItem {
   metadata: {
     chunk_index: number;
     document_id: string;
+    text_preview?: string;
+    created_at?: string;
   };
   distance: number;
 }
@@ -54,8 +75,15 @@ export const documentApi = {
     return response.data;
   },
 
-  getContent: async (id: string): Promise<{ document_id: string; filename: string; extracted_text: string }> => {
-    const response = await client.get<{ document_id: string; filename: string; extracted_text: string }>(`/documents/${id}/content`);
+  getContent: async (id: string): Promise<DocumentContentResponse> => {
+    const response = await client.get<DocumentContentResponse>(`/documents/${id}/content`, {
+      params: { full_text: true },
+    });
+    return response.data;
+  },
+
+  extract: async (id: string): Promise<{ status: string; message: string; text_length?: number }> => {
+    const response = await client.post<{ status: string; message: string; text_length?: number }>(`/documents/${id}/extract`);
     return response.data;
   },
 
@@ -85,6 +113,16 @@ export const documentApi = {
       query,
       n_results: nResults,
     });
+    return response.data;
+  },
+
+  transcribe: async (id: string): Promise<{ status: string; message: string }> => {
+    const response = await client.post<{ status: string; message: string }>(`/documents/${id}/transcribe`);
+    return response.data;
+  },
+
+  getTranscript: async (id: string): Promise<DocumentContentResponse> => {
+    const response = await client.get<DocumentContentResponse>(`/documents/${id}/transcript`);
     return response.data;
   },
 };

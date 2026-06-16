@@ -9,6 +9,8 @@ const QuestionSetDetailPage: React.FC = () => {
   const [questionSet, setQuestionSet] = useState<QuestionSetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [downloadingFormat, setDownloadingFormat] = useState<'docx' | 'pdf' | null>(null);
 
   const navigate = useNavigate();
 
@@ -25,6 +27,7 @@ const QuestionSetDetailPage: React.FC = () => {
       try {
         const response = await questionApi.get(questionSetId);
         setQuestionSet(response);
+        setActionError(null);
       } catch (err: any) {
         if (err.response?.status === 401) {
           localStorage.removeItem('access_token');
@@ -39,6 +42,45 @@ const QuestionSetDetailPage: React.FC = () => {
 
     fetchData();
   }, [questionSetId, navigate]);
+
+  const handleExport = async (format: 'docx' | 'pdf') => {
+    if (!questionSet) {
+      return;
+    }
+
+    setActionError(null);
+    setDownloadingFormat(format);
+
+    try {
+      if (format === 'docx') {
+        await questionApi.downloadDocx(questionSet.id);
+      } else {
+        await questionApi.downloadPdf(questionSet.id);
+      }
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('access_token');
+        navigate('/login');
+        return;
+      }
+
+      if (err.response?.data instanceof Blob) {
+        try {
+          const payload = JSON.parse(await err.response.data.text());
+          const detail = payload?.detail;
+          setActionError(typeof detail === 'string' ? detail : 'Xuất file thất bại.');
+          return;
+        } catch {
+          // Fall through to the generic message below.
+        }
+      }
+
+      const detail = err.response?.data?.detail;
+      setActionError(typeof detail === 'string' ? detail : 'Xuất file thất bại. Hãy thử lại sau.');
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -73,26 +115,28 @@ const QuestionSetDetailPage: React.FC = () => {
             </button>
 
             <div style={styles.exportButtons}>
-              <a
-                href={questionApi.exportDocxUrl(questionSet.id)}
-                target="_blank"
-                rel="noreferrer"
-                style={{ ...styles.exportLink, backgroundColor: '#2b6cb0' }}
+              <button
+                type="button"
+                onClick={() => handleExport('docx')}
+                disabled={downloadingFormat !== null}
+                style={{ ...styles.exportButton, backgroundColor: '#2b6cb0' }}
               >
-                📥 Tải xuống đề Microsoft Word (.docx)
-              </a>
-              
-              <a
-                href={questionApi.exportPdfUrl(questionSet.id)}
-                target="_blank"
-                rel="noreferrer"
-                style={{ ...styles.exportLink, backgroundColor: '#c53030' }}
+                {downloadingFormat === 'docx' ? 'Đang tạo DOCX...' : '📥 Tải DOCX'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExport('pdf')}
+                disabled={downloadingFormat !== null}
+                style={{ ...styles.exportButton, backgroundColor: '#c53030' }}
               >
-                📥 Tải xuống đề PDF (.pdf)
-              </a>
+                {downloadingFormat === 'pdf' ? 'Đang tạo PDF...' : '📥 Tải PDF'}
+              </button>
             </div>
           </div>
         )}
+
+        {actionError && <div style={styles.errorAlert}>{actionError}</div>}
 
         {/* Metadata Header */}
         {questionSet && (
@@ -259,14 +303,17 @@ const styles = {
     gap: '12px',
     flexWrap: 'wrap' as const,
   },
-  exportLink: {
+  exportButton: {
     padding: '10px 16px',
     fontSize: '13px',
     fontWeight: '600',
     color: '#fff',
     borderRadius: '6px',
-    textDecoration: 'none',
-    display: 'inline-block',
+    border: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   errorAlert: {
     padding: '12px 16px',

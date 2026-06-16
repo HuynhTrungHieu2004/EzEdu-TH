@@ -26,8 +26,8 @@ def configure_cloudinary():
         secure=True
     )
 
-def upload_file_to_cloudinary(file_path: str, folder: str = "documents") -> dict:
-    """Uploads a local file to Cloudinary with resource_type='auto' to support PDF, DOCX, PPTX"""
+def upload_file_to_cloudinary(file_path: str, folder: str = "documents", resource_type: str = "auto") -> dict:
+    """Uploads a local file to Cloudinary with specified resource_type"""
     if not is_cloudinary_configured():
         # Fallback to local storage
         target_dir = Path(file_path).parent
@@ -42,14 +42,15 @@ def upload_file_to_cloudinary(file_path: str, folder: str = "documents") -> dict
         
         return {
             "secure_url": f"local://{persisted_path.resolve()}",
-            "public_id": f"local_{persisted_filename}"
+            "public_id": f"local_{persisted_filename}",
+            "resource_type": "video" if resource_type == "video" else "raw"
         }
 
     configure_cloudinary()
     response = cloudinary.uploader.upload(
         file_path,
         folder=folder,
-        resource_type="auto"
+        resource_type=resource_type
     )
     return response
 

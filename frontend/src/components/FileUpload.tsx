@@ -19,18 +19,29 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       const selectedFile = e.target.files[0];
       
       // Validate format
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase();
-      if (ext !== 'pdf' && ext !== 'docx' && ext !== 'pptx') {
-        setError('Hệ thống chỉ hỗ trợ định dạng tệp .pdf, .docx, .pptx.');
+      const docExts = ['pdf', 'docx', 'pptx'];
+      const videoExts = ['mp4', 'mov', 'webm', 'mkv'];
+      const ext = selectedFile.name.split('.').pop()?.toLowerCase() || '';
+      
+      if (!docExts.includes(ext) && !videoExts.includes(ext)) {
+        setError('Hệ thống chỉ hỗ trợ các định dạng .pdf, .docx, .pptx, .mp4, .mov, .webm, .mkv.');
         setFile(null);
         return;
       }
 
-      // Validate size (20MB)
-      if (selectedFile.size > 20 * 1024 * 1024) {
-        setError('Dung lượng tệp vượt quá giới hạn cho phép (20MB).');
-        setFile(null);
-        return;
+      // Validate size based on media kind
+      if (docExts.includes(ext)) {
+        if (selectedFile.size > 20 * 1024 * 1024) {
+          setError('Dung lượng tệp tài liệu vượt quá giới hạn cho phép (20MB).');
+          setFile(null);
+          return;
+        }
+      } else if (videoExts.includes(ext)) {
+        if (selectedFile.size > 100 * 1024 * 1024) {
+          setError('Dung lượng tệp video vượt quá giới hạn cho phép (100MB).');
+          setFile(null);
+          return;
+        }
       }
 
       setFile(selectedFile);
@@ -73,7 +84,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
             ref={inputRef}
             type="file"
             onChange={handleFileChange}
-            accept=".pdf,.docx,.pptx"
+            accept=".pdf,.docx,.pptx,.mp4,.mov,.webm,.mkv"
             disabled={loading}
             id="file-upload-input"
             style={styles.fileInput}
@@ -81,10 +92,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
           <label htmlFor="file-upload-input" style={styles.uploadLabel}>
             <div style={styles.icon}>📁</div>
             <div style={styles.labelTitle}>
-              {file ? file.name : 'Nhấp để chọn tài liệu hoặc kéo thả tệp vào đây'}
+              {file ? file.name : 'Nhấp để chọn học liệu hoặc kéo thả tệp vào đây'}
             </div>
             <div style={styles.labelSubtitle}>
-              Hỗ trợ định dạng PDF, DOCX, PPTX (Tối đa 20MB)
+              Hỗ trợ PDF, DOCX, PPTX (Tối đa 20MB) & MP4, MOV, WEBM, MKV (Tối đa 100MB)
             </div>
           </label>
         </div>

@@ -1,105 +1,222 @@
+import hashlib
+import logging
+import math
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+
+import chromadb
 import numpy as np
+
+from app.core.config import settings
 from app.database.mongodb import get_database
 from app.services.llm_service import get_embedding, get_embeddings
 
+logger = logging.getLogger(__name__)
+
+COLLECTION_NAME = "document_chunks"
+EMBEDDING_DIMENSION = 384
+TEXT_PREVIEW_LENGTH = 180
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+
+def _resolve_chroma_persist_dir() -> Path:
+    persist_dir = Path(settings.CHROMA_PERSIST_DIR or "./chroma_db")
+    if not persist_dir.is_absolute():
+        persist_dir = BACKEND_DIR / persist_dir
+    persist_dir.mkdir(parents=True, exist_ok=True)
+    return persist_dir
+
+
 def init_chroma_client():
-    """Fallback mock client to comply with settings configurations"""
-    return None
+    """Initialize the persistent ChromaDB client and create the storage directory if needed."""
+    return chromadb.PersistentClient(path=str(_resolve_chroma_persist_dir()))
+
+
+def _managed_collection_names(client) -> list[str]:
+    names: list[str] = []
+    for collection in client.list_collections():
+        collection_name = getattr(collection, "name", str(collection))
+        if collection_name == COLLECTION_NAME or collection_name.startswith(f"{COLLECTION_NAME}_"):
+            names.append(collection_name)
+    return names
+
+
+def _build_collection_name(source: str, dimension: int) -> str:
+    safe_source = re.sub(r"[^a-z0-9]+", "_", source.lower()).strip("_") or "unknown"
+    return f"{COLLECTION_NAME}_{safe_source}_{dimension}d"
+
+
+def _get_collection(source: str, dimension: int):
+    client = init_chroma_client()
+    return client.get_or_create_collection(
+        name=_build_collection_name(source, dimension),
+        metadata={"hnsw:space": "cosine"},
+    )
+
+
+def _delete_document_vectors(client, document_id: str, user_id: str) -> None:
+    owner_filter = _build_owner_filter(document_id, user_id)
+    for collection_name in _managed_collection_names(client):
+        try:
+            client.get_collection(collection_name).delete(where=owner_filter)
+        except Exception as exc:
+            logger.warning("Failed to clean vectors from collection %s: %s", collection_name, exc.__class__.__name__)
+
+
+def _build_owner_filter(document_id: str, user_id: str) -> dict:
+    return {"$and": [{"document_id": document_id}, {"user_id": user_id}]}
+
+
+def _normalize_vector(vector: list[float]) -> list[float]:
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return vector
+    return [value / norm for value in vector]
+
+
+def _local_hash_embedding(text: str, dimension: int = EMBEDDING_DIMENSION) -> list[float]:
+    """Generate a deterministic local embedding so indexing/search still works without external AI."""
+    vector = np.zeros(dimension, dtype=np.float32)
+    tokens = re.findall(r"\w+", text.lower())
+    if not tokens:
+        return vector.tolist()
+
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % dimension
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        weight = 1.0 + (digest[5] / 255.0)
+        vector[index] += sign * weight
+
+    norm = np.linalg.norm(vector)
+    if norm != 0:
+        vector = vector / norm
+    return vector.astype(float).tolist()
+
+
+def _local_hash_embeddings(texts: list[str]) -> list[list[float]]:
+    return [_local_hash_embedding(text) for text in texts]
+
+
+def _build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
+    if not texts:
+        return "local", []
+
+    if settings.GEMINI_API_KEY:
+        try:
+            return "gemini", [_normalize_vector(embedding) for embedding in get_embeddings(texts)]
+        except Exception as exc:
+            logger.warning("Falling back to local embeddings because Gemini embeddings failed: %s", exc.__class__.__name__)
+
+    return "local", _local_hash_embeddings(texts)
+
+
+def _build_query_embedding(text: str) -> tuple[str, list[float]]:
+    if settings.GEMINI_API_KEY:
+        try:
+            return "gemini", _normalize_vector(get_embedding(text))
+        except Exception as exc:
+            logger.warning("Falling back to local query embedding because Gemini query embedding failed: %s", exc.__class__.__name__)
+
+    return "local", _local_hash_embedding(text)
+
 
 async def add_document_chunks(document_id: str, user_id: str, chunks: list[str]):
     """
-    Computes text embeddings via the Gemini API, then saves the chunks
-    along with their vectors directly into MongoDB.
+    Persist chunk metadata in MongoDB and vector embeddings in ChromaDB.
     """
+    if not chunks:
+        return
+
     db = get_database()
-    
-    # 1. Fetch embeddings from Gemini API
-    try:
-        embeddings = get_embeddings(chunks)
-    except Exception as e:
-        print(f"Embedding generation error: {e}")
-        # Fallback to zero vectors in case of API failure
-        embeddings = [[0.0] * 768 for _ in chunks]
+    source, embeddings = _build_embeddings(chunks)
+    if not embeddings:
+        return
 
-    # 2. Structure MongoDB documents
+    dimension = len(embeddings[0]) if embeddings[0] else EMBEDDING_DIMENSION
+    client = init_chroma_client()
+    collection = _get_collection(source, dimension)
+    now = datetime.now(timezone.utc)
+
+    await db["document_chunks"].delete_many({"document_id": document_id, "user_id": user_id})
+    _delete_document_vectors(client, document_id, user_id)
+
     chunk_docs = []
-    for idx, chunk in enumerate(chunks):
-        chunk_docs.append({
-            "document_id": document_id,
-            "user_id": user_id,
-            "chunk_index": idx,
-            "content": chunk,
-            "embedding": embeddings[idx]
-        })
+    chroma_ids = []
+    chroma_metadatas = []
 
-    # 3. Save to database
-    await db["document_chunks"].delete_many({"document_id": document_id})
-    if chunk_docs:
-        await db["document_chunks"].insert_many(chunk_docs)
+    for index, chunk in enumerate(chunks):
+        chunk_id = f"{document_id}:{index}"
+        preview = chunk[:TEXT_PREVIEW_LENGTH]
+
+        chunk_docs.append(
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "chunk_index": index,
+                "text_preview": preview,
+                "content": chunk,
+                "created_at": now,
+            }
+        )
+        chroma_ids.append(chunk_id)
+        chroma_metadatas.append(
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "chunk_index": index,
+                "text_preview": preview,
+                "created_at": now.isoformat(),
+            }
+        )
+
+    collection.upsert(
+        ids=chroma_ids,
+        documents=chunks,
+        embeddings=embeddings,
+        metadatas=chroma_metadatas,
+    )
+    await db["document_chunks"].insert_many(chunk_docs)
+
 
 async def search_relevant_chunks(document_id: str, user_id: str, query: str, n_results: int = 5) -> list[dict]:
     """
-    Performs a vector search across document chunks stored in MongoDB by
-    calculating cosine similarity with the query vector embedding.
+    Search relevant chunks for a document/user pair from ChromaDB.
     """
-    db = get_database()
-    
-    # 1. Retrieve all chunks belonging to the document
-    cursor = db["document_chunks"].find({"document_id": document_id})
-    db_chunks = [doc async for doc in cursor]
-    if not db_chunks:
+    if not query.strip():
         return []
 
-    # 2. Embed the query text
-    try:
-        query_vector = get_embedding(query)
-    except Exception as e:
-        print(f"Query embedding generation error: {e}")
-        # Fallback: return the first few chunks directly
-        results = []
-        for c in db_chunks[:n_results]:
-            results.append({
-                "id": str(c["_id"]),
-                "text": c["content"],
-                "metadata": {"chunk_index": c["chunk_index"], "document_id": document_id},
-                "distance": 1.0
-            })
-        return results
+    source, query_embedding = _build_query_embedding(query)
+    dimension = len(query_embedding) if query_embedding else EMBEDDING_DIMENSION
+    collection = _get_collection(source, dimension)
+    raw_results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        where=_build_owner_filter(document_id, user_id),
+        include=["documents", "metadatas", "distances"],
+    )
 
-    # 3. Calculate Cosine Similarity for each chunk
-    q_vec = np.array(query_vector)
-    q_norm = np.linalg.norm(q_vec)
-    
-    scored_chunks = []
-    for c in db_chunks:
-        c_emb = c.get("embedding")
-        if not c_emb or len(c_emb) != len(query_vector):
-            similarity = 0.0
-        else:
-            c_vec = np.array(c_emb)
-            c_norm = np.linalg.norm(c_vec)
-            if q_norm == 0 or c_norm == 0:
-                similarity = 0.0
-            else:
-                similarity = np.dot(q_vec, c_vec) / (q_norm * c_norm)
-                
-        scored_chunks.append({
-            "id": str(c["_id"]),
-            "text": c["content"],
-            "metadata": {"chunk_index": c["chunk_index"], "document_id": document_id},
-            "similarity": float(similarity)
-        })
+    ids = raw_results.get("ids", [[]])[0]
+    documents = raw_results.get("documents", [[]])[0]
+    metadatas = raw_results.get("metadatas", [[]])[0]
+    distances = raw_results.get("distances", [[]])[0]
 
-    # 4. Sort and return top N matches
-    scored_chunks.sort(key=lambda x: x["similarity"], reverse=True)
-    
     results = []
-    for sc in scored_chunks[:n_results]:
-        results.append({
-            "id": sc["id"],
-            "text": sc["text"],
-            "metadata": sc["metadata"],
-            "distance": float(1.0 - sc["similarity"])  # Distance metric
-        })
-        
+    for index, chunk_id in enumerate(ids):
+        metadata = metadatas[index] or {}
+        results.append(
+            {
+                "id": chunk_id,
+                "text": documents[index],
+                "metadata": {
+                    "chunk_index": int(metadata.get("chunk_index", index)),
+                    "document_id": metadata.get("document_id", document_id),
+                    "text_preview": metadata.get("text_preview", ""),
+                    "created_at": metadata.get("created_at"),
+                },
+                "distance": float(distances[index]) if index < len(distances) else 0.0,
+            }
+        )
+
     return results

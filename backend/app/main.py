@@ -7,15 +7,44 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
 from app.routers import db_test, auth, documents, questions, chat
 
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+UPLOADS_DIR = BACKEND_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+import logging
+logger = logging.getLogger("app.main")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi động kết nối MongoDB khi startup
     await connect_to_mongo()
+    
+    # Tự động tạo tài khoản test@test.com nếu chưa tồn tại
+    from app.database.mongodb import get_database
+    from app.core.security import get_password_hash
+    from datetime import datetime, timezone
+    try:
+        db = get_database()
+        existing = await db["users"].find_one({"email": "test@test.com"})
+        if not existing:
+            hashed_password = get_password_hash("123456")
+            user_doc = {
+                "email": "test@test.com",
+                "full_name": "Test User",
+                "hashed_password": hashed_password,
+                "created_at": datetime.now(timezone.utc)
+            }
+            await db["users"].insert_one(user_doc)
+            logger.info("Đã tự động tạo tài khoản test@test.com (mật khẩu: 123456)")
+    except Exception as e:
+        logger.error(f"Lỗi khi tự động tạo tài khoản mặc định: {e}")
+        
     yield
     # Đóng kết nối MongoDB khi shutdown
     await close_mongo_connection()
@@ -35,6 +64,8 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 # Đăng ký các router
 app.include_router(db_test.router, prefix=f"{settings.API_V1_STR}/db", tags=["Database"])

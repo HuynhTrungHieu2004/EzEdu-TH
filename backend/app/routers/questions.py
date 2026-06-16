@@ -8,9 +8,37 @@ from app.schemas.auth import UserResponse
 from app.schemas.question import QuestionGenerateRequest, QuestionSetResponse
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
-from app.services.export_service import export_question_set_to_docx, export_question_set_to_pdf
+from app.services.export_service import (
+    build_export_filename,
+    export_question_set_to_docx,
+    export_question_set_to_pdf,
+)
 
 router = APIRouter()
+
+
+async def get_owned_question_set_or_404(question_set_id: str, current_user: UserResponse) -> dict:
+    if not ObjectId.is_valid(question_set_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Question set not found."
+        )
+
+    db = get_database()
+    question_set = await db["question_sets"].find_one({"_id": ObjectId(question_set_id)})
+    if not question_set:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Question set not found."
+        )
+
+    if question_set["user_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this question set."
+        )
+
+    return question_set
 
 @router.post("/generate", response_model=QuestionSetResponse, status_code=status.HTTP_201_CREATED)
 async def generate_questions_api(
@@ -56,6 +84,8 @@ async def generate_questions_api(
     except ValueError as val_err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(val_err))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred during question generation: {str(e)}"
@@ -129,25 +159,7 @@ async def get_question_set(
     """
     Retrieve details of a single question set.
     """
-    if not ObjectId.is_valid(question_set_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    db = get_database()
-    qs = await db["question_sets"].find_one({"_id": ObjectId(question_set_id)})
-    if not qs:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    if qs["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this question set."
-        )
+    qs = await get_owned_question_set_or_404(question_set_id, current_user)
 
     return QuestionSetResponse(
         id=str(qs["_id"]),
@@ -170,32 +182,21 @@ async def export_docx_api(
     """
     Export question set to Microsoft Word (.docx) file download.
     """
-    if not ObjectId.is_valid(question_set_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    db = get_database()
-    qs = await db["question_sets"].find_one({"_id": ObjectId(question_set_id)})
-    if not qs:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    if qs["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this question set."
-        )
+    qs = await get_owned_question_set_or_404(question_set_id, current_user)
 
-    file_stream = export_question_set_to_docx(qs)
-    filename = f"bo_cau_hoi_{question_set_id}.docx"
+    try:
+        file_stream = export_question_set_to_docx(qs)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể xuất bộ câu hỏi sang DOCX lúc này."
+        ) from exc
+
+    filename = build_export_filename(qs, "docx")
     return StreamingResponse(
         file_stream,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
     )
 
 @router.get("/{question_set_id}/export/pdf")
@@ -206,30 +207,19 @@ async def export_pdf_api(
     """
     Export question set to PDF (.pdf) file download.
     """
-    if not ObjectId.is_valid(question_set_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    db = get_database()
-    qs = await db["question_sets"].find_one({"_id": ObjectId(question_set_id)})
-    if not qs:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Question set not found."
-        )
-        
-    if qs["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this question set."
-        )
+    qs = await get_owned_question_set_or_404(question_set_id, current_user)
 
-    file_stream = export_question_set_to_pdf(qs)
-    filename = f"bo_cau_hoi_{question_set_id}.pdf"
+    try:
+        file_stream = export_question_set_to_pdf(qs)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể xuất bộ câu hỏi sang PDF lúc này."
+        ) from exc
+
+    filename = build_export_filename(qs, "pdf")
     return StreamingResponse(
         file_stream,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
     )

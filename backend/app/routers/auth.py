@@ -1,6 +1,7 @@
+from typing import Optional
 from datetime import datetime, timezone
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from app.core.config import settings
@@ -11,14 +12,22 @@ from app.schemas.auth import UserRegister, UserLogin, UserResponse, Token, Token
 router = APIRouter()
 
 # Swagger UI Authorize sẽ sử dụng endpoint login-swagger
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login-swagger")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login-swagger", auto_error=False)
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
+async def get_current_user(
+    token_header: Optional[str] = Depends(oauth2_scheme),
+    token_query: Optional[str] = Query(None, alias="token")
+) -> UserResponse:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    token = token_header or token_query
+    if not token:
+        raise credentials_exception
+        
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception

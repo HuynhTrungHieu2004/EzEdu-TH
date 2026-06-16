@@ -1,5 +1,4 @@
 import client from './client';
-import { buildApiUrl } from '../config/api';
 
 export interface QuestionItem {
   question: string;
@@ -23,6 +22,48 @@ export interface QuestionSetResponse {
   updated_at: string;
 }
 
+type ExportFormat = 'docx' | 'pdf';
+
+function parseFilename(contentDisposition?: string, fallback = 'question-set') {
+  if (!contentDisposition) {
+    return fallback;
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const basicMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  if (basicMatch?.[1]) {
+    return basicMatch[1];
+  }
+
+  return fallback;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(objectUrl);
+}
+
+async function exportQuestionSet(id: string, format: ExportFormat) {
+  const response = await client.get<Blob>(`/questions/${id}/export/${format}`, {
+    responseType: 'blob',
+  });
+
+  const extension = format === 'docx' ? 'docx' : 'pdf';
+  const fallbackName = `question-set.${extension}`;
+  const filename = parseFilename(response.headers['content-disposition'], fallbackName);
+  downloadBlob(response.data, filename);
+}
+
 export const questionApi = {
   generate: async (documentId: string, count: number, difficulty: string, type: string): Promise<QuestionSetResponse> => {
     const response = await client.post<QuestionSetResponse>('/questions/generate', {
@@ -44,11 +85,11 @@ export const questionApi = {
     return response.data;
   },
 
-  exportDocxUrl: (id: string): string => {
-    return buildApiUrl(`/api/v1/questions/${id}/export/docx`);
+  downloadDocx: async (id: string) => {
+    await exportQuestionSet(id, 'docx');
   },
 
-  exportPdfUrl: (id: string): string => {
-    return buildApiUrl(`/api/v1/questions/${id}/export/pdf`);
+  downloadPdf: async (id: string) => {
+    await exportQuestionSet(id, 'pdf');
   },
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { QuestionItem } from '../api/questionApi';
 
 interface QuestionCardProps {
@@ -9,6 +9,29 @@ interface QuestionCardProps {
 const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
   const isMultipleChoice = question.question_type === 'multiple_choice';
   const isTrueFalse = question.question_type === 'true_false';
+  const isShortAnswer = !question.options || Object.keys(question.options).length === 0;
+
+  // State for multiple choice & true/false
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  // State for short answer
+  const [shortAnswerInput, setShortAnswerInput] = useState('');
+  const [shortAnswerChecked, setShortAnswerChecked] = useState(false);
+
+  const handleOptionClick = (key: string) => {
+    if (selectedAnswer) return; // Prevent changing answer
+    setSelectedAnswer(key);
+  };
+
+  const handleShortAnswerCheck = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shortAnswerInput.trim()) return;
+    setShortAnswerChecked(true);
+  };
+
+  const hasOptions = question.options && Object.keys(question.options).length > 0;
+  const showExplanation = hasOptions ? (selectedAnswer !== null) : shortAnswerChecked;
 
   return (
     <div style={styles.card}>
@@ -21,46 +44,136 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
 
       <h4 style={styles.questionText}>{question.question}</h4>
 
-      {question.options && Object.keys(question.options).length > 0 && (
+      {hasOptions && question.options && (
         <div style={styles.optionsList}>
           {Object.entries(question.options).map(([key, val]) => {
-            const isCorrect = key === question.correct_answer;
+            const isSelected = key === selectedAnswer;
+            let isCorrect = key.toUpperCase() === question.correct_answer.toUpperCase();
+            if (isTrueFalse) {
+              const ansNormal = question.correct_answer.toLowerCase();
+              if (ansNormal === 'true' || ansNormal === 'a' || ansNormal === 'đúng') {
+                isCorrect = key === 'A';
+              } else if (ansNormal === 'false' || ansNormal === 'b' || ansNormal === 'sai') {
+                isCorrect = key === 'B';
+              }
+            }
+            const hasSelectedAny = selectedAnswer !== null;
+
+            // Determine colors and borders dynamically
+            let borderColor = 'var(--border)';
+            let backgroundColor = 'var(--bg)';
+            let badgeBg = 'var(--accent-bg)';
+            let badgeColor = 'var(--accent)';
+            let statusLabel = null;
+
+            if (hasSelectedAny) {
+              if (isCorrect) {
+                // Correct option always highlighted in green
+                borderColor = '#22c55e';
+                backgroundColor = 'rgba(34, 197, 94, 0.05)';
+                badgeBg = '#22c55e';
+                badgeColor = '#fff';
+                statusLabel = <span style={styles.correctLabel}>✓ Đáp án đúng</span>;
+              } else if (isSelected) {
+                // Wrong selected option highlighted in red
+                borderColor = '#ef4444';
+                backgroundColor = 'rgba(239, 68, 68, 0.05)';
+                badgeBg = '#ef4444';
+                badgeColor = '#fff';
+                statusLabel = <span style={styles.wrongLabel}>✗ Bạn chọn sai</span>;
+              }
+            } else {
+              // Interactive hover styles when no option is selected yet
+              const isHovered = key === hoveredKey;
+              if (isHovered) {
+                borderColor = 'var(--accent)';
+                backgroundColor = 'var(--code-bg)';
+              }
+            }
+
             return (
               <div
                 key={key}
+                onClick={() => handleOptionClick(key)}
+                onMouseEnter={() => !hasSelectedAny && setHoveredKey(key)}
+                onMouseLeave={() => !hasSelectedAny && setHoveredKey(null)}
                 style={{
                   ...styles.optionItem,
-                  borderColor: isCorrect ? '#22c55e' : 'var(--border)',
-                  backgroundColor: isCorrect ? 'rgba(34, 197, 94, 0.05)' : 'var(--bg)',
+                  borderColor,
+                  backgroundColor,
+                  cursor: hasSelectedAny ? 'default' : 'pointer',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 <span
                   style={{
                     ...styles.optionLetter,
-                    backgroundColor: isCorrect ? '#22c55e' : 'var(--accent-bg)',
-                    color: isCorrect ? '#fff' : 'var(--accent)',
+                    backgroundColor: badgeBg,
+                    color: badgeColor,
                   }}
                 >
                   {key}
                 </span>
                 <span style={styles.optionVal}>{val}</span>
-                {isCorrect && <span style={styles.correctLabel}>✓ Đáp án đúng</span>}
+                {statusLabel}
               </div>
             );
           })}
         </div>
       )}
 
-      {(!question.options || Object.keys(question.options).length === 0) && (
-        <div style={styles.shortAnswerBox}>
-          <strong>Đáp án mong đợi:</strong> <span style={styles.answerText}>{question.correct_answer}</span>
+      {isShortAnswer && (
+        <div style={styles.shortAnswerSection}>
+          {!shortAnswerChecked ? (
+            <form onSubmit={handleShortAnswerCheck} style={styles.shortAnswerForm}>
+              <input
+                type="text"
+                value={shortAnswerInput}
+                onChange={(e) => setShortAnswerInput(e.target.value)}
+                placeholder="Nhập câu trả lời của bạn vào đây..."
+                style={styles.shortAnswerInput}
+                required
+              />
+              <button type="submit" style={styles.checkButton}>
+                Kiểm tra đáp án
+              </button>
+            </form>
+          ) : (
+            <div style={styles.shortAnswerResult}>
+              <div style={styles.userAnswerBox}>
+                <strong>Câu trả lời của bạn: </strong>
+                <span
+                  style={{
+                    color:
+                      shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()
+                        ? '#22c55e'
+                        : '#ef4444',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {shortAnswerInput}
+                </span>
+                {shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase() ? (
+                  <span style={styles.correctLabel}> (Chính xác!)</span>
+                ) : (
+                  <span style={styles.wrongLabel}> (Chưa chính xác)</span>
+                )}
+              </div>
+              <div style={styles.shortAnswerExpectedBox}>
+                <strong>Đáp án đúng: </strong>
+                <span style={styles.answerText}>{question.correct_answer}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      <div style={styles.explanationSection}>
-        <div style={styles.explanationHeader}>💡 Giải thích chi tiết từ tài liệu:</div>
-        <p style={styles.explanationText}>{question.explanation}</p>
-      </div>
+      {showExplanation && (
+        <div style={styles.explanationSection}>
+          <div style={styles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
+          <p style={styles.explanationText}>{question.explanation}</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -138,14 +251,60 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     color: '#22c55e',
+    marginLeft: 'auto',
   },
-  shortAnswerBox: {
+  wrongLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#ef4444',
+    marginLeft: 'auto',
+  },
+  shortAnswerSection: {
+    marginTop: '6px',
+  },
+  shortAnswerForm: {
+    display: 'flex',
+    gap: '12px',
+  },
+  shortAnswerInput: {
+    flexGrow: 1,
+    padding: '10px 14px',
+    fontSize: '14px',
+    borderRadius: '8px',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text-h)',
+    outline: 'none',
+  },
+  checkButton: {
+    padding: '10px 20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: 'var(--accent)',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+  },
+  shortAnswerResult: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
     padding: '12px 16px',
     backgroundColor: 'var(--code-bg)',
+    borderRadius: '8px',
     borderLeft: '4px solid var(--accent)',
-    borderRadius: '0 8px 8px 0',
+  },
+  userAnswerBox: {
     fontSize: '14px',
     color: 'var(--text-h)',
+  },
+  shortAnswerExpectedBox: {
+    fontSize: '14px',
+    color: 'var(--text-h)',
+    borderTop: '1px dashed var(--border)',
+    paddingTop: '8px',
+    marginTop: '4px',
   },
   answerText: {
     color: 'var(--accent)',

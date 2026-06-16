@@ -67,11 +67,29 @@ const DocumentsPage: React.FC = () => {
           backgroundColor: 'rgba(34, 197, 94, 0.1)',
           color: '#22c55e',
         };
+      case 'transcribing':
+        return {
+          label: 'Đang tạo transcript',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          color: '#f59e0b',
+        };
+      case 'transcribed':
+        return {
+          label: 'Đã có transcript',
+          backgroundColor: 'rgba(14, 165, 233, 0.1)',
+          color: '#0ea5e9',
+        };
       case 'indexed':
         return {
           label: 'Đã lập chỉ mục',
           backgroundColor: 'rgba(99, 102, 241, 0.1)',
           color: '#6366f1',
+        };
+      case 'index_failed':
+        return {
+          label: 'Lỗi lập chỉ mục',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          color: '#ef4444',
         };
       case 'failed':
         return {
@@ -103,7 +121,7 @@ const DocumentsPage: React.FC = () => {
         <div style={styles.pageHeader}>
           <div>
             <h2 style={styles.pageTitle}>Quản lý Học liệu Điện tử</h2>
-            <p style={styles.pageSubtitle}>Tải lên và quản lý các tài liệu PDF, DOCX, PPTX của riêng bạn.</p>
+            <p style={styles.pageSubtitle}>Tải lên và quản lý các tài liệu PDF, DOCX, PPTX và video MP4, MOV, WEBM, MKV của bạn.</p>
           </div>
           <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
             ← Quay lại Dashboard
@@ -119,7 +137,7 @@ const DocumentsPage: React.FC = () => {
 
           {documents.length === 0 ? (
             <div style={styles.emptyState}>
-              Bạn chưa tải lên tài liệu nào. Hãy chọn file PDF, DOCX hoặc PPTX ở phần trên để bắt đầu.
+              Bạn chưa tải lên học liệu nào. Hãy chọn file PDF, DOCX, PPTX hoặc video ở phần trên để bắt đầu.
             </div>
           ) : (
             <div style={styles.tableWrapper}>
@@ -136,15 +154,25 @@ const DocumentsPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {documents.map((doc) => {
+                    const isVideo = doc.media_kind === 'video';
                     const statusMeta = getStatusMeta(doc.status);
 
                     return (
                       <tr key={doc.id} style={styles.tr}>
                         <td style={styles.tdName} onClick={() => navigate(`/documents/${doc.id}`)}>
-                          📄 {doc.original_filename}
+                          {isVideo ? '📹' : '📄'} {doc.original_filename}
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.typeTag}>{doc.file_type.toUpperCase()}</span>
+                          <span
+                            style={{
+                              ...styles.typeTag,
+                              backgroundColor: isVideo ? 'rgba(245, 158, 11, 0.1)' : 'var(--code-bg)',
+                              color: isVideo ? '#d97706' : 'var(--text-h)',
+                              borderColor: isVideo ? 'rgba(245, 158, 11, 0.2)' : 'var(--border)',
+                            }}
+                          >
+                            {isVideo ? 'Video' : 'Tài liệu'} ({doc.file_type.toUpperCase()})
+                          </span>
                         </td>
                         <td style={styles.td}>{formatSize(doc.file_size)}</td>
                         <td style={styles.td}>

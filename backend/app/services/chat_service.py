@@ -1,97 +1,136 @@
 from datetime import datetime, timezone
-from bson import ObjectId
+
 from app.database.mongodb import get_database
-from app.services.rag_service import search_relevant_chunks
 from app.services.llm_service import generate_content
+from app.services.rag_service import search_relevant_chunks
+
+INSUFFICIENT_INFO_ANSWER = "Tài liệu không cung cấp đủ thông tin để trả lời câu hỏi này."
+MAX_SOURCE_CHUNKS = 5
+MAX_CONTEXT_CHARS = 6000
+
 
 def build_chat_prompt(context: str, question: str) -> str:
-    """Creates a RAG prompt constraining the assistant to answer only based on the document context."""
+    """Build a grounded Q&A prompt that forbids answers outside the retrieved document context."""
     return f"""
-Bạn là một trợ lý học tập AI thông minh. Nhiệm vụ của bạn là trả lời câu hỏi của người dùng dựa trên thông tin được cung cấp dưới đây.
+Bạn là trợ lý học tập.
 
 Yêu cầu bắt buộc:
-1. Chỉ trả lời dựa trên phần NỘI DUNG TÀI LIỆU (CONTEXT) dưới đây. Tuyệt đối không tự suy diễn hoặc dùng kiến thức ngoài tài liệu để bổ sung.
-2. Nếu trong phần CONTEXT không có đủ thông tin hoặc không liên quan đến câu hỏi, hãy trả lời chính xác là: "Xin lỗi, tôi không tìm thấy thông tin này trong tài liệu học tập của bạn." và không cố tự bịa ra câu trả lời.
-3. Trả lời ngắn gọn, súc tích, dễ hiểu và đi thẳng vào trọng tâm câu hỏi.
+1. Chỉ trả lời dựa trên NỘI DUNG TÀI LIỆU được cung cấp bên dưới.
+2. Không bịa thông tin, không suy diễn ngoài tài liệu, không dùng kiến thức bên ngoài.
+3. Nếu tài liệu không cung cấp đủ thông tin để trả lời, bạn phải trả lời đúng nguyên văn:
+"{INSUFFICIENT_INFO_ANSWER}"
+4. Trả lời bằng tiếng Việt.
+5. Trả lời rõ ràng, ngắn gọn, phù hợp cho người học.
 
----
-NỘI DUNG TÀI LIỆU (CONTEXT):
+NỘI DUNG TÀI LIỆU:
 {context}
----
 
-CÂU HỎI CỦA NGƯỜI DÙNG:
+CÂU HỎI:
 {question}
 
 TRẢ LỜI:
 """
 
+
+def _normalize_answer(answer: str) -> str:
+    cleaned = (answer or "").strip()
+    if not cleaned:
+        return INSUFFICIENT_INFO_ANSWER
+    return cleaned
+
+
+def _truncate_context(chunks: list[dict], limit: int = MAX_CONTEXT_CHARS) -> str:
+    selected_parts: list[str] = []
+    total = 0
+
+    for index, chunk in enumerate(chunks, start=1):
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+        part = f"[Đoạn {index}]\n{text}"
+        additional = len(part) + (2 if selected_parts else 0)
+        if selected_parts and total + additional > limit:
+            break
+        if not selected_parts and len(part) > limit:
+            selected_parts.append(part[:limit])
+            break
+        selected_parts.append(part)
+        total += additional
+
+    return "\n\n".join(selected_parts).strip()
+
+
 async def ask_document_question(document_id: str, user_id: str, question: str) -> dict:
     """
-    Looks up vector chunks via RAG, prepares prompt, fetches answer from Gemini, 
-    and registers the interaction in the MongoDB 'chat_messages' collection.
+    Retrieve relevant chunks with RAG, ask Gemini for a grounded answer, and save the exchange.
     """
-    # 1. Search relevant chunks using RAG
-    relevant_chunks = await search_relevant_chunks(document_id, user_id, question, n_results=5)
-    
-    # Fallback to MongoDB direct lookup if ChromaDB did not index or returned empty
+    db = get_database()
+    relevant_chunks = await search_relevant_chunks(
+        document_id=document_id,
+        user_id=user_id,
+        query=question,
+        n_results=MAX_SOURCE_CHUNKS,
+    )
+
     if not relevant_chunks:
-        db = get_database()
-        cursor = db["document_chunks"].find({"document_id": document_id}).limit(3)
-        relevant_chunks = [
-            {
-                "text": doc["content"],
-                "metadata": {"chunk_index": doc["chunk_index"], "document_id": document_id}
-            } 
-            async for doc in cursor
-        ]
+        answer = INSUFFICIENT_INFO_ANSWER
+        source_chunks = []
+    else:
+        context = _truncate_context(relevant_chunks)
+        if not context:
+            answer = INSUFFICIENT_INFO_ANSWER
+            source_chunks = []
+        else:
+            answer = _normalize_answer(generate_content(build_chat_prompt(context, question)))
+            source_chunks = [
+                {
+                    "chunk_index": chunk.get("metadata", {}).get("chunk_index"),
+                    "text": chunk.get("text", ""),
+                    "distance": chunk.get("distance"),
+                    "text_preview": chunk.get("metadata", {}).get("text_preview"),
+                }
+                for chunk in relevant_chunks
+            ]
 
-    context = "\n\n".join([c["text"] for c in relevant_chunks])
-    
-    # 2. Call Gemini
-    prompt = build_chat_prompt(context, question)
-    answer = generate_content(prompt)
-    
-    # 3. Store conversation to database
-    db = get_database()
     chat_message = {
-        "document_id": document_id,
         "user_id": user_id,
-        "question": question,
+        "document_id": document_id,
+        "question": question.strip(),
         "answer": answer,
-        "sources": [
-            {
-                "chunk_index": c.get("metadata", {}).get("chunk_index"),
-                "text": c["text"]
-            }
-            for c in relevant_chunks
-        ],
-        "created_at": datetime.now(timezone.utc)
-    }
-    
-    result = await db["chat_messages"].insert_one(chat_message)
-    chat_message["_id"] = str(result.inserted_id)
-    
-    return {
-        "id": chat_message["_id"],
-        "question": question,
-        "answer": answer,
-        "sources": chat_message["sources"],
-        "created_at": chat_message["created_at"]
+        "source_chunks": source_chunks,
+        "created_at": datetime.now(timezone.utc),
     }
 
-async def get_chat_history(document_id: str, user_id: str) -> list:
-    """Fetches full chat history records sorted in ascending chronological order"""
+    result = await db["chat_messages"].insert_one(chat_message)
+
+    return {
+        "id": str(result.inserted_id),
+        "document_id": document_id,
+        "question": chat_message["question"],
+        "answer": answer,
+        "source_chunks": source_chunks,
+        "created_at": chat_message["created_at"],
+    }
+
+
+async def get_chat_history(document_id: str, user_id: str) -> list[dict]:
+    """Return stored chat history for one user/document pair in chronological order."""
     db = get_database()
-    cursor = db["chat_messages"].find({"document_id": document_id, "user_id": user_id}).sort("created_at", 1)
-    
-    history = []
-    async for doc in cursor:
-        history.append({
-            "id": str(doc["_id"]),
-            "question": doc["question"],
-            "answer": doc["answer"],
-            "sources": doc.get("sources", []),
-            "created_at": doc["created_at"]
-        })
-        
+    cursor = db["chat_messages"].find(
+        {"document_id": document_id, "user_id": user_id}
+    ).sort("created_at", 1)
+
+    history: list[dict] = []
+    async for item in cursor:
+        history.append(
+            {
+                "id": str(item["_id"]),
+                "document_id": item["document_id"],
+                "question": item["question"],
+                "answer": item["answer"],
+                "source_chunks": item.get("source_chunks", []),
+                "created_at": item["created_at"],
+            }
+        )
+
     return history

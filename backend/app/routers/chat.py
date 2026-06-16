@@ -1,115 +1,92 @@
 from typing import List
+
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database.mongodb import get_database
-from app.schemas.auth import UserResponse
-from app.schemas.chat import ChatAskRequest, ChatAskResponse
 from app.routers.auth import get_current_user
-from app.services.chat_service import ask_document_question, get_chat_history
+from app.schemas.auth import UserResponse
+from app.schemas.chat import ChatAskRequest, ChatMessageResponse
+from app.services.chat_service import get_chat_history, ask_document_question
 
 router = APIRouter()
 
-@router.post("/ask", response_model=ChatAskResponse)
-async def ask_question_api(
-    payload: ChatAskRequest,
-    current_user: UserResponse = Depends(get_current_user)
-):
-    """
-    Submit a user question about a specific document context, query relevant chunks via RAG, 
-    generate an answer using Gemini, and log the interaction.
-    """
+
+async def get_owned_document_or_404(document_id: str, current_user: UserResponse) -> dict:
+    if not ObjectId.is_valid(document_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+
     db = get_database()
-    
-    # Enforce document ownership boundary check
-    if not ObjectId.is_valid(payload.document_id):
+    document = await db["documents"].find_one({"_id": ObjectId(document_id)})
+    if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
+            detail="Document not found.",
         )
-        
-    doc = await db["documents"].find_one({"_id": ObjectId(payload.document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-        
-    if doc["user_id"] != current_user.id:
+
+    if document["user_id"] != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document."
+            detail="You do not have permission to access this document.",
+        )
+
+    return document
+
+
+@router.post("/ask", response_model=ChatMessageResponse, status_code=status.HTTP_200_OK)
+async def ask_question_api(
+    payload: ChatAskRequest,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Ask a question grounded only in the indexed content of one owned document.
+    """
+    document = await get_owned_document_or_404(payload.document_id, current_user)
+    if document.get("status") != "indexed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bạn cần index tài liệu trước khi hỏi đáp.",
         )
 
     try:
         response = await ask_document_question(
             document_id=payload.document_id,
             user_id=current_user.id,
-            question=payload.question
+            question=payload.question,
         )
-    except ValueError as val_err:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(val_err)
-        )
-    except Exception as e:
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred during Q&A processing: {str(e)}"
-        )
+            detail="Hệ thống hỏi đáp học liệu tạm thời gặp lỗi.",
+        ) from exc
 
-    return ChatAskResponse(
-        id=response["id"],
-        question=response["question"],
-        answer=response["answer"],
-        sources=response["sources"],
-        created_at=response["created_at"]
-    )
+    return ChatMessageResponse(**response)
 
-@router.get("/history/{document_id}", response_model=List[ChatAskResponse])
+
+@router.get("/history/{document_id}", response_model=List[ChatMessageResponse])
 async def get_history_api(
     document_id: str,
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
 ):
     """
-    Retrieve Q&A chat history logs for a specific document.
+    Return Q&A history for one owned document.
     """
-    db = get_database()
-    
-    if not ObjectId.is_valid(document_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-        
-    doc = await db["documents"].find_one({"_id": ObjectId(document_id)})
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found."
-        )
-        
-    if doc["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document's Q&A history."
-        )
+    await get_owned_document_or_404(document_id, current_user)
 
     try:
         history = await get_chat_history(document_id=document_id, user_id=current_user.id)
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load Q&A history: {str(e)}"
-        )
-        
-    return [
-        ChatAskResponse(
-            id=item["id"],
-            question=item["question"],
-            answer=item["answer"],
-            sources=item["sources"],
-            created_at=item["created_at"]
-        )
-        for item in history
-    ]
+            detail="Không thể tải lịch sử hỏi đáp lúc này.",
+        ) from exc
+
+    return [ChatMessageResponse(**item) for item in history]
