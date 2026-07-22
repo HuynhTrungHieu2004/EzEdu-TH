@@ -3,12 +3,21 @@ import { useNavigate } from 'react-router-dom';
 
 import { chatApi } from '../api/chatApi';
 import type { ChatMessageResponse } from '../api/chatApi';
+import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
 
 interface ChatBoxProps {
   documentId: string;
+  disabled?: boolean;
+  disabledMessage?: string;
+  onBusyChange?: (busy: boolean) => void;
 }
 
-const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
+const ChatBox: React.FC<ChatBoxProps> = ({
+  documentId,
+  disabled = false,
+  disabledMessage = 'Hỏi đáp tạm khóa trong khi hệ thống cập nhật nội dung.',
+  onBusyChange,
+}) => {
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,14 +33,13 @@ const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
       try {
         const history = await chatApi.getHistory(documentId);
         setMessages(history);
-      } catch (err: any) {
-        if (err.response?.status === 401) {
+      } catch (err: unknown) {
+        if (isUnauthorizedError(err)) {
           localStorage.removeItem('access_token');
           navigate('/login');
           return;
         }
-        const detail = err.response?.data?.detail;
-        setError(typeof detail === 'string' ? detail : 'Không thể tải lịch sử hỏi đáp.');
+        setError(getApiErrorDetail(err) ?? 'Không thể tải lịch sử hỏi đáp.');
       } finally {
         setLoadingHistory(false);
       }
@@ -41,33 +49,35 @@ const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
   }, [documentId, navigate]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
   }, [messages, loading]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!question.trim() || loading) {
+    if (!question.trim() || loading || disabled) {
       return;
     }
 
     const userQuestion = question.trim();
     setQuestion('');
     setLoading(true);
+    onBusyChange?.(true);
     setError(null);
 
     try {
       const response = await chatApi.ask(documentId, userQuestion);
       setMessages((prev) => [...prev, response]);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      if (isUnauthorizedError(err)) {
         localStorage.removeItem('access_token');
         navigate('/login');
         return;
       }
-      const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Không thể gửi câu hỏi lúc này.');
+      setError(getApiErrorDetail(err) ?? 'Không thể gửi câu hỏi lúc này.');
     } finally {
       setLoading(false);
+      onBusyChange?.(false);
     }
   };
 
@@ -128,17 +138,30 @@ const ChatBox: React.FC<ChatBoxProps> = ({ documentId }) => {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
+      {disabled && (
+        <div style={styles.disabledNotice} role="status">
+          {disabledMessage}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} style={styles.form} aria-disabled={disabled}>
         <input
           type="text"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder="Nhập câu hỏi liên quan đến nội dung tài liệu..."
           style={styles.input}
-          disabled={loading}
+          disabled={loading || disabled}
         />
-        <button type="submit" disabled={!question.trim() || loading} style={styles.button}>
-          {loading ? 'Đang gửi...' : 'Gửi câu hỏi'}
+        <button
+          type="submit"
+          disabled={!question.trim() || loading || disabled}
+          style={{
+            ...styles.button,
+            ...(disabled ? styles.buttonDisabled : {}),
+          }}
+        >
+          {loading ? 'Đang gửi...' : disabled ? 'Tạm khóa' : 'Gửi câu hỏi'}
         </button>
       </form>
     </div>
@@ -261,6 +284,16 @@ const styles = {
     borderTop: '1px solid var(--border)',
     backgroundColor: 'var(--bg)',
   },
+  disabledNotice: {
+    margin: '0 24px',
+    padding: '10px 12px',
+    border: '1px solid rgba(245, 158, 11, 0.2)',
+    borderRadius: '10px',
+    color: '#9a6510',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    fontSize: '12px',
+    lineHeight: 1.5,
+  },
   input: {
     flex: 1,
     minWidth: 0,
@@ -281,6 +314,10 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
+  },
+  buttonDisabled: {
+    cursor: 'not-allowed',
+    opacity: 0.55,
   },
   error: {
     padding: '12px 14px',

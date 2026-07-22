@@ -47,11 +47,22 @@ def upload_file_to_cloudinary(file_path: str, folder: str = "documents", resourc
         }
 
     configure_cloudinary()
-    response = cloudinary.uploader.upload(
-        file_path,
-        folder=folder,
-        resource_type=resource_type
-    )
+    file_size = os.path.getsize(file_path)
+    # Use upload_large for video or files larger than 20MB (20 * 1024 * 1024 bytes)
+    # to handle large file sizes without timing out or failing.
+    if resource_type == "video" or file_size > 20 * 1024 * 1024:
+        response = cloudinary.uploader.upload_large(
+            file_path,
+            folder=folder,
+            resource_type=resource_type,
+            chunk_size=6000000  # 6MB chunks
+        )
+    else:
+        response = cloudinary.uploader.upload(
+            file_path,
+            folder=folder,
+            resource_type=resource_type
+        )
     return response
 
 def delete_file_from_cloudinary(public_id: str) -> dict:

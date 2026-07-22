@@ -49,8 +49,18 @@ async def get_current_user(
         id=str(user_doc["_id"]),
         email=user_doc["email"],
         full_name=user_doc["full_name"],
+        role=user_doc.get("role", "user"),
         created_at=user_doc["created_at"]
     )
+
+async def require_admin(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+    """Dependency to enforce admin authorization."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Quyền truy cập bị từ chối. Chỉ dành cho quản trị viên."
+        )
+    return current_user
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserRegister):
@@ -68,6 +78,7 @@ async def register(user_in: UserRegister):
         "email": user_in.email,
         "full_name": user_in.full_name,
         "hashed_password": hashed_password,
+        "role": user_in.role,
         "created_at": datetime.now(timezone.utc)
     }
     
@@ -77,6 +88,7 @@ async def register(user_in: UserRegister):
         id=str(result.inserted_id),
         email=user_in.email,
         full_name=user_in.full_name,
+        role=user_in.role,
         created_at=user_doc["created_at"]
     )
 
@@ -90,7 +102,7 @@ async def login(user_in: UserLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
-        
+
     access_token = create_access_token(subject=str(user["_id"]))
     return Token(access_token=access_token, token_type="bearer")
 

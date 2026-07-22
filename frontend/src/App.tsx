@@ -7,21 +7,30 @@ import DashboardPage from './pages/DashboardPage';
 import DocumentsPage from './pages/DocumentsPage';
 import DocumentDetailPage from './pages/DocumentDetailPage';
 import QuestionGeneratePage from './pages/QuestionGeneratePage';
+import QuickGeneratePage from './pages/QuickGeneratePage';
 import QuestionSetDetailPage from './pages/QuestionSetDetailPage';
+import QuestionHistoryPage from './pages/QuestionHistoryPage';
+import PublishedQuestionSetsPage from './pages/PublishedQuestionSetsPage';
+import AdvancedChatPage from './pages/AdvancedChatPage';
+import LearningHistoryPage from './pages/LearningHistoryPage';
+import StudentStatisticsPage from './pages/StudentStatisticsPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import { buildApiUrl, isApiBaseUrlConfigured } from './config/api';
 
-// Welcome landing page retaining original check logic but styled nicely
 function WelcomeScreen() {
-  const [backendStatus, setBackendStatus] = useState('Đang kết nối...');
-  const [isConnected, setIsConnected] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [backendStatus, setBackendStatus] = useState(
+    isApiBaseUrlConfigured ? 'Đang kết nối...' : 'Thiếu cấu hình VITE_API_BASE_URL'
+  );
+  const [isConnected, setIsConnected] = useState<'connecting' | 'connected' | 'disconnected'>(
+    isApiBaseUrlConfigured ? 'connecting' : 'disconnected'
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isApiBaseUrlConfigured) {
-      setBackendStatus('Thiếu cấu hình VITE_API_BASE_URL');
-      setIsConnected('disconnected');
       return;
     }
 
@@ -41,47 +50,82 @@ function WelcomeScreen() {
   const hasToken = !!localStorage.getItem('access_token');
 
   return (
-    <main style={styles.main}>
-      <div style={styles.heroGroup}>
-        <div style={styles.logoBadge}>AI</div>
-        <h1 style={styles.title}>AI Question Generator</h1>
-        <p style={styles.subtitle}>
-          Hệ thống sinh câu hỏi đánh giá năng lực tự động từ học liệu điện tử bằng mô hình ngôn ngữ lớn (LLM)
+    <section className="hero-home">
+      <div className="hero-content">
+        <div className="hero-mark" translate="no">AI</div>
+        <div>
+          <p className="eyebrow">Learning Assessment Studio</p>
+          <h1 className="hero-title">Tạo câu hỏi đánh giá từ học liệu trong vài phút</h1>
+        </div>
+        <p className="hero-copy">
+          Tải lên tài liệu hoặc video, trích xuất nội dung, hỏi đáp theo ngữ cảnh và sinh bộ câu hỏi
+          có đáp án, giải thích, mức độ khó và xuất file phục vụ giảng dạy.
         </p>
-      </div>
 
-      <div style={styles.statusCard}>
-        <span className={`status-indicator ${isConnected}`} style={styles.indicator}></span>
-        <span style={{ color: 'var(--text-h)', fontWeight: '500' }}>{backendStatus}</span>
-      </div>
+        <div className="hero-status">
+          <span className={`status-indicator ${isConnected}`} />
+          <span>{backendStatus}</span>
+        </div>
 
-      <div style={styles.actionGroup}>
-        {hasToken ? (
-          <button onClick={() => navigate('/dashboard')} style={styles.primaryButton}>
-            Vào Trang Quản Trị (Dashboard)
-          </button>
-        ) : (
-          <>
-            <button onClick={() => navigate('/login')} style={styles.primaryButton}>
-              Đăng Nhập Hệ Thống
+        <div className="hero-actions">
+          {hasToken ? (
+            <button type="button" onClick={() => navigate('/dashboard')} className="btn-primary">
+              Vào Dashboard
             </button>
-            <button onClick={() => navigate('/register')} style={styles.secondaryButton}>
-              Đăng Ký Tài Khoản
-            </button>
-          </>
-        )}
+          ) : (
+            <>
+              <button type="button" onClick={() => navigate('/login')} className="btn-primary">
+                Đăng nhập
+              </button>
+              <button type="button" onClick={() => navigate('/register')} className="btn-secondary">
+                Tạo tài khoản
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      <div style={styles.featuresPreview}>
-        <h3 style={styles.previewTitle}>Tính năng cốt lõi hệ thống:</h3>
-        <ul style={styles.previewList}>
-          <li>⚡ Đọc hiểu tài liệu PDF/Word thông minh</li>
-          <li>📊 Tự động phân loại theo ma trận độ khó</li>
-          <li>🧠 Sinh câu hỏi trắc nghiệm khách quan đa dạng</li>
-          <li>💾 Xuất dữ liệu phục vụ kiểm tra đánh giá</li>
-        </ul>
+      <figure className="hero-visual" aria-label="Minh họa không gian AI phân tích học liệu">
+        <img src="/visuals/ai-education-hero.png" alt="" />
+        <figcaption className="hero-visual-caption">
+          <span className="hero-chip">
+            <strong>PDF</strong>
+            <span>Word, slide, video</span>
+          </span>
+          <span className="hero-chip">
+            <strong>RAG</strong>
+            <span>Tìm kiếm theo ngữ nghĩa</span>
+          </span>
+          <span className="hero-chip">
+            <strong>Quiz</strong>
+            <span>Đáp án và giải thích</span>
+          </span>
+        </figcaption>
+      </figure>
+
+      <div className="feature-grid" aria-label="Tính năng chính">
+        <article className="feature-tile">
+          <span className="feature-kicker">01</span>
+          <h2 className="feature-title">Đọc học liệu</h2>
+          <p className="feature-text">Nhận PDF, DOCX, PPTX và video để trích xuất nội dung học tập.</p>
+        </article>
+        <article className="feature-tile">
+          <span className="feature-kicker">02</span>
+          <h2 className="feature-title">Lập chỉ mục</h2>
+          <p className="feature-text">Chia nhỏ nội dung và tạo dữ liệu truy xuất cho hỏi đáp theo ngữ nghĩa.</p>
+        </article>
+        <article className="feature-tile">
+          <span className="feature-kicker">03</span>
+          <h2 className="feature-title">Sinh câu hỏi</h2>
+          <p className="feature-text">Tạo câu hỏi theo số lượng, độ khó, dạng câu hỏi và mức Bloom.</p>
+        </article>
+        <article className="feature-tile">
+          <span className="feature-kicker">04</span>
+          <h2 className="feature-title">Xuất bộ đề</h2>
+          <p className="feature-text">Xem đáp án, giải thích và tải bộ câu hỏi phục vụ kiểm tra đánh giá.</p>
+        </article>
       </div>
-    </main>
+    </section>
   );
 }
 
@@ -128,6 +172,14 @@ function App() {
             } 
           />
           <Route 
+            path="/generate" 
+            element={
+              <ProtectedRoute>
+                <QuickGeneratePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/question-sets/:questionSetId" 
             element={
               <ProtectedRoute>
@@ -135,129 +187,60 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          
+          <Route 
+            path="/question-history" 
+            element={
+              <ProtectedRoute>
+                <QuestionHistoryPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route
+            path="/published-questions"
+            element={
+              <ProtectedRoute>
+                <PublishedQuestionSetsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learning-history"
+            element={
+              <ProtectedRoute>
+                <LearningHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student-statistics"
+            element={
+              <ProtectedRoute>
+                <StudentStatisticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/chat-advanced" 
+            element={
+              <ProtectedRoute>
+                <AdvancedChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <AdminRoute>
+                <AdminDashboardPage />
+              </AdminRoute>
+            }
+          />
+
           <Route path="*" element={<WelcomeScreen />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>
   );
 }
-
-
-const styles = {
-  main: {
-    padding: '60px 24px',
-    maxWidth: '800px',
-    margin: '0 auto',
-    textAlign: 'center' as const,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    gap: '32px',
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  heroGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    gap: '12px',
-  },
-  logoBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '64px',
-    height: '64px',
-    borderRadius: '16px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    fontSize: '24px',
-    fontWeight: 'bold',
-    border: '1px solid var(--accent-border)',
-    boxShadow: 'var(--shadow)',
-  },
-  title: {
-    fontSize: '36px',
-    fontWeight: '700',
-    margin: 0,
-    color: 'var(--text-h)',
-    letterSpacing: '-1px',
-  },
-  subtitle: {
-    fontSize: '16px',
-    color: 'var(--text)',
-    maxWidth: '580px',
-    lineHeight: '1.5',
-    margin: 0,
-  },
-  statusCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 24px',
-    borderRadius: '12px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--code-bg)',
-    fontSize: '15px',
-  },
-  indicator: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-    display: 'inline-block',
-  },
-  actionGroup: {
-    display: 'flex',
-    gap: '16px',
-    marginTop: '8px',
-  },
-  primaryButton: {
-    padding: '14px 28px',
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: 'var(--accent)',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    boxShadow: 'var(--shadow)',
-  },
-  secondaryButton: {
-    padding: '14px 28px',
-    fontSize: '16px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  featuresPreview: {
-    marginTop: '24px',
-    textAlign: 'left' as const,
-    borderTop: '1px solid var(--border)',
-    paddingTop: '32px',
-    width: '100%',
-  },
-  previewTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    marginBottom: '16px',
-  },
-  previewList: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '16px',
-    padding: 0,
-    margin: 0,
-    listStyle: 'none',
-    fontSize: '14px',
-    color: 'var(--text)',
-  },
-};
 
 export default App;

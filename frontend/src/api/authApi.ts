@@ -1,13 +1,25 @@
 import client from './client';
 import type { Token, UserResponse } from '../types/auth';
 
+export interface RegisterPayload {
+  email: string;
+  full_name: string;
+  password: string;
+  role?: 'student' | 'lecturer';
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
 export const authApi = {
-  register: async (userData: any): Promise<UserResponse> => {
+  register: async (userData: RegisterPayload): Promise<UserResponse> => {
     const response = await client.post<UserResponse>('/auth/register', userData);
     return response.data;
   },
 
-  login: async (credentials: any): Promise<Token> => {
+  login: async (credentials: LoginPayload): Promise<Token> => {
     const response = await client.post<Token>('/auth/login', credentials);
     return response.data;
   },

@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "total_cases": 9,
+  "passed_cases": 9,
+  "failed_cases_count": 0,
+  "live_mode": false,
+  "llm_model": "mock",
+  "embedding_model": "local",
+  "dataset_version": "1.0.0",
+  "fixtures_version": "1.0.0",
+  "categories": {
+    "parsing": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "threshold": 1.0
+    },
+    "retrieval": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "threshold": 0.9
+    },
+    "qa": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "threshold": 0.8
+    },
+    "verification": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "threshold": 0.8
+    },
+    "question_gen": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "threshold": 0.8
+    }
+  },
+  "failed_cases_details": [],
+  "timestamp": "2026-07-17T21:31:36.656354+00:00",
+  "commit_hash": "unknown"
+}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { questionApi } from '../api/questionApi';
 import type { QuestionSetResponse } from '../api/questionApi';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse } from '../api/documentApi';
+import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
 
 const QuestionGeneratePage: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
@@ -20,7 +21,7 @@ const QuestionGeneratePage: React.FC = () => {
 
   const navigate = useNavigate();
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     if (!documentId) return;
     try {
       const history = await questionApi.listByDocument(documentId);
@@ -28,7 +29,7 @@ const QuestionGeneratePage: React.FC = () => {
     } catch (err) {
       console.error('Failed to load question sets history:', err);
     }
-  };
+  }, [documentId]);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -45,8 +46,8 @@ const QuestionGeneratePage: React.FC = () => {
         setDocument(doc);
         
         await fetchHistory();
-      } catch (err: any) {
-        if (err.response?.status === 401) {
+      } catch (err: unknown) {
+        if (isUnauthorizedError(err)) {
           localStorage.removeItem('access_token');
           navigate('/login');
         } else {
@@ -58,7 +59,7 @@ const QuestionGeneratePage: React.FC = () => {
     };
 
     fetchData();
-  }, [documentId, navigate]);
+  }, [documentId, fetchHistory, navigate]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +71,10 @@ const QuestionGeneratePage: React.FC = () => {
     try {
       const response = await questionApi.generate(documentId, count, difficulty, type);
       navigate(`/question-sets/${response.id}`);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
       setError(
-        typeof detail === 'string'
-          ? detail
-          : 'Sinh câu hỏi thất bại. Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.'
+        detail ?? 'Sinh câu hỏi thất bại. Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.'
       );
     } finally {
       setGenerating(false);

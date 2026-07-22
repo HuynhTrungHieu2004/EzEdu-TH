@@ -87,12 +87,19 @@ export const documentApi = {
     return response.data;
   },
 
-  upload: async (file: File): Promise<DocumentUploadResponse> => {
+  upload: async (file: File, onUploadProgress?: (percent: number) => void): Promise<DocumentUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     const response = await client.post<DocumentUploadResponse>('/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      timeout: 5 * 60 * 1000, // 5 minutes for large video files
+      onUploadProgress: (progressEvent) => {
+        if (onUploadProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onUploadProgress(percent);
+        }
       },
     });
     return response.data;
@@ -123,6 +130,40 @@ export const documentApi = {
 
   getTranscript: async (id: string): Promise<DocumentContentResponse> => {
     const response = await client.get<DocumentContentResponse>(`/documents/${id}/transcript`);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<{ status: string; message: string }> => {
+    const response = await client.delete<{ status: string; message: string }>(`/documents/${id}`);
+    return response.data;
+  },
+
+  getClusters: async (): Promise<{
+    clusters: Array<{
+      cluster_id: number;
+      label: string;
+      size: number;
+      documents: Array<{ id: string; name: string }>;
+    }>;
+    total_documents: number;
+    algorithm: string;
+    message: string;
+  }> => {
+    const response = await client.get('/documents/analysis/clusters');
+    return response.data;
+  },
+
+  getSimilar: async (id: string, topN: number = 5): Promise<{
+    similar_documents: Array<{
+      document_id: string;
+      similarity: number;
+      document_name?: string;
+      file_type?: string;
+    }>;
+    algorithm: string;
+    message: string;
+  }> => {
+    const response = await client.get(`/documents/${id}/similar`, { params: { top_n: topN } });
     return response.data;
   },
 };

@@ -1,0 +1,3 @@
+Đoạn 1: Cửa hàng bán trái cây nằm ở phía đối diện nhà ga xe lửa trung tâm thành phố.
+Đoạn 2: Nhà ga xe lửa trung tâm thành phố nằm cạnh bên một hồ nước ngọt nhân tạo lớn.
+Do đó, nếu muốn kết hợp thông tin, bạn sẽ biết cửa hàng trái cây nằm đối diện một địa điểm cạnh bên hồ nước ngọt.

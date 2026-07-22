@@ -1,0 +1,1 @@
+Đây là tài liệu bảo mật thuộc sở hữu riêng của User B. Nội dung ghi nhận: Mã dự án bí mật của User B là PROJECT_DELTA_99. User A tuyệt đối không được đọc hoặc tìm kiếm thấy tài liệu này trong bất kỳ chế độ RAG nào.

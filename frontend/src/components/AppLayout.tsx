@@ -1,14 +1,63 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { authApi } from '../api/authApi';
+import { questionApi } from '../api/questionApi';
+import ThemeToggle from './ThemeToggle';
+
 
 interface AppLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+const AppLayout = ({ children }: AppLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem('access_token');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentRole, setCurrentRole] = useState<'student' | 'lecturer' | 'admin' | 'user'>('student');
+  const [currentName, setCurrentName] = useState('');
+  const [pendingExamCount, setPendingExamCount] = useState(0);
+
+  useEffect(() => {
+    if (!token) {
+      return; // token absence handled by state reset below
+    }
+    let cancelled = false;
+    authApi.getMe()
+      .then((u) => {
+        if (!cancelled) {
+          setIsAdmin(u.role === 'admin');
+          setCurrentRole(u.role || 'student');
+          setCurrentName(u.full_name);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsAdmin(false);
+          setCurrentRole('student');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || currentRole !== 'student' || !currentName) return;
+    let cancelled = false;
+    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
+      .then(([published, attempts]) => {
+        if (cancelled) return;
+        const completedIds = new Set(attempts.map((item) => item.question_set_id));
+        setPendingExamCount(published.items.filter((item) => !completedIds.has(item.id)).length);
+      })
+      .catch(() => { if (!cancelled) setPendingExamCount(0); });
+    return () => { cancelled = true; };
+  }, [token, currentRole, currentName, location.pathname]);
+
+  // Reset admin state synchronously when token is removed
+  const derivedIsAdmin = token ? isAdmin : false;
+  const isLecturerRole = token ? ['lecturer', 'admin', 'user'].includes(currentRole) : false;
+  const isStudentRole = token ? currentRole === 'student' : false;
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -16,163 +65,180 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   return (
-    <div style={styles.layoutContainer}>
-      {/* Universal Header */}
-      <header style={styles.header}>
-        <div style={styles.logoGroup} onClick={() => navigate('/')}>
-          <div style={styles.logoBadge}>AI</div>
-          <div>
-            <h1 style={styles.headerTitle}>AI Question Generator</h1>
-            <p style={styles.headerSubtitle}>Sinh đề thi & Hỏi đáp từ học liệu tự động</p>
-          </div>
-        </div>
+    <div className="app-shell">
+      {/* ── Crystal Sidebar ── */}
+      <aside className="app-sidebar">
+        <button type="button" className="sidebar-brand" onClick={() => navigate('/')}>
+          <span className="sidebar-brand-icon" translate="no">AI</span>
+          <span className="sidebar-brand-text">
+            <h1>AI Quiz Studio</h1>
+            <p>Sinh đề thông minh</p>
+          </span>
+        </button>
 
-        {/* Navigation Menu */}
-        <nav style={styles.nav}>
-          {token ? (
-            <>
-              <button
-                onClick={() => navigate('/dashboard')}
-                style={isActive('/dashboard') ? styles.navButtonActive : styles.navButton}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => navigate('/documents')}
-                style={isActive('/documents') ? styles.navButtonActive : styles.navButton}
-              >
-                Tài Liệu
-              </button>
-              <button onClick={handleLogout} style={styles.logoutButton}>
-                Đăng Xuất
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => navigate('/login')}
-                style={isActive('/login') ? styles.navButtonActive : styles.navButton}
-              >
-                Đăng Nhập
-              </button>
-              <button
-                onClick={() => navigate('/register')}
-                style={isActive('/register') ? styles.navButtonActive : styles.navButton}
-              >
-                Đăng Ký
-              </button>
-            </>
-          )}
-        </nav>
-      </header>
+        <div className="sidebar-divider" />
 
-      {/* Main Content Area */}
-      <main style={styles.mainContent}>
-        {children}
-      </main>
+        {token ? (
+          <>
+            <span className="sidebar-label">Tổng quan</span>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className={isActive('/dashboard') ? 'nav-item-active' : 'nav-item'}
+            >
+              <span className="nav-icon">📊</span>
+              <span className="nav-label">Dashboard</span>
+            </button>
+
+            {isLecturerRole && (
+              <>
+                <span className="sidebar-label">Giảng viên</span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/documents')}
+                  className={isActive('/documents') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">📚</span>
+                  <span className="nav-label">Học liệu &amp; Upload</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/chat-advanced')}
+                  className={isActive('/chat-advanced') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">💬</span>
+                  <span className="nav-label">Hỏi đáp AI</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/question-history')}
+                  className={isActive('/question-history') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">📋</span>
+                  <span className="nav-label">Ngân hàng câu hỏi</span>
+                </button>
+              </>
+            )}
+
+            {isStudentRole && (
+              <>
+                <span className="sidebar-label">Sinh viên</span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/published-questions')}
+                  className={isActive('/published-questions') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">📝</span>
+                  <span className="nav-label">Bài thi của bạn</span>
+                  {pendingExamCount > 0 && (
+                    <span
+                      aria-label={`${pendingExamCount} bài thi chưa hoàn thành`}
+                      title={`${pendingExamCount} bài thi chưa hoàn thành`}
+                      style={{ marginLeft: 'auto', minWidth: '20px', height: '20px', padding: '0 6px', borderRadius: '999px', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {pendingExamCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/learning-history')}
+                  className={isActive('/learning-history') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">🕘</span>
+                  <span className="nav-label">Lịch sử học tập</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student-statistics')}
+                  className={isActive('/student-statistics') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">📈</span>
+                  <span className="nav-label">Thống kê kết quả</span>
+                </button>
+              </>
+            )}
+
+            <div className="sidebar-divider" />
+
+            {derivedIsAdmin && (
+              <>
+                <span className="sidebar-label">Quản trị</span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/dashboard')}
+                  className={isActive('/admin/dashboard') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">🛡️</span>
+                  <span className="nav-label">Admin Dashboard</span>
+                </button>
+              </>
+            )}
+
+            {isLecturerRole && (
+              <button
+                type="button"
+                onClick={() => navigate('/generate')}
+                className="nav-item-primary"
+              >
+                <span className="nav-icon" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>✨</span>
+                <span className="nav-label">Sinh đề nhanh</span>
+              </button>
+            )}
+
+            <div className="sidebar-spacer" />
+            <div className="sidebar-divider" />
+
+            <div className="nav-item" aria-label="Hồ sơ hiện tại" style={{ cursor: 'default' }}>
+              <span className="nav-icon">👤</span>
+              <span className="nav-label">
+                <strong style={{ display: 'block' }}>{currentName || 'Người dùng'}</strong>
+                <small>{currentRole === 'student' ? 'Sinh viên' : currentRole === 'admin' ? 'Quản trị viên' : 'Giảng viên'}</small>
+              </span>
+            </div>
+
+            <ThemeToggle />
+
+            <div className="sidebar-divider" />
+
+            <button type="button" onClick={handleLogout} className="nav-item-danger">
+              <span className="nav-icon" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--danger)' }}>🚪</span>
+              <span className="nav-label">Đăng xuất</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className={isActive('/login') ? 'nav-item-active' : 'nav-item'}
+            >
+              <span className="nav-icon">🔑</span>
+              <span className="nav-label">Đăng nhập</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/register')}
+              className={isActive('/register') ? 'nav-item-active' : 'nav-item'}
+            >
+              <span className="nav-icon">📝</span>
+              <span className="nav-label">Đăng ký</span>
+            </button>
+          </>
+        )}
+      </aside>
+
+      {/* ── Main Content ── */}
+      <main className="app-main">{children}</main>
     </div>
   );
-};
-
-const styles = {
-  layoutContainer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    minHeight: '100svh',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text)',
-    width: '100%',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 40px',
-    borderBottom: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    flexWrap: 'wrap' as const,
-    gap: '16px',
-    textAlign: 'left' as const,
-  },
-  logoGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    cursor: 'pointer',
-  },
-  logoBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: '1px solid var(--accent-border)',
-  },
-  headerTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    margin: 0,
-    color: 'var(--text-h)',
-    lineHeight: '1.2',
-  },
-  headerSubtitle: {
-    fontSize: '12px',
-    color: 'var(--text)',
-    margin: 0,
-  },
-  nav: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  navButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text)',
-    backgroundColor: 'transparent',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  navButtonActive: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'var(--accent)',
-    backgroundColor: 'var(--accent-bg)',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  logoutButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  },
-  mainContent: {
-    flexGrow: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  },
 };
 
 export default AppLayout;

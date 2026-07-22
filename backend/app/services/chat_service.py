@@ -62,7 +62,7 @@ def _truncate_context(chunks: list[dict], limit: int = MAX_CONTEXT_CHARS) -> str
 
 async def ask_document_question(document_id: str, user_id: str, question: str) -> dict:
     """
-    Retrieve relevant chunks with RAG, ask Gemini for a grounded answer, and save the exchange.
+    Retrieve relevant chunks with RAG, ask the configured AI provider for a grounded answer, and save the exchange.
     """
     db = get_database()
     relevant_chunks = await search_relevant_chunks(

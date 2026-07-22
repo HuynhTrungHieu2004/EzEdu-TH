@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse, SearchResultItem } from '../api/documentApi';
 import ChatBox from '../components/ChatBox';
+import VerificationPanel from '../components/VerificationPanel';
+import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
 
 const DocumentDetailPage: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
@@ -13,6 +15,8 @@ const DocumentDetailPage: React.FC = () => {
 
   // Operations state
   const [processing, setProcessing] = useState(false);
+  const [verificationApplying, setVerificationApplying] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
 
   // Content Preview (extracted text or video transcript)
   const [extractedText, setExtractedText] = useState<string | null>(null);
@@ -24,8 +28,24 @@ const DocumentDetailPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const navigate = useNavigate();
+  const currentDocumentStatus = document?.status;
 
-  const fetchDocument = async (showLoading = true) => {
+  const loadContent = useCallback(async (mediaKind?: DocumentResponse['media_kind']) => {
+    if (!documentId) return;
+    setLoadingContent(true);
+    try {
+      const contentRes = mediaKind === 'video'
+        ? await documentApi.getTranscript(documentId)
+        : await documentApi.getContent(documentId);
+      setExtractedText(contentRes.extracted_text || '');
+    } catch (contentError) {
+      console.error('Failed to load content preview:', contentError);
+    } finally {
+      setLoadingContent(false);
+    }
+  }, [documentId]);
+
+  const fetchDocument = useCallback(async (showLoading = true) => {
     if (!documentId) return;
     if (showLoading) setLoading(true);
     setError(null);
@@ -33,41 +53,29 @@ const DocumentDetailPage: React.FC = () => {
       const doc = await documentApi.get(documentId);
       setDocument(doc);
 
-      // If document status is processed, transcribed, or indexed, fetch its text content
-      if (['processed', 'transcribed', 'indexed', 'index_failed'].includes(doc.status)) {
-        loadContent();
+      if ([
+        'processed',
+        'transcribed',
+        'indexed',
+        'indexing',
+        'index_failed',
+      ].includes(doc.status)) {
+        await loadContent(doc.media_kind);
       }
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      if (isUnauthorizedError(err)) {
         localStorage.removeItem('access_token');
         navigate('/login');
         return;
       }
-      const detail = err.response?.data?.detail;
       setError(
-        typeof detail === 'string'
-          ? detail
-          : 'Không tải được thông tin học liệu. Có thể học liệu không tồn tại hoặc bạn không có quyền truy cập.'
+        getApiErrorDetail(err)
+          ?? 'Không tải được thông tin học liệu. Có thể học liệu không tồn tại hoặc bạn không có quyền truy cập.'
       );
     } finally {
       if (showLoading) setLoading(false);
     }
-  };
-
-  const loadContent = async () => {
-    if (!documentId) return;
-    setLoadingContent(true);
-    try {
-      const contentRes = document?.media_kind === 'video'
-        ? await documentApi.getTranscript(documentId)
-        : await documentApi.getContent(documentId);
-      setExtractedText(contentRes.extracted_text || '');
-    } catch (cErr) {
-      console.error('Failed to load content preview:', cErr);
-    } finally {
-      setLoadingContent(false);
-    }
-  };
+  }, [documentId, loadContent, navigate]);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -75,24 +83,32 @@ const DocumentDetailPage: React.FC = () => {
       navigate('/login');
       return;
     }
-    fetchDocument();
-  }, [documentId, navigate]);
+    void Promise.resolve().then(() => fetchDocument());
+  }, [documentId, fetchDocument, navigate]);
 
-  // Polling for transcribing status
+  // Poll document operations that run outside the current request/tab.
   useEffect(() => {
-    if (!document) return;
+    if (
+      !currentDocumentStatus
+      || !['transcribing', 'indexing'].includes(currentDocumentStatus)
+    ) return;
 
-    let timer: ReturnType<typeof setInterval> | undefined;
-    if (document.status === 'transcribing') {
-      timer = setInterval(() => {
-        fetchDocument(false);
-      }, 4000);
-    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    return () => {
-      if (timer) clearInterval(timer);
+    const poll = async () => {
+      await fetchDocument(false);
+      if (!cancelled) {
+        timer = setTimeout(() => void poll(), 4000);
+      }
     };
-  }, [document?.status]);
+
+    timer = setTimeout(() => void poll(), 4000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [currentDocumentStatus, fetchDocument]);
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -117,14 +133,13 @@ const DocumentDetailPage: React.FC = () => {
         await documentApi.extract(documentId);
         await fetchDocument(false);
       }
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
       setActionError(
-        typeof detail === 'string'
-          ? detail
-          : isVideo
+        detail
+          ?? (isVideo
           ? 'Không thể bắt đầu transcription cho video. Hãy kiểm tra dịch vụ AI.'
-          : 'Trích xuất văn bản thất bại.'
+          : 'Trích xuất văn bản thất bại.')
       );
     } finally {
       setProcessing(false);
@@ -132,17 +147,24 @@ const DocumentDetailPage: React.FC = () => {
   };
 
   const handleIndexDocument = async () => {
-    if (!documentId) return;
+    if (
+      !documentId
+      || verificationApplying
+      || document?.status === 'indexing'
+      || searchLoading
+      || chatBusy
+    ) return;
     setProcessing(true);
+    setSearchResults([]);
     setActionError(null);
 
     try {
       await documentApi.index(documentId);
       await fetchDocument(false);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
       setActionError(
-        typeof detail === 'string' ? detail : 'Lập chỉ mục học liệu thất bại.'
+        detail ?? 'Lập chỉ mục học liệu thất bại.'
       );
     } finally {
       setProcessing(false);
@@ -151,16 +173,21 @@ const DocumentDetailPage: React.FC = () => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!documentId || !searchQuery.trim() || searchLoading) return;
+    if (
+      !documentId
+      || !searchQuery.trim()
+      || searchLoading
+      || verificationApplying
+      || document?.status === 'indexing'
+    ) return;
 
     setSearchLoading(true);
     setActionError(null);
     try {
       const results = await documentApi.search(documentId, searchQuery);
       setSearchResults(results);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      setActionError(typeof detail === 'string' ? detail : 'Tìm kiếm ngữ nghĩa thất bại.');
+    } catch (err: unknown) {
+      setActionError(getApiErrorDetail(err) ?? 'Tìm kiếm ngữ nghĩa thất bại.');
     } finally {
       setSearchLoading(false);
     }
@@ -195,6 +222,8 @@ const DocumentDetailPage: React.FC = () => {
         return 'Chờ trích xuất';
       case 'transcribing':
         return 'Đang chạy transcription...';
+      case 'indexing':
+        return 'Đang cập nhật chỉ mục...';
       case 'transcribed':
         return 'Đã transcribe';
       case 'processed':
@@ -210,12 +239,28 @@ const DocumentDetailPage: React.FC = () => {
     }
   };
 
-  const isProcessedState = ['processed', 'transcribed', 'indexed', 'index_failed'].includes(document.status);
+  const isProcessedState = [
+    'processed',
+    'transcribed',
+    'indexed',
+    'indexing',
+    'index_failed',
+  ].includes(document.status);
   const isIndexedState = document.status === 'indexed';
+  const contentLocked = verificationApplying || document.status === 'indexing';
+  const isIndexingState = contentLocked;
+  const downstreamBusy = searchLoading || chatBusy;
+
+  const handleVerificationApplyingChange = (applying: boolean) => {
+    setVerificationApplying(applying);
+    if (applying) {
+      setSearchResults([]);
+    }
+  };
 
   return (
     <div style={styles.container}>
-      <main style={styles.mainContent}>
+      <main className="document-detail-main" style={styles.mainContent}>
         <div style={styles.navigation}>
           <button onClick={() => navigate('/documents')} style={styles.backButton}>
             ← Quay lại danh sách tài liệu
@@ -224,7 +269,17 @@ const DocumentDetailPage: React.FC = () => {
 
         {actionError && <div style={styles.errorAlert}>{actionError}</div>}
 
-        <div style={styles.layout}>
+        {contentLocked && (
+          <div className="document-operation-notice" role="status">
+            <span className="small-spinner" aria-hidden="true" />
+            <span>
+              Đang áp dụng nội dung và cập nhật chỉ mục. Tìm kiếm, hỏi đáp và
+              sinh câu hỏi được tạm khóa.
+            </span>
+          </div>
+        )}
+
+        <div className="document-detail-layout" style={styles.layout}>
           {/* Left Column: Metadata and Video Player */}
           <div style={styles.leftColumn}>
             <div style={styles.card}>
@@ -261,7 +316,7 @@ const DocumentDetailPage: React.FC = () => {
                 </div>
               )}
 
-              <div style={styles.metaGrid}>
+              <div className="document-detail-meta-grid" style={styles.metaGrid}>
                 <div style={styles.metaItem}>
                   <strong>Định dạng file:</strong>
                   <span>{document.file_type.toUpperCase()}</span>
@@ -310,7 +365,7 @@ const DocumentDetailPage: React.FC = () => {
               <div style={styles.pipeline}>
                 {/* Step 1: Upload */}
                 <div style={styles.step}>
-                  <div style={{ ...styles.stepCircle, backgroundColor: '#22c55e', color: '#fff' }}>✓</div>
+                  <div style={{ ...styles.stepCircle, backgroundColor: 'var(--success)', color: '#fff', borderColor: 'var(--success)' }}>✓</div>
                   <div style={styles.stepInfo}>
                     <strong style={styles.stepTitle}>Bước 1: Tải học liệu lên hệ thống</strong>
                     <span style={styles.stepDesc}>Học liệu đã được lưu trữ thành công trên Cloudinary.</span>
@@ -322,8 +377,9 @@ const DocumentDetailPage: React.FC = () => {
                   <div
                     style={{
                       ...styles.stepCircle,
-                      backgroundColor: isProcessedState ? '#22c55e' : document.status === 'transcribing' ? '#f59e0b' : 'var(--border)',
+                      backgroundColor: isProcessedState ? 'var(--success)' : document.status === 'transcribing' ? 'var(--warning)' : 'transparent',
                       color: isProcessedState || document.status === 'transcribing' ? '#fff' : 'var(--text)',
+                      borderColor: isProcessedState ? 'var(--success)' : document.status === 'transcribing' ? 'var(--warning)' : 'var(--border)',
                     }}
                   >
                     {isProcessedState ? '✓' : '2'}
@@ -334,7 +390,7 @@ const DocumentDetailPage: React.FC = () => {
                     </strong>
                     <span style={styles.stepDesc}>
                       {isVideo
-                        ? 'Dùng trí tuệ nhân tạo Gemini đọc và chuyển đổi tiếng nói trong video thành văn bản.'
+                        ? 'Dùng AI chuyển đổi tiếng nói trong video thành văn bản.'
                         : 'Phân tích cấu trúc file PDF/DOCX/PPTX để lấy nội dung text.'}
                     </span>
 
@@ -352,22 +408,43 @@ const DocumentDetailPage: React.FC = () => {
                     {document.status === 'transcribing' && (
                       <div style={styles.stepStatusInline}>
                         <div style={styles.smallSpinner}></div>
-                        <span>Đang chạy transcription trên hệ thống Gemini...</span>
+                        <span>Đang chạy transcription video trên hệ thống AI...</span>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* Recommended checkpoint before indexing and generation */}
+                {isProcessedState && (
+                  <VerificationPanel
+                    key={document.id}
+                    documentId={document.id}
+                    documentStatus={document.status}
+                    disabled={processing || contentLocked || downstreamBusy}
+                    onApplied={() => fetchDocument(false)}
+                    onApplyingChange={handleVerificationApplyingChange}
+                  />
+                )}
 
                 {/* Step 3: Vector Indexing */}
                 <div style={styles.step}>
                   <div
                     style={{
                       ...styles.stepCircle,
-                      backgroundColor: isIndexedState ? '#22c55e' : 'var(--border)',
-                      color: isIndexedState ? '#fff' : 'var(--text)',
+                      backgroundColor: isIndexingState
+                        ? 'var(--warning)'
+                        : isIndexedState
+                          ? 'var(--success)'
+                          : 'transparent',
+                      color: isIndexingState || isIndexedState ? '#fff' : 'var(--text)',
+                      borderColor: isIndexingState
+                        ? 'var(--warning)'
+                        : isIndexedState
+                          ? 'var(--success)'
+                          : 'var(--border)',
                     }}
                   >
-                    {isIndexedState ? '✓' : '3'}
+                    {isIndexingState ? '…' : isIndexedState ? '✓' : '3'}
                   </div>
                   <div style={styles.stepInfo}>
                     <strong style={styles.stepTitle}>Bước 3: Lập chỉ mục Vector DB (ChromaDB)</strong>
@@ -376,14 +453,21 @@ const DocumentDetailPage: React.FC = () => {
                     </span>
 
                     {/* Button for Step 3 */}
-                    {isProcessedState && !isIndexedState && (
+                    {isProcessedState && !isIndexedState && !isIndexingState && (
                       <button
                         onClick={handleIndexDocument}
-                        disabled={processing}
-                        style={{ ...styles.actionButton, backgroundColor: '#6366f1' }}
+                        disabled={processing || contentLocked || downstreamBusy}
+                        style={{ ...styles.actionButton, background: 'linear-gradient(135deg, #0ea5e9, #38bdf8)', border: 'none' }}
                       >
                         {processing ? '⏳ Đang xử lý...' : isVideo ? '⚡ Index video' : '⚡ Lập chỉ mục Vector DB'}
                       </button>
+                    )}
+
+                    {isIndexingState && (
+                      <div style={styles.stepStatusInline}>
+                        <div style={styles.smallSpinner}></div>
+                        <span>Đang cập nhật nội dung và lập lại chỉ mục...</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -393,8 +477,10 @@ const DocumentDetailPage: React.FC = () => {
                   <div
                     style={{
                       ...styles.stepCircle,
-                      backgroundColor: isIndexedState ? '#8b5cf6' : 'var(--border)',
-                      color: isIndexedState ? '#fff' : 'var(--text)',
+                      backgroundColor: isIndexedState && !contentLocked
+                        ? 'var(--accent)'
+                        : 'var(--border)',
+                      color: isIndexedState && !contentLocked ? '#fff' : 'var(--text)',
                     }}
                   >
                     4
@@ -407,8 +493,16 @@ const DocumentDetailPage: React.FC = () => {
 
                     {isIndexedState && (
                       <button
-                        onClick={() => navigate(`/documents/${document.id}/questions`)}
-                        style={styles.generateButton}
+                        onClick={() => {
+                          if (!contentLocked) {
+                            navigate(`/documents/${document.id}/questions`);
+                          }
+                        }}
+                        disabled={contentLocked}
+                        style={{
+                          ...styles.generateButton,
+                          ...(contentLocked ? styles.disabledAction : {}),
+                        }}
                       >
                         {isVideo ? '✨ Sinh câu hỏi từ video' : '✨ Sinh câu hỏi bằng AI ngay'}
                       </button>
@@ -426,17 +520,29 @@ const DocumentDetailPage: React.FC = () => {
                   Tìm kiếm thông tin theo ngữ nghĩa trong cơ sở dữ liệu vector vừa lập chỉ mục.
                 </p>
 
-                <form onSubmit={handleSearch} style={styles.searchForm}>
+                <form
+                  className="document-detail-search-form"
+                  onSubmit={handleSearch}
+                  style={styles.searchForm}
+                >
                   <input
                     type="text"
                     placeholder="Nhập câu hỏi hoặc từ khóa tìm kiếm ngữ nghĩa..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     style={styles.searchInput}
+                    disabled={contentLocked}
                     required
                   />
-                  <button type="submit" disabled={searchLoading} style={styles.searchButton}>
-                    {searchLoading ? '...' : 'Tìm kiếm'}
+                  <button
+                    type="submit"
+                    disabled={searchLoading || contentLocked}
+                    style={{
+                      ...styles.searchButton,
+                      ...(contentLocked ? styles.disabledAction : {}),
+                    }}
+                  >
+                    {searchLoading ? '...' : contentLocked ? 'Tạm khóa' : 'Tìm kiếm'}
                   </button>
                 </form>
 
@@ -466,11 +572,16 @@ const DocumentDetailPage: React.FC = () => {
             <div style={styles.card}>
               <h4 style={styles.sectionTitle}>💬 Hỏi đáp với tài liệu</h4>
               <p style={styles.cardSubtitle}>
-                Đặt câu hỏi trực tiếp với học liệu đã index. Hệ thống sẽ truy xuất các đoạn liên quan rồi trả lời bằng Gemini.
+                Đặt câu hỏi trực tiếp với học liệu đã index. Hệ thống sẽ truy xuất các đoạn liên quan rồi trả lời bằng AI.
               </p>
 
               {isIndexedState ? (
-                <ChatBox documentId={document.id} />
+                <ChatBox
+                  documentId={document.id}
+                  disabled={contentLocked}
+                  disabledMessage="Hỏi đáp tạm khóa trong khi nội dung và chỉ mục đang được cập nhật."
+                  onBusyChange={setChatBusy}
+                />
               ) : (
                 <div style={styles.chatNotice}>
                   Bạn cần index tài liệu trước khi hỏi đáp.
@@ -523,7 +634,6 @@ const styles = {
   },
   mainContent: {
     flexGrow: 1,
-    padding: '40px',
     maxWidth: '1200px',
     margin: '0 auto',
     width: '100%',
@@ -557,7 +667,6 @@ const styles = {
   },
   layout: {
     display: 'grid',
-    gridTemplateColumns: '1.1fr 0.9fr',
     gap: '30px',
     alignItems: 'start',
   },
@@ -623,7 +732,6 @@ const styles = {
   },
   metaGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '12px',
   },
   metaItem: {
@@ -738,11 +846,16 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#8b5cf6',
+    background: 'linear-gradient(135deg, var(--accent), var(--accent-2))',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
+    boxShadow: '0 4px 12px rgba(15, 118, 110, 0.24)',
+  },
+  disabledAction: {
+    cursor: 'not-allowed',
+    opacity: 0.55,
+    boxShadow: 'none',
   },
   cardSubtitle: {
     fontSize: '13px',

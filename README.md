@@ -215,3 +215,72 @@ Hệ thống đã hoàn thiện luồng xử lý tự động hóa đầu cuối
 * Bổ sung tính năng OCR bằng Gemini Multimodal để đọc được cả sơ đồ, công thức toán học và hình ảnh trong học liệu văn bản.
 * Hỗ trợ chia sẻ bộ câu hỏi giữa các tài khoản người dùng khác nhau trong cùng hệ thống.
 * Bổ sung biểu đồ thống kê kết quả làm bài của học sinh để giáo viên dễ theo dõi tiến độ năng lực.
+
+---
+
+## 💾 Hướng Dẫn Sao Lưu (Backup) & Khôi Phục (Restore)
+
+### 1. Sao lưu CSDL MongoDB
+Sử dụng công cụ `mongodump` để sao lưu dữ liệu sang thư mục cục bộ:
+```bash
+mongodump --uri="MONGODB_URI_CUA_BAN" --out=./backup/mongodb/
+```
+
+### 2. Sao lưu Học Liệu (Tệp tải lên cục bộ)
+Sao lưu thư mục chứa tài liệu/video tạm thời:
+```bash
+tar -czvf ./backup/uploads_backup.tar.gz ./backend/uploads/
+```
+
+### 3. Sao lưu Vector Storage (ChromaDB)
+Nếu ChromaDB chạy cục bộ (nhập dữ liệu trực tiếp trong `CHROMA_PERSIST_DIR`):
+```bash
+tar -czvf ./backup/chroma_db_backup.tar.gz ./backend/chroma_db/
+```
+
+### 4. Khôi phục Dữ liệu (Restore)
+* **Khôi phục MongoDB**:
+  ```bash
+  mongorestore --uri="MONGODB_URI_CUA_BAN" ./backup/mongodb/
+  ```
+* **Khôi phục File Uploads**:
+  ```bash
+  tar -xzvf ./backup/uploads_backup.tar.gz -C .
+  ```
+* **Khôi phục ChromaDB**:
+  ```bash
+  tar -xzvf ./backup/chroma_db_backup.tar.gz -C .
+  ```
+  *(Lưu ý: Nếu dữ liệu vector bị thiếu hoặc không đồng bộ với MongoDB sau khi restore, hãy chạy lại chức năng Lập Chỉ Mục Vector trên giao diện để re-index).*
+
+---
+
+## 🔄 Kế Hoạch Quay Lui (Rollback Plan)
+
+Khi triển khai phiên bản mới gặp sự cố nghiêm trọng (lỗi crash server, rò rỉ bộ nhớ, lỗi logic nghiệp vụ):
+
+1. **Xác định commit ổn định**: Xem nhật ký git để tìm commit hoạt động gần nhất:
+   ```bash
+   git log --oneline -n 10
+   ```
+2. **Thực hiện quay lui code**:
+   ```bash
+   git reset --hard <COMMIT_HASH_ON_DINH>
+   ```
+3. **Kiểm tra môi trường và cài đặt lại thư viện**:
+   ```bash
+   ./scripts/check_environment.sh
+   cd backend && pip install -r requirements.txt
+   cd ../frontend && npm install
+   ```
+4. **Khôi phục dữ liệu**: Nếu cơ sở dữ liệu bị hỏng trong phiên bản lỗi, hãy chạy lệnh restore MongoDB từ bản sao lưu gần nhất.
+5. **Chạy lại toàn bộ kiểm thử**:
+   ```bash
+   ./scripts/run_all_tests.sh
+   ```
+6. **Khởi động lại các dịch vụ**:
+   ```bash
+   ./scripts/start_backend.sh
+   ./scripts/start_frontend.sh
+   ```
+

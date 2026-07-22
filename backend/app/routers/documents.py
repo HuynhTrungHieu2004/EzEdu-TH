@@ -1,3 +1,4 @@
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -21,6 +22,12 @@ from app.schemas.document import (
     DocumentUploadResponse,
 )
 from app.services.cloudinary_service import delete_file_from_cloudinary, upload_file_to_cloudinary
+from app.services.document_mutation_service import (
+    MUTATION_TOKEN_FIELD,
+    acquire_document_mutation_lock,
+    finalize_document_mutation,
+    mutation_owner_filter,
+)
 from app.services.document_parser import extract_text
 from app.services.rag_service import add_document_chunks, search_relevant_chunks
 from app.services.text_chunking_service import split_text_into_chunks
@@ -36,8 +43,18 @@ ALLOWED_EXTENSIONS = DOCUMENT_EXTENSIONS | VIDEO_EXTENSIONS
 MAX_DOCUMENT_SIZE = 20 * 1024 * 1024  # 20MB
 MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100MB
 CONTENT_PREVIEW_LENGTH = 1000
+
+
+def ensure_lecturer_or_admin(current_user: UserResponse) -> None:
+    if getattr(current_user, "role", "user") not in {"lecturer", "admin", "user"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ giảng viên mới được quản lý học liệu.",
+        )
 DOWNLOAD_TIMEOUT_SECONDS = 60.0
 ALREADY_EXTRACTED_STATUSES = {"processed", "transcribed", "indexed"}
+BUSY_DOCUMENT_STATUSES = {"extracting", "indexing", "transcribing", "deleting"}
+INDEXABLE_DOCUMENT_STATUSES = {"processed", "transcribed", "indexed", "index_failed"}
 
 
 class SearchRequest(BaseModel):
@@ -75,7 +92,8 @@ def cleanup_temp_file(file_path: Path) -> None:
 
 def build_temp_file_path(filename: str) -> Path:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    return UPLOAD_DIR / f"{uuid.uuid4()}_{Path(filename).name}"
+    ext = Path(filename).suffix  # e.g. ".mp4", ".pdf"
+    return UPLOAD_DIR / f"{uuid.uuid4()}{ext}"
 
 
 def ensure_valid_document_id(document_id: str) -> ObjectId:
@@ -192,31 +210,66 @@ async def save_document_content(
     extracted_text: str,
     *,
     status_value: str = "processed",
+    mutation_token: Optional[str] = None,
+    mutation_status: str = "extracting",
 ) -> dict:
     now = datetime.now(timezone.utc)
     document_id = str(document["_id"])
     text_length = len(extracted_text)
     db = get_database()
 
-    await db["document_contents"].update_one(
-        {"document_id": document_id},
-        {
-            "$set": {
-                "user_id": document["user_id"],
-                "extracted_text": extracted_text,
-                "text_length": text_length,
-                "updated_at": now,
-            },
-            "$setOnInsert": {
-                "document_id": document_id,
-                "created_at": now,
-            },
+    if mutation_token:
+        owner = await db["documents"].find_one(
+            mutation_owner_filter(
+                document_id,
+                document["user_id"],
+                mutation_token,
+                status=mutation_status,
+            ),
+            {"_id": 1},
+        )
+        if not owner:
+            raise RuntimeError("Document mutation lock is no longer owned.")
+
+    content_update = {
+        "$set": {
+            "user_id": document["user_id"],
+            "extracted_text": extracted_text,
+            "text_length": text_length,
+            "updated_at": now,
         },
+        "$setOnInsert": {
+            "document_id": document_id,
+            "created_at": now,
+        },
+    }
+    if mutation_token:
+        content_update["$set"].update(
+            {
+                "content_revision": mutation_token,
+                "verification_reindex_pending": False,
+            }
+        )
+        content_update["$unset"] = {
+            "applied_verification_issue_ids": "",
+            "verification_reindexed_at": "",
+        }
+
+    await db["document_contents"].update_one(
+        {"document_id": document_id, "user_id": document["user_id"]},
+        content_update,
         upsert=True,
     )
 
-    await update_document_status(document, status_value=status_value, error_message=None)
-    return await db["document_contents"].find_one({"document_id": document_id})
+    if not mutation_token:
+        await update_document_status(
+            document,
+            status_value=status_value,
+            error_message=None,
+        )
+    return await db["document_contents"].find_one(
+        {"document_id": document_id, "user_id": document["user_id"]}
+    )
 
 
 async def download_document_to_tempfile(cloudinary_url: str, destination: Path) -> None:
@@ -273,7 +326,12 @@ async def download_document_to_tempfile(cloudinary_url: str, destination: Path) 
         ) from exc
 
 
-async def extract_and_store_document_content(document: dict, file_path: Path) -> dict:
+async def extract_and_store_document_content(
+    document: dict,
+    file_path: Path,
+    *,
+    mutation_token: Optional[str] = None,
+) -> dict:
     try:
         extracted_text = extract_text(str(file_path), document["file_type"])
     except FileNotFoundError as exc:
@@ -293,7 +351,11 @@ async def extract_and_store_document_content(document: dict, file_path: Path) ->
         ) from exc
 
     try:
-        return await save_document_content(document, extracted_text)
+        return await save_document_content(
+            document,
+            extracted_text,
+            mutation_token=mutation_token,
+        )
     except Exception as exc:
         raise DocumentProcessingError(
             "Failed to save extracted text to the database.",
@@ -353,6 +415,7 @@ async def upload_document(
     """
     Upload a learning material (document or video), store metadata, and extract text if it is a document.
     """
+    ensure_lecturer_or_admin(current_user)
     filename = Path(file.filename or "unnamed_file").name
     file_ext = filename.split(".")[-1].lower() if "." in filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:
@@ -529,6 +592,7 @@ async def extract_document_content(
     """
     Download the uploaded file from Cloudinary when needed and extract text for the owner.
     """
+    ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
     if document.get("media_kind") == "video":
         raise HTTPException(
@@ -537,7 +601,9 @@ async def extract_document_content(
         )
     db = get_database()
 
-    existing_content = await db["document_contents"].find_one({"document_id": document_id})
+    existing_content = await db["document_contents"].find_one(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
     if (
         document.get("status") in ALREADY_EXTRACTED_STATUSES
         and existing_content
@@ -550,6 +616,13 @@ async def extract_document_content(
             text_length=existing_content.get("text_length"),
         )
 
+    original_status = document.get("status", "uploaded")
+    if original_status in BUSY_DOCUMENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu đang được xử lý bởi một yêu cầu khác.",
+        )
+
     cloudinary_url = document.get("cloudinary_url")
     if not cloudinary_url:
         raise HTTPException(
@@ -557,16 +630,78 @@ async def extract_document_content(
             detail="Cloudinary URL is missing for this document.",
         )
 
-    temp_file_path = build_temp_file_path(document["original_filename"])
+    lock_token = await acquire_document_mutation_lock(
+        db,
+        document_id,
+        current_user.id,
+        expected_status=original_status,
+        operation="force_extract" if force else "extract",
+        locked_status="extracting",
+        expected_updated_at=document.get("updated_at"),
+    )
+    if not lock_token:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu vừa được thay đổi bởi một yêu cầu khác. Vui lòng thử lại.",
+        )
 
+    temp_file_path = build_temp_file_path(document["original_filename"])
+    lock_finished = False
+    content_saved = False
+    failure_status = original_status if existing_content else "failed"
     try:
         await download_document_to_tempfile(cloudinary_url, temp_file_path)
-        content_doc = await extract_and_store_document_content(document, temp_file_path)
+        content_doc = await extract_and_store_document_content(
+            document,
+            temp_file_path,
+            mutation_token=lock_token,
+        )
+        content_saved = True
+        lock_finished = await finalize_document_mutation(
+            db,
+            document_id,
+            current_user.id,
+            lock_token,
+            final_status="processed",
+            error_message=None,
+            required_status="extracting",
+        )
+        if not lock_finished:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Mất quyền cập nhật học liệu trong khi trích xuất.",
+            )
     except DocumentProcessingError as exc:
-        await fail_document_processing(document, exc.message)
+        lock_finished = await finalize_document_mutation(
+            db,
+            document_id,
+            current_user.id,
+            lock_token,
+            final_status=failure_status,
+            error_message=exc.message if failure_status == "failed" else document.get("error_message"),
+            required_status="extracting",
+        )
         raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
     finally:
         cleanup_temp_file(temp_file_path)
+        if not lock_finished:
+            await finalize_document_mutation(
+                db,
+                document_id,
+                current_user.id,
+                lock_token,
+                final_status="processed" if content_saved else failure_status,
+                error_message=(
+                    None
+                    if content_saved
+                    else document.get("error_message")
+                ),
+                required_status="extracting",
+            )
+
+    document = await db["documents"].find_one(
+        {"_id": ObjectId(document_id), "user_id": current_user.id}
+    )
 
     return build_extract_response(
         document,
@@ -612,12 +747,24 @@ async def index_document_api(
     """
     Split extracted text into chunks, index them into vector storage, and mark the document as indexed.
     """
+    ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
     db = get_database()
-    content_doc = await db["document_contents"].find_one({"document_id": document_id})
+    content_doc = await db["document_contents"].find_one(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
 
-    if document.get("status") == "indexed" and not force:
-        existing_chunks = await db["document_chunks"].count_documents({"document_id": document_id, "user_id": current_user.id})
+    original_status = document.get("status")
+    if original_status in BUSY_DOCUMENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu đang được xử lý bởi một yêu cầu khác.",
+        )
+
+    if original_status == "indexed" and not force:
+        existing_chunks = await db["document_chunks"].count_documents(
+            {"document_id": document_id, "user_id": current_user.id}
+        )
         return {
             "status": "indexed",
             "message": "Document is already indexed.",
@@ -630,24 +777,103 @@ async def index_document_api(
             detail="No extracted text found for this document. Please upload first or ensure parsing succeeded.",
         )
 
-    raw_text = content_doc["extracted_text"]
-    chunks = split_text_into_chunks(raw_text)
-    if not chunks:
+    if original_status not in INDEXABLE_DOCUMENT_STATUSES:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No text chunks could be generated from this document.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu chưa sẵn sàng để lập chỉ mục.",
         )
 
+    lock_token = await acquire_document_mutation_lock(
+        db,
+        document_id,
+        current_user.id,
+        expected_status=original_status,
+        operation="manual_index",
+        locked_status="indexing",
+        expected_updated_at=document.get("updated_at"),
+    )
+    if not lock_token:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu vừa được thay đổi bởi một yêu cầu khác. Vui lòng thử lại.",
+        )
+
+    lock_finished = False
+    indexing_started = False
     try:
+        # Re-read after acquiring the lock. A request that read an older
+        # document snapshot must never index that stale content.
+        content_doc = await db["document_contents"].find_one(
+            {"document_id": document_id, "user_id": current_user.id}
+        )
+        if not content_doc or not content_doc.get("extracted_text"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No extracted text found for this document.",
+            )
+
+        raw_text = content_doc["extracted_text"]
+        content_updated_at = content_doc.get("updated_at")
+        chunks = split_text_into_chunks(raw_text)
+        if not chunks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No text chunks could be generated from this document.",
+            )
+
+        indexing_started = True
         await add_document_chunks(document_id, current_user.id, chunks)
+
+        content_finish = await db["document_contents"].update_one(
+            {
+                "_id": content_doc["_id"],
+                "user_id": current_user.id,
+                "extracted_text": raw_text,
+                "updated_at": content_updated_at,
+            },
+            {
+                "$set": {
+                    "verification_reindex_pending": False,
+                    "verification_reindexed_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+        if content_finish.matched_count != 1:
+            raise RuntimeError("Document content changed during indexing.")
+
+        lock_finished = await finalize_document_mutation(
+            db,
+            document_id,
+            current_user.id,
+            lock_token,
+            final_status="indexed",
+            error_message=None,
+            required_status="indexing",
+        )
+        if not lock_finished:
+            raise RuntimeError("Document indexing lock is no longer owned.")
+    except HTTPException:
+        raise
     except Exception as exc:
-        await fail_document_indexing(document, "Failed to index chunks into ChromaDB.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to index this document into ChromaDB.",
         ) from exc
-
-    await update_document_status(document, status_value="indexed", error_message=None)
+    finally:
+        if not lock_finished:
+            await finalize_document_mutation(
+                db,
+                document_id,
+                current_user.id,
+                lock_token,
+                final_status="index_failed" if indexing_started else original_status,
+                error_message=(
+                    "Failed to index chunks into ChromaDB."
+                    if indexing_started
+                    else document.get("error_message")
+                ),
+                required_status="indexing",
+            )
 
     return {
         "status": "indexed",
@@ -692,7 +918,12 @@ async def search_document_chunks(
     """
     Search relevant semantic chunks within the target document using vector similarity.
     """
-    await get_owned_document(document_id, current_user)
+    document = await get_owned_document(document_id, current_user)
+    if document.get("status") != "indexed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu đang được re-index hoặc chưa lập chỉ mục thành công.",
+        )
 
     try:
         results = await search_relevant_chunks(
@@ -718,32 +949,81 @@ async def search_document_chunks(
     ]
 
 
-async def run_video_transcription_task(document: dict, user_id: str):
+async def run_video_transcription_task(
+    document: dict,
+    user_id: str,
+    mutation_token: str,
+):
     import logging
     logger = logging.getLogger("app.routers.documents")
+    db = get_database()
+    document_id = str(document["_id"])
     cloudinary_url = document.get("cloudinary_url")
     if not cloudinary_url:
-        await fail_document_processing(document, "Cloudinary URL is missing for this video.")
+        await finalize_document_mutation(
+            db,
+            document_id,
+            user_id,
+            mutation_token,
+            final_status="failed",
+            error_message="Cloudinary URL is missing for this video.",
+            required_status="transcribing",
+        )
         return
-        
+
     temp_file_path = build_temp_file_path(document["original_filename"])
-    
+
     try:
         # 1. Download video
         logger.info(f"Downloading video from {cloudinary_url} for transcription...")
         await download_document_to_tempfile(cloudinary_url, temp_file_path)
-        
-        # 2. Call Gemini transcribe
-        logger.info(f"Sending video file {temp_file_path} to Gemini for transcription...")
-        transcript = transcribe_video(str(temp_file_path))
-        
+
+        # 2. Transcribe with the configured Groq Whisper backend
+        logger.info(f"Sending video file {temp_file_path} to Groq Whisper for transcription...")
+        transcript = await asyncio.to_thread(transcribe_video, str(temp_file_path))
+
         # 3. Save transcript to MongoDB
         logger.info("Saving transcript to MongoDB...")
-        await save_document_content(document, transcript, status_value="transcribed")
+        await save_document_content(
+            document,
+            transcript,
+            status_value="transcribed",
+            mutation_token=mutation_token,
+            mutation_status="transcribing",
+        )
+        finalized = await finalize_document_mutation(
+            db,
+            document_id,
+            user_id,
+            mutation_token,
+            final_status="transcribed",
+            error_message=None,
+            required_status="transcribing",
+        )
+        if not finalized:
+            logger.warning(
+                "Discarded stale transcription completion for document %s.",
+                document_id,
+            )
+            return
         logger.info(f"Video transcription completed successfully for document {document['_id']}.")
     except Exception as exc:
-        logger.error(f"Error in run_video_transcription_task: {exc}")
-        await fail_document_processing(document, f"Video transcription failed: {str(exc)}")
+        finalized = await finalize_document_mutation(
+            db,
+            document_id,
+            user_id,
+            mutation_token,
+            final_status="failed",
+            error_message=f"Video transcription failed: {str(exc)[:240]}",
+            required_status="transcribing",
+        )
+        if finalized:
+            logger.error("Video transcription failed for document %s: %s", document_id, exc)
+        else:
+            logger.info(
+                "Ignored stale transcription task for document %s.",
+                document_id,
+            )
     finally:
         cleanup_temp_file(temp_file_path)
 
@@ -757,6 +1037,7 @@ async def transcribe_video_api(
     """
     Start transcription for a video document in the background.
     """
+    ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
     
     if document.get("media_kind") != "video":
@@ -765,34 +1046,64 @@ async def transcribe_video_api(
             detail="Only video documents can be transcribed.",
         )
         
-    if not settings.GEMINI_API_KEY:
+    if not settings.GROQ_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Chưa cấu hình dịch vụ transcription cho video.",
+            detail="Chưa cấu hình GROQ_API_KEY để transcribe video.",
         )
 
-    if document.get("status") in {"transcribed", "indexed"}:
+    original_status = document.get("status", "uploaded")
+    if original_status in {"transcribed", "indexed"}:
         return {
-            "status": document.get("status"),
+            "status": original_status,
             "message": "Video transcript is already available.",
         }
-        
-    if document.get("status") == "transcribing":
+
+    if original_status == "transcribing":
         return {
             "status": "transcribing",
             "message": "Video transcription is already in progress.",
         }
 
-    # Update status to transcribing
-    await update_document_status(document, status_value="transcribing", error_message=None)
-    
+    if original_status in BUSY_DOCUMENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu đang được xử lý bởi một yêu cầu khác.",
+        )
+
+    db = get_database()
+    mutation_token = await acquire_document_mutation_lock(
+        db,
+        document_id,
+        current_user.id,
+        expected_status=original_status,
+        operation="transcription",
+        locked_status="transcribing",
+        expected_updated_at=document.get("updated_at"),
+    )
+    if not mutation_token:
+        current = await db["documents"].find_one(
+            {"_id": ObjectId(document_id), "user_id": current_user.id},
+            {"status": 1},
+        )
+        if current and current.get("status") == "transcribing":
+            return {
+                "status": "transcribing",
+                "message": "Video transcription is already in progress.",
+            }
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu vừa được thay đổi bởi một yêu cầu khác. Vui lòng thử lại.",
+        )
+
     # Launch background task
     background_tasks.add_task(
         run_video_transcription_task,
         document=document,
-        user_id=current_user.id
+        user_id=current_user.id,
+        mutation_token=mutation_token,
     )
-    
+
     return {
         "status": "transcribing",
         "message": "Video transcription has been started in the background.",
@@ -830,3 +1141,203 @@ async def get_video_transcript(
         )
         
     return build_content_response(document, content_doc, include_full_text=True)
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_200_OK)
+async def delete_document(
+    document_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Delete a document and all associated data (content, chunks, vectors, cloud file).
+    """
+    ensure_lecturer_or_admin(current_user)
+    document = await get_owned_document(document_id, current_user)
+    db = get_database()
+
+    if document.get("status") in BUSY_DOCUMENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu đang được xử lý. Vui lòng thử xoá lại sau.",
+        )
+
+    # CAS against both revision and mutation ownership. This prevents a stale
+    # delete request from removing a document while apply/index/extract owns it.
+    delete_filter = {
+        "_id": document["_id"],
+        "user_id": current_user.id,
+        "status": document.get("status"),
+        MUTATION_TOKEN_FIELD: {"$exists": False},
+        "verification_apply_token": {"$exists": False},
+    }
+    if document.get("updated_at") is not None:
+        delete_filter["updated_at"] = document["updated_at"]
+    claimed = await db["documents"].update_one(
+        delete_filter,
+        {
+            "$set": {
+                "status": "deleting",
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+    if claimed.modified_count != 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Học liệu vừa được thay đổi hoặc đang được xử lý. Vui lòng thử lại.",
+        )
+
+    # 1. Delete vectors from ChromaDB (best-effort)
+    try:
+        from app.services.rag_service import init_chroma_client, _delete_document_vectors
+        chroma_client = init_chroma_client()
+        _delete_document_vectors(chroma_client, document_id, current_user.id)
+    except Exception:
+        pass
+
+    # 2. Delete file from Cloudinary / local storage (best-effort)
+    cloudinary_public_id = document.get("cloudinary_public_id")
+    if cloudinary_public_id:
+        try:
+            delete_file_from_cloudinary(cloudinary_public_id)
+        except Exception:
+            pass
+
+    # 3. Delete related MongoDB collections
+    await db["document_chunks"].delete_many(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
+    await db["document_contents"].delete_many(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
+    await db["question_sets"].delete_many(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
+    await db["verification_issues"].delete_many(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
+    await db["verification_sessions"].delete_many(
+        {"document_id": document_id, "user_id": current_user.id}
+    )
+    await db["documents"].delete_one(
+        {
+            "_id": document["_id"],
+            "user_id": current_user.id,
+            "status": "deleting",
+        }
+    )
+
+    return {
+        "status": "deleted",
+        "message": f"Tài liệu '{document.get('original_filename', '')}' đã được xoá thành công.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# K-Means Clustering & Similar Documents
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/analysis/clusters")
+async def get_document_clusters(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Phân cụm tài liệu tự động bằng thuật toán K-Means dựa trên vector embeddings.
+    Trả về danh sách cụm tài liệu, mỗi cụm có tên chủ đề do AI đặt.
+    """
+    from app.services.clustering_service import (
+        get_document_vectors_from_chroma,
+        cluster_documents,
+    )
+    from app.services.llm_service import label_cluster_names
+
+    # 1. Get all document vectors for this user
+    doc_vectors = get_document_vectors_from_chroma(current_user.id)
+
+    if len(doc_vectors) < 2:
+        return {
+            "clusters": [],
+            "message": "Cần ít nhất 2 tài liệu đã được lập chỉ mục để phân cụm.",
+            "total_documents": len(doc_vectors),
+        }
+
+    # 2. Run K-Means clustering
+    clusters = cluster_documents(doc_vectors)
+
+    # 3. Get document previews for AI labeling
+    db = get_database()
+    doc_previews = {}
+    doc_names = {}
+    for doc_id in doc_vectors.keys():
+        if ObjectId.is_valid(doc_id):
+            doc = await db["documents"].find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                doc_names[doc_id] = doc.get("original_filename", "")
+            content = await db["document_contents"].find_one({"document_id": doc_id})
+            if content:
+                doc_previews[doc_id] = (content.get("extracted_text", "") or "")[:200]
+
+    # 4. AI labels the clusters
+    clusters = label_cluster_names(clusters, doc_previews)
+
+    # 5. Enrich clusters with document names
+    for cluster in clusters:
+        cluster["documents"] = []
+        for doc_id in cluster.get("document_ids", []):
+            cluster["documents"].append({
+                "id": doc_id,
+                "name": doc_names.get(doc_id, "Unknown"),
+            })
+
+    return {
+        "clusters": clusters,
+        "total_documents": len(doc_vectors),
+        "algorithm": "K-Means",
+        "message": f"Đã phân cụm {len(doc_vectors)} tài liệu thành {len(clusters)} nhóm.",
+    }
+
+
+@router.get("/{document_id}/similar")
+async def get_similar_documents(
+    document_id: str,
+    top_n: int = Query(5, ge=1, le=20),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """
+    Tìm tài liệu tương tự dựa trên Cosine Similarity của vector embeddings.
+    """
+    from app.services.clustering_service import (
+        get_document_vectors_from_chroma,
+        find_similar_documents,
+    )
+
+    await get_owned_document(document_id, current_user)
+
+    # 1. Get all document vectors
+    doc_vectors = get_document_vectors_from_chroma(current_user.id)
+
+    if document_id not in doc_vectors:
+        return {
+            "similar_documents": [],
+            "message": "Tài liệu chưa được lập chỉ mục vector.",
+        }
+
+    # 2. Find similar documents
+    target_vector = doc_vectors[document_id]
+    similar = find_similar_documents(target_vector, doc_vectors, document_id, top_n)
+
+    # 3. Enrich with document names
+    db = get_database()
+    for item in similar:
+        doc_id = item["document_id"]
+        if ObjectId.is_valid(doc_id):
+            doc = await db["documents"].find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                item["document_name"] = doc.get("original_filename", "")
+                item["file_type"] = doc.get("file_type", "")
+
+    return {
+        "similar_documents": similar,
+        "algorithm": "Cosine Similarity",
+        "message": f"Tìm thấy {len(similar)} tài liệu tương tự.",
+    }

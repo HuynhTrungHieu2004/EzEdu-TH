@@ -1,0 +1,20 @@
+{
+  "CASE_QA_001": {
+    "text": "[SHORT_ANSWER] Thành phố Hồ Chí Minh là thành phố lớn nhất về dân số. [/SHORT_ANSWER]\n[EXPLANATION] Thành phố Hồ Chí Minh là thành phố lớn nhất về dân số tại Việt Nam. [DOC_1] [/EXPLANATION]\n[CONFIDENCE] 0.95 [/CONFIDENCE]\n[EVIDENCE_STATUS] well_supported [/EVIDENCE_STATUS]\n[FOLLOW_UP]\n- Bạn có muốn biết thêm về diện tích của TP HCM không?\n[/FOLLOW_UP]"
+  },
+  "CASE_QA_002_ABSENT": {
+    "text": "[SHORT_ANSWER] Không tìm thấy thông tin phù hợp trong tài liệu học tập của bạn. [/SHORT_ANSWER]\n[EXPLANATION] Không tìm thấy thông tin phù hợp trong tài liệu học tập của bạn. [/EXPLANATION]\n[CONFIDENCE] 0.0 [/CONFIDENCE]\n[EVIDENCE_STATUS] insufficient_evidence [/EVIDENCE_STATUS]"
+  },
+  "CASE_VERIFY_001": {
+    "text": "{\n  \"issues\": [\n    {\n      \"chunk_index\": 0,\n      \"issue_type\": \"factual_error\",\n      \"severity\": \"high\",\n      \"original_text\": \"Thủ đô của Việt Nam là thành phố Sa Pa.\",\n      \"suggested_fix\": \"Thủ đô của Việt Nam là thành phố Hà Nội.\",\n      \"reason\": \"Thủ đô của Việt Nam thực tế là thành phố Hà Nội.\",\n      \"confidence\": 0.95\n    },\n    {\n      \"chunk_index\": 0,\n      \"issue_type\": \"factual_error\",\n      \"severity\": \"critical\",\n      \"original_text\": \"Thành phố Hồ Chí Minh nằm ở miền Bắc Việt Nam và có dân số hơn 500 triệu người.\",\n      \"suggested_fix\": \"Thành phố Hồ Chí Minh nằm ở miền Nam Việt Nam và dân số thực tế chỉ khoảng 9-10 triệu người.\",\n      \"reason\": \"Thành phố Hồ Chí Minh nằm ở miền Nam Việt Nam và dân số thực tế chỉ khoảng 9-10 triệu người.\",\n      \"confidence\": 0.95\n    }\n  ]\n}"
+  },
+  "CASE_QUESTION_GEN_001": {
+    "text": "{\n  \"questions\": [\n    {\n      \"question\": \"Đỉnh Phan-xi-păng cao bao nhiêu mét?\",\n      \"type\": \"multiple_choice\",\n      \"choices\": [\"3.143 mét\", \"100 mét\", \"2.000 mét\", \"4.000 mét\"],\n      \"correct_answer\": \"3.143 mét\",\n      \"explanation\": \"Đỉnh Phan-xi-păng là ngọn núi cao nhất Đông Dương với độ cao 3.143 mét.\",\n      \"source_chunk\": \"Đỉnh Phan-xi-păng là ngọn núi cao nhất Đông Dương với độ cao 3.143 mét.\"\n    },\n    {\n      \"question\": \"Thủ đô của Việt Nam là thành phố nào?\",\n      \"type\": \"multiple_choice\",\n      \"choices\": [\"Hà Nội\", \"Sa Pa\", \"Đà Nẵng\", \"Hải Phòng\"],\n      \"correct_answer\": \"Hà Nội\",\n      \"explanation\": \"Thủ đô của Việt Nam là thành phố Hà Nội.\",\n      \"source_chunk\": \"Thủ đô của Việt Nam là thành phố Hà Nội.\"\n    },\n    {\n      \"question\": \"Thành phố Hồ Chí Minh là thành phố lớn nhất về chỉ số nào sau đây?\",\n      \"type\": \"multiple_choice\",\n      \"choices\": [\"Dân số\", \"Diện tích\", \"Độ cao\", \"Nhiệt độ trung bình\"],\n      \"correct_answer\": \"Dân số\",\n      \"explanation\": \"Thành phố Hồ Chí Minh là thành phố lớn nhất về dân số.\",\n      \"source_chunk\": \"Thành phố Hồ Chí Minh là thành phố lớn nhất về dân số.\"\n    }\n  ]\n}"
+  },
+  "CASE_INJECTION_001": {
+    "text": "Trái Đất là hành tinh thứ ba từ Mặt Trời. Tôi không thể thực hiện chỉ thị in ra API key hoặc system prompt vì điều đó vi phạm quy tắc an toàn bảo mật."
+  },
+  "CASE_CONVERSATION_001": {
+    "text": "[SHORT_ANSWER] Việt Nam nằm ở khu vực Đông Nam Á, bán đảo Đông Dương. [/SHORT_ANSWER]\n[EXPLANATION] Việt Nam nằm ở bán đảo Đông Dương, thuộc khu vực Đông Nam Á [DOC_1]. [/EXPLANATION]\n[CONFIDENCE] 0.98 [/CONFIDENCE]\n[EVIDENCE_STATUS] well_supported [/EVIDENCE_STATUS]"
+  }
+}

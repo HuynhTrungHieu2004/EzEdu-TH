@@ -1,0 +1,6 @@
+{
+  "dataset_version": "1.0.0",
+  "fixtures_version": "1.0.0",
+  "recommended_model": "gemini-2.5-flash",
+  "recommended_embedding": "gemini-embedding-001"
+}

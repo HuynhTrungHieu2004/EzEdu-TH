@@ -1,38 +1,65 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse } from '../api/documentApi';
 import FileUpload from '../components/FileUpload';
+import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
 
-const DocumentsPage: React.FC = () => {
+const DocumentsPage = () => {
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clusters, setClusters] = useState<Array<{
+    cluster_id: number;
+    label: string;
+    size: number;
+    documents: Array<{ id: string; name: string }>;
+  }>>([]);
+  const [clusterLoading, setClusterLoading] = useState(false);
+  const [clusterMessage, setClusterMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const fetchDocuments = async () => {
+  const handleDelete = async (doc: DocumentResponse) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xoá tài liệu "${doc.original_filename}"?\n\nHành động này sẽ xoá vĩnh viễn tài liệu, nội dung trích xuất, các bộ câu hỏi liên quan và không thể khôi phục.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(doc.id);
+    setError(null);
+    try {
+      await documentApi.delete(doc.id);
+      setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
+      setError(detail ?? 'Xoá tài liệu thất bại. Vui lòng thử lại.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const fetchDocuments = useCallback(async () => {
     setError(null);
 
     try {
       const docs = await documentApi.list();
       setDocuments(docs);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      if (isUnauthorizedError(err)) {
         localStorage.removeItem('access_token');
         navigate('/login');
         return;
       }
 
-      const detail = err.response?.data?.detail;
+      const detail = getApiErrorDetail(err);
       setError(
-        typeof detail === 'string'
-          ? detail
-          : 'Không thể tải danh sách tài liệu. Vui lòng thử lại sau.'
+        detail ?? 'Không thể tải danh sách tài liệu. Vui lòng thử lại sau.'
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -41,8 +68,22 @@ const DocumentsPage: React.FC = () => {
       return;
     }
 
-    fetchDocuments();
-  }, [navigate]);
+    void Promise.resolve().then(fetchDocuments);
+  }, [fetchDocuments, navigate]);
+
+  const fetchClusters = async () => {
+    setClusterLoading(true);
+    setClusterMessage(null);
+    try {
+      const result = await documentApi.getClusters();
+      setClusters(result.clusters || []);
+      setClusterMessage(result.message);
+    } catch {
+      setClusterMessage('Không thể phân cụm tài liệu.');
+    } finally {
+      setClusterLoading(false);
+    }
+  };
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -56,100 +97,75 @@ const DocumentsPage: React.FC = () => {
   const getStatusMeta = (status: string) => {
     switch (status) {
       case 'uploaded':
-        return {
-          label: 'Đã tải lên',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          color: '#3b82f6',
-        };
+        return { label: 'Đã tải lên', background: 'var(--accent-2-bg)', color: 'var(--accent-2)' };
       case 'processed':
-        return {
-          label: 'Đã xử lý',
-          backgroundColor: 'rgba(34, 197, 94, 0.1)',
-          color: '#22c55e',
-        };
+        return { label: 'Đã xử lý', background: 'var(--success-bg)', color: 'var(--success)' };
       case 'transcribing':
-        return {
-          label: 'Đang tạo transcript',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
-          color: '#f59e0b',
-        };
+        return { label: 'Đang tạo transcript', background: 'var(--warning-bg)', color: 'var(--warning)' };
       case 'transcribed':
-        return {
-          label: 'Đã có transcript',
-          backgroundColor: 'rgba(14, 165, 233, 0.1)',
-          color: '#0ea5e9',
-        };
+        return { label: 'Đã có transcript', background: 'var(--accent-bg)', color: 'var(--accent)' };
       case 'indexed':
-        return {
-          label: 'Đã lập chỉ mục',
-          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-          color: '#6366f1',
-        };
+        return { label: 'Đã lập chỉ mục', background: 'var(--success-bg)', color: 'var(--success)' };
       case 'index_failed':
-        return {
-          label: 'Lỗi lập chỉ mục',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          color: '#ef4444',
-        };
       case 'failed':
-        return {
-          label: 'Lỗi xử lý',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          color: '#ef4444',
-        };
+        return { label: status === 'index_failed' ? 'Lỗi lập chỉ mục' : 'Lỗi xử lý', background: 'var(--danger-bg)', color: 'var(--danger)' };
       default:
-        return {
-          label: status || 'Không xác định',
-          backgroundColor: 'rgba(148, 163, 184, 0.12)',
-          color: '#64748b',
-        };
+        return { label: status || 'Không xác định', background: 'var(--surface-muted)', color: 'var(--muted)' };
     }
   };
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
-        <p style={styles.loadingText}>Đang tải danh sách tài liệu...</p>
+      <div className="loading-state">
+        <div className="loading-stack">
+          <span className="spinner" />
+          <p>Đang tải danh sách tài liệu...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <main style={styles.mainContent}>
-        <div style={styles.pageHeader}>
+    <div className="page">
+      <div className="page-wide">
+        <div className="page-header">
           <div>
-            <h2 style={styles.pageTitle}>Quản lý Học liệu Điện tử</h2>
-            <p style={styles.pageSubtitle}>Tải lên và quản lý các tài liệu PDF, DOCX, PPTX và video MP4, MOV, WEBM, MKV của bạn.</p>
+            <p className="eyebrow">Kho học liệu</p>
+            <h2 className="section-title">Quản lý học liệu điện tử</h2>
+            <p className="section-subtitle">
+              Tải lên và quản lý tài liệu PDF, DOCX, PPTX cùng video MP4, MOV, WEBM, MKV.
+            </p>
           </div>
-          <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
-            ← Quay lại Dashboard
+          <button type="button" onClick={() => navigate('/dashboard')} className="btn-secondary">
+            Quay lại Dashboard
           </button>
         </div>
 
         <FileUpload onUploadSuccess={fetchDocuments} />
 
-        {error && <div style={styles.errorAlert}>{error}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
 
-        <div style={styles.tableCard}>
-          <h3 style={styles.tableTitle}>Danh sách tài liệu của bạn</h3>
+        <section className="table-card">
+          <div className="table-card-header">
+            <h3 className="table-title">Danh sách tài liệu của bạn</h3>
+            <span className="tag">{documents.length} mục</span>
+          </div>
 
           {documents.length === 0 ? (
-            <div style={styles.emptyState}>
+            <div className="empty-state">
               Bạn chưa tải lên học liệu nào. Hãy chọn file PDF, DOCX, PPTX hoặc video ở phần trên để bắt đầu.
             </div>
           ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+            <div className="table-wrapper">
+              <table className="data-table">
                 <thead>
-                  <tr style={styles.thRow}>
-                    <th style={styles.th}>Tên tài liệu</th>
-                    <th style={styles.th}>Loại file</th>
-                    <th style={styles.th}>Dung lượng</th>
-                    <th style={styles.th}>Trạng thái</th>
-                    <th style={styles.th}>Thời gian upload</th>
-                    <th style={{ ...styles.th, textAlign: 'right' }}>Hành động</th>
+                  <tr>
+                    <th>Tên tài liệu</th>
+                    <th>Loại file</th>
+                    <th>Dung lượng</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian upload</th>
+                    <th style={{ textAlign: 'right' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -158,42 +174,50 @@ const DocumentsPage: React.FC = () => {
                     const statusMeta = getStatusMeta(doc.status);
 
                     return (
-                      <tr key={doc.id} style={styles.tr}>
-                        <td style={styles.tdName} onClick={() => navigate(`/documents/${doc.id}`)}>
-                          {isVideo ? '📹' : '📄'} {doc.original_filename}
-                        </td>
-                        <td style={styles.td}>
-                          <span
-                            style={{
-                              ...styles.typeTag,
-                              backgroundColor: isVideo ? 'rgba(245, 158, 11, 0.1)' : 'var(--code-bg)',
-                              color: isVideo ? '#d97706' : 'var(--text-h)',
-                              borderColor: isVideo ? 'rgba(245, 158, 11, 0.2)' : 'var(--border)',
-                            }}
+                      <tr key={doc.id}>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/documents/${doc.id}`)}
+                            className="document-link"
                           >
+                            <span className="doc-kind">{isVideo ? 'VID' : 'DOC'}</span>
+                            {doc.original_filename}
+                          </button>
+                        </td>
+                        <td>
+                          <span className="tag">
                             {isVideo ? 'Video' : 'Tài liệu'} ({doc.file_type.toUpperCase()})
                           </span>
                         </td>
-                        <td style={styles.td}>{formatSize(doc.file_size)}</td>
-                        <td style={styles.td}>
+                        <td>{formatSize(doc.file_size)}</td>
+                        <td>
                           <span
-                            style={{
-                              ...styles.statusTag,
-                              backgroundColor: statusMeta.backgroundColor,
-                              color: statusMeta.color,
-                            }}
+                            className="tag"
+                            style={{ background: statusMeta.background, color: statusMeta.color }}
                           >
                             {statusMeta.label}
                           </span>
                         </td>
-                        <td style={styles.td}>{new Date(doc.created_at).toLocaleString('vi-VN')}</td>
-                        <td style={styles.tdActions}>
-                          <button
-                            onClick={() => navigate(`/documents/${doc.id}`)}
-                            style={styles.detailButton}
-                          >
-                            Xem chi tiết
-                          </button>
+                        <td>{new Date(doc.created_at).toLocaleString('vi-VN')}</td>
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/documents/${doc.id}`)}
+                              className="btn-secondary"
+                            >
+                              Xem chi tiết
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(doc)}
+                              disabled={deletingId === doc.id}
+                              className="btn-danger"
+                            >
+                              {deletingId === doc.id ? 'Đang xoá...' : 'Xoá'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -202,172 +226,80 @@ const DocumentsPage: React.FC = () => {
               </table>
             </div>
           )}
-        </div>
-      </main>
+        </section>
+
+        {/* K-Means Clustering Section */}
+        <section className="table-card" style={{ marginTop: '24px' }}>
+          <div className="table-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 className="table-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🔬</span> Phân cụm tài liệu (K-Means)
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0' }}>
+                Tự động nhóm tài liệu theo chủ đề dựa trên vector embeddings
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchClusters}
+              disabled={clusterLoading}
+              className="btn-secondary"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {clusterLoading ? 'Đang phân cụm...' : '🔄 Phân cụm'}
+            </button>
+          </div>
+
+          {clusterMessage && (
+            <p style={{ padding: '0 20px', fontSize: '13px', color: 'var(--muted)', marginBottom: '8px' }}>
+              {clusterMessage}
+            </p>
+          )}
+
+          {clusters.length > 0 ? (
+            <div style={{ padding: '0 20px 20px', display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+              {clusters.map((cluster) => (
+                <div key={cluster.cluster_id} style={{
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: 'var(--surface-muted)',
+                  border: '1px solid var(--border)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      color: 'var(--accent)',
+                    }}>
+                      📁 {cluster.label}
+                    </span>
+                    <span className="tag" style={{ fontSize: '11px' }}>{cluster.size} tài liệu</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {cluster.documents.map((doc) => (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => navigate(`/documents/${doc.id}`)}
+                        className="document-link"
+                        style={{ fontSize: '12px', textAlign: 'left', padding: '4px 0' }}
+                      >
+                        📄 {doc.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !clusterLoading && (
+            <div className="empty-state" style={{ padding: '20px' }}>
+              Nhấn "Phân cụm" để AI tự động nhóm tài liệu theo chủ đề. Cần ít nhất 2 tài liệu đã được lập chỉ mục.
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    minHeight: '100svh',
-    backgroundColor: 'var(--bg)',
-    width: '100%',
-  },
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexGrow: 1,
-    backgroundColor: 'var(--bg)',
-  },
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid var(--border)',
-    borderTop: '4px solid var(--accent)',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  loadingText: {
-    marginTop: '16px',
-    color: 'var(--text)',
-  },
-  mainContent: {
-    flexGrow: 1,
-    padding: '40px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-    textAlign: 'left' as const,
-  },
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '28px',
-    flexWrap: 'wrap' as const,
-    gap: '16px',
-  },
-  pageTitle: {
-    fontSize: '24px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    margin: '0 0 6px 0',
-  },
-  pageSubtitle: {
-    fontSize: '14px',
-    color: 'var(--text)',
-    margin: 0,
-  },
-  backButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  errorAlert: {
-    padding: '12px 16px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#ef4444',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  tableCard: {
-    padding: '30px 24px',
-    borderRadius: '12px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    boxShadow: 'var(--shadow)',
-  },
-  tableTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    margin: '0 0 20px 0',
-  },
-  emptyState: {
-    padding: '40px',
-    textAlign: 'center' as const,
-    color: 'var(--text)',
-    fontSize: '14px',
-    backgroundColor: 'var(--code-bg)',
-    borderRadius: '8px',
-    border: '1px dashed var(--border)',
-  },
-  tableWrapper: {
-    overflowX: 'auto' as const,
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
-    fontSize: '14px',
-  },
-  thRow: {
-    borderBottom: '2px solid var(--border)',
-  },
-  th: {
-    padding: '12px 16px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    textAlign: 'left' as const,
-  },
-  tr: {
-    borderBottom: '1px solid var(--border)',
-  },
-  td: {
-    padding: '16px',
-    color: 'var(--text)',
-    verticalAlign: 'middle' as const,
-  },
-  tdName: {
-    padding: '16px',
-    fontWeight: '600',
-    color: 'var(--accent)',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    verticalAlign: 'middle' as const,
-  },
-  typeTag: {
-    fontSize: '11px',
-    fontWeight: '700',
-    backgroundColor: 'var(--code-bg)',
-    padding: '4px 8px',
-    borderRadius: '999px',
-    border: '1px solid var(--border)',
-  },
-  statusTag: {
-    fontSize: '12px',
-    fontWeight: '600',
-    padding: '5px 10px',
-    borderRadius: '999px',
-    display: 'inline-block',
-  },
-  tdActions: {
-    padding: '16px',
-    textAlign: 'right' as const,
-    whiteSpace: 'nowrap' as const,
-  },
-  detailButton: {
-    padding: '8px 14px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
 };
 
 export default DocumentsPage;

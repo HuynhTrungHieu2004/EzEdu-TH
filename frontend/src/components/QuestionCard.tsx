@@ -1,51 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { QuestionItem } from '../api/questionApi';
 
 interface QuestionCardProps {
   question: QuestionItem;
   index: number;
+  /** When true, answers/explanations are hidden until user clicks "Hiện đáp án". */
+  studyMode?: boolean;
+  /** External signal to reveal/hide answer in study mode. */
+  forceReveal?: boolean;
+  savedAnswer?: string;
+  onAnswerChange?: (questionIndex: number, answer: string) => void;
+  examMode?: boolean;
+  submittedResult?: {
+    is_correct: boolean;
+    correct_answer: string;
+  };
 }
 
-const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
+const QuestionCard: React.FC<QuestionCardProps> = ({
+  question,
+  index,
+  studyMode = false,
+  forceReveal = false,
+  savedAnswer,
+  onAnswerChange,
+  examMode = false,
+  submittedResult,
+}) => {
   const isMultipleChoice = question.question_type === 'multiple_choice';
   const isTrueFalse = question.question_type === 'true_false';
   const isShortAnswer = !question.options || Object.keys(question.options).length === 0;
+  const hasOptions = question.options && Object.keys(question.options).length > 0;
+  const statusLabels: Record<string, string> = {
+    draft: 'Bản nháp',
+    review_pending: 'Chờ duyệt',
+    approved: 'Đã duyệt',
+    published: 'Đã xuất bản',
+  };
 
   // State for multiple choice & true/false
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(savedAnswer || null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   // State for short answer
-  const [shortAnswerInput, setShortAnswerInput] = useState('');
+  const [shortAnswerInput, setShortAnswerInput] = useState(savedAnswer || '');
   const [shortAnswerChecked, setShortAnswerChecked] = useState(false);
 
+  // Study mode: manual reveal toggle
+  const [manualReveal, setManualReveal] = useState(false);
+
+  // Sync forceReveal from parent
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setManualReveal(forceReveal);
+      if (!forceReveal) {
+        // Reset interactive state when hiding answers
+        setSelectedAnswer(null);
+        setShortAnswerChecked(false);
+        setShortAnswerInput('');
+      }
+    });
+  }, [forceReveal]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      if (hasOptions) {
+        setSelectedAnswer(savedAnswer || null);
+      } else {
+        setShortAnswerInput(savedAnswer || '');
+      }
+    });
+  }, [savedAnswer, hasOptions]);
+
   const handleOptionClick = (key: string) => {
-    if (selectedAnswer) return; // Prevent changing answer
+    if (selectedAnswer && !examMode) return; // Prevent changing answer outside exam mode
     setSelectedAnswer(key);
+    onAnswerChange?.(index - 1, key);
   };
 
   const handleShortAnswerCheck = (e: React.FormEvent) => {
     e.preventDefault();
     if (!shortAnswerInput.trim()) return;
     setShortAnswerChecked(true);
+    onAnswerChange?.(index - 1, shortAnswerInput.trim());
   };
 
-  const hasOptions = question.options && Object.keys(question.options).length > 0;
-  const showExplanation = hasOptions ? (selectedAnswer !== null) : shortAnswerChecked;
+  // Determine if explanation/answer should be shown
+  const isRevealed = studyMode ? manualReveal : true;
+  const showExplanation = examMode
+    ? Boolean(submittedResult)
+    : hasOptions
+      ? (selectedAnswer !== null)
+      : shortAnswerChecked;
+
+  // In study mode with reveal off, hide answer feedback
+  const showAnswerFeedback = examMode
+    ? Boolean(submittedResult)
+    : studyMode
+      ? (manualReveal || selectedAnswer !== null)
+      : true;
 
   return (
-    <div style={styles.card}>
-      <div style={styles.header}>
-        <span style={styles.badge}>Câu {index}</span>
-        <span style={styles.typeBadge}>
-          {isMultipleChoice ? 'Trắc nghiệm' : isTrueFalse ? 'Đúng/Sai' : 'Tự luận ngắn'}
-        </span>
+    <div style={cardStyles.card}>
+      <div style={cardStyles.header}>
+        <span style={cardStyles.badge}>Câu {index}</span>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={cardStyles.typeBadge}>
+            {isMultipleChoice ? 'Trắc nghiệm' : isTrueFalse ? 'Đúng/Sai' : 'Tự luận ngắn'}
+          </span>
+          {question.status && (
+            <span style={cardStyles.typeBadge}>
+              {statusLabels[question.status] || question.status}
+            </span>
+          )}
+          {question.bloom_level && (() => {
+            const bloomMap: Record<string, { label: string; color: string }> = {
+              remember: { label: 'Nhận biết', color: '#22c55e' },
+              understand: { label: 'Thông hiểu', color: '#3b82f6' },
+              apply: { label: 'Vận dụng', color: '#f59e0b' },
+              analyze: { label: 'Vận dụng cao', color: '#ef4444' },
+            };
+            const bloom = bloomMap[question.bloom_level];
+            if (!bloom) return null;
+            return (
+              <span style={{
+                fontSize: '11px',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                background: `${bloom.color}15`,
+                color: bloom.color,
+                fontWeight: 600,
+                border: `1px solid ${bloom.color}30`,
+              }}>
+                🎓 {bloom.label}
+              </span>
+            );
+          })()}
+          {(question.tags || []).map((tag) => (
+            <span key={tag} style={cardStyles.tagBadge}>{tag}</span>
+          ))}
+          {/* Study mode reveal toggle */}
+          {studyMode && !examMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setManualReveal((prev) => {
+                  if (prev) {
+                    // Hiding: reset interactive state
+                    setSelectedAnswer(null);
+                    setShortAnswerChecked(false);
+                    setShortAnswerInput('');
+                  }
+                  return !prev;
+                });
+              }}
+              style={{
+                fontSize: '11px',
+                padding: '3px 10px',
+                borderRadius: '12px',
+                background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'rgba(139, 124, 248, 0.1)',
+                color: manualReveal ? '#10b981' : 'var(--accent)',
+                fontWeight: 600,
+                border: `1px solid ${manualReveal ? 'rgba(16, 185, 129, 0.3)' : 'var(--accent-border)'}`,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              {manualReveal ? '👁️ Ẩn đáp án' : '👁️‍🗨️ Hiện đáp án'}
+            </button>
+          )}
+        </div>
       </div>
 
-      <h4 style={styles.questionText}>{question.question}</h4>
+      <h4 style={cardStyles.questionText}>{question.question}</h4>
 
       {hasOptions && question.options && (
-        <div style={styles.optionsList}>
+        <div style={cardStyles.optionsList}>
           {Object.entries(question.options).map(([key, val]) => {
             const isSelected = key === selectedAnswer;
             let isCorrect = key.toUpperCase() === question.correct_answer.toUpperCase();
@@ -66,22 +196,27 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
             let badgeColor = 'var(--accent)';
             let statusLabel = null;
 
-            if (hasSelectedAny) {
+            const shouldShowResult = showAnswerFeedback && hasSelectedAny;
+
+            if (shouldShowResult) {
               if (isCorrect) {
                 // Correct option always highlighted in green
                 borderColor = '#22c55e';
                 backgroundColor = 'rgba(34, 197, 94, 0.05)';
                 badgeBg = '#22c55e';
                 badgeColor = '#fff';
-                statusLabel = <span style={styles.correctLabel}>✓ Đáp án đúng</span>;
+                statusLabel = <span style={cardStyles.correctLabel}>✓ Đáp án đúng</span>;
               } else if (isSelected) {
                 // Wrong selected option highlighted in red
                 borderColor = '#ef4444';
                 backgroundColor = 'rgba(239, 68, 68, 0.05)';
                 badgeBg = '#ef4444';
                 badgeColor = '#fff';
-                statusLabel = <span style={styles.wrongLabel}>✗ Bạn chọn sai</span>;
+                statusLabel = <span style={cardStyles.wrongLabel}>✗ Bạn chọn sai</span>;
               }
+            } else if (examMode && isSelected) {
+              borderColor = 'var(--accent)';
+              backgroundColor = 'var(--code-bg)';
             } else {
               // Interactive hover styles when no option is selected yet
               const isHovered = key === hoveredKey;
@@ -98,23 +233,23 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
                 onMouseEnter={() => !hasSelectedAny && setHoveredKey(key)}
                 onMouseLeave={() => !hasSelectedAny && setHoveredKey(null)}
                 style={{
-                  ...styles.optionItem,
+                  ...cardStyles.optionItem,
                   borderColor,
                   backgroundColor,
-                  cursor: hasSelectedAny ? 'default' : 'pointer',
+                  cursor: hasSelectedAny && !examMode ? 'default' : 'pointer',
                   transition: 'all 0.2s ease',
                 }}
               >
                 <span
                   style={{
-                    ...styles.optionLetter,
+                    ...cardStyles.optionLetter,
                     backgroundColor: badgeBg,
                     color: badgeColor,
                   }}
                 >
                   {key}
                 </span>
-                <span style={styles.optionVal}>{val}</span>
+                <span style={cardStyles.optionVal}>{val}</span>
                 {statusLabel}
               </div>
             );
@@ -123,29 +258,30 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
       )}
 
       {isShortAnswer && (
-        <div style={styles.shortAnswerSection}>
+        <div style={cardStyles.shortAnswerSection}>
           {!shortAnswerChecked ? (
-            <form onSubmit={handleShortAnswerCheck} style={styles.shortAnswerForm}>
+            <form onSubmit={handleShortAnswerCheck} style={cardStyles.shortAnswerForm}>
               <input
                 type="text"
                 value={shortAnswerInput}
                 onChange={(e) => setShortAnswerInput(e.target.value)}
                 placeholder="Nhập câu trả lời của bạn vào đây..."
-                style={styles.shortAnswerInput}
+                style={cardStyles.shortAnswerInput}
                 required
               />
-              <button type="submit" style={styles.checkButton}>
+              <button type="submit" style={cardStyles.checkButton}>
                 Kiểm tra đáp án
               </button>
             </form>
           ) : (
-            <div style={styles.shortAnswerResult}>
-              <div style={styles.userAnswerBox}>
+            <div style={cardStyles.shortAnswerResult}>
+              <div style={cardStyles.userAnswerBox}>
                 <strong>Câu trả lời của bạn: </strong>
                 <span
                   style={{
-                    color:
-                      shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()
+                    color: examMode && !submittedResult
+                      ? 'var(--text-h)'
+                      : (submittedResult?.is_correct ?? shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase())
                         ? '#22c55e'
                         : '#ef4444',
                     fontWeight: 'bold',
@@ -153,32 +289,74 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index }) => {
                 >
                   {shortAnswerInput}
                 </span>
-                {shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase() ? (
-                  <span style={styles.correctLabel}> (Chính xác!)</span>
-                ) : (
-                  <span style={styles.wrongLabel}> (Chưa chính xác)</span>
+                {(!examMode || submittedResult) && (
+                  (submittedResult?.is_correct ?? shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase()) ? (
+                    <span style={cardStyles.correctLabel}> (Chính xác!)</span>
+                  ) : (
+                    <span style={cardStyles.wrongLabel}> (Chưa chính xác)</span>
+                  )
                 )}
               </div>
-              <div style={styles.shortAnswerExpectedBox}>
-                <strong>Đáp án đúng: </strong>
-                <span style={styles.answerText}>{question.correct_answer}</span>
-              </div>
+              {examMode && !submittedResult && (
+                <div style={cardStyles.shortAnswerExpectedBox}>
+                  <strong>Đã ghi nhận câu trả lời. </strong>
+                  Hệ thống sẽ chấm sau khi bạn nộp bài.
+                </div>
+              )}
+              {isRevealed && !examMode && (
+                <div style={cardStyles.shortAnswerExpectedBox}>
+                  <strong>Đáp án đúng: </strong>
+                  <span style={cardStyles.answerText}>{question.correct_answer}</span>
+                </div>
+              )}
+              {examMode && submittedResult && (
+                <div style={cardStyles.shortAnswerExpectedBox}>
+                  <strong>Đáp án đúng: </strong>
+                  <span style={cardStyles.answerText}>{submittedResult.correct_answer}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {showExplanation && (
-        <div style={styles.explanationSection}>
-          <div style={styles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
-          <p style={styles.explanationText}>{question.explanation}</p>
+      {/* Study mode: show revealed answer without interaction */}
+      {studyMode && manualReveal && !examMode && !selectedAnswer && hasOptions && (
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: '8px',
+          backgroundColor: 'rgba(34, 197, 94, 0.06)',
+          border: '1px solid rgba(34, 197, 94, 0.2)',
+          fontSize: '14px',
+          color: 'var(--text-h)',
+        }}>
+          <strong style={{ color: '#22c55e' }}>✓ Đáp án đúng:</strong>{' '}
+          {question.correct_answer}
+          {question.options && question.options[question.correct_answer]
+            ? ` — ${question.options[question.correct_answer]}`
+            : ''}
+        </div>
+      )}
+
+      {showExplanation && (examMode || isRevealed) && (
+        <div style={cardStyles.explanationSection}>
+          <div style={cardStyles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
+          <p style={cardStyles.explanationText}>{question.explanation}</p>
+        </div>
+      )}
+
+      {/* Study mode: show explanation on manual reveal even without interaction */}
+      {studyMode && manualReveal && !showExplanation && (
+        <div style={cardStyles.explanationSection}>
+          <div style={cardStyles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
+          <p style={cardStyles.explanationText}>{question.explanation}</p>
         </div>
       )}
     </div>
   );
 };
 
-const styles = {
+const cardStyles = {
   card: {
     padding: '24px',
     borderRadius: '12px',
@@ -194,6 +372,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap' as const,
+    gap: '8px',
   },
   badge: {
     fontSize: '12px',
@@ -210,6 +390,15 @@ const styles = {
     padding: '4px 8px',
     borderRadius: '4px',
     border: '1px solid var(--border)',
+  },
+  tagBadge: {
+    fontSize: '11px',
+    color: '#0f766e',
+    backgroundColor: 'rgba(20, 184, 166, 0.1)',
+    padding: '3px 8px',
+    borderRadius: '999px',
+    border: '1px solid rgba(20, 184, 166, 0.25)',
+    fontWeight: 600,
   },
   questionText: {
     fontSize: '16px',

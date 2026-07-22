@@ -99,6 +99,33 @@ def _local_hash_embeddings(texts: list[str]) -> list[list[float]]:
     return [_local_hash_embedding(text) for text in texts]
 
 
+def _token_set(text: str) -> set[str]:
+    return set(re.findall(r"\w+", (text or "").lower()))
+
+
+def _lexical_overlap_score(query: str, text: str) -> float:
+    query_tokens = _token_set(query)
+    text_tokens = _token_set(text)
+    if not query_tokens or not text_tokens:
+        return 0.0
+    return len(query_tokens & text_tokens) / len(query_tokens)
+
+
+def _rerank_chunks(query: str, chunks: list[dict], limit: int) -> list[dict]:
+    reranked = []
+    for chunk in chunks:
+        distance = float(chunk.get("distance", 1.0))
+        vector_score = max(0.0, 1.0 - distance)
+        lexical_score = _lexical_overlap_score(query, chunk.get("text", ""))
+        rerank_score = (vector_score * 0.75) + (lexical_score * 0.25)
+        enriched = dict(chunk)
+        enriched["rerank_score"] = round(rerank_score, 6)
+        enriched["lexical_score"] = round(lexical_score, 6)
+        reranked.append(enriched)
+    reranked.sort(key=lambda item: item.get("rerank_score", 0.0), reverse=True)
+    return reranked[:limit]
+
+
 def _build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
     if not texts:
         return "local", []
@@ -190,9 +217,10 @@ async def search_relevant_chunks(document_id: str, user_id: str, query: str, n_r
     source, query_embedding = _build_query_embedding(query)
     dimension = len(query_embedding) if query_embedding else EMBEDDING_DIMENSION
     collection = _get_collection(source, dimension)
+    fetch_limit = max(n_results, min(n_results * 3, 30))
     raw_results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=n_results,
+        n_results=fetch_limit,
         where=_build_owner_filter(document_id, user_id),
         include=["documents", "metadatas", "distances"],
     )
@@ -219,4 +247,82 @@ async def search_relevant_chunks(document_id: str, user_id: str, query: str, n_r
             }
         )
 
-    return results
+    return _rerank_chunks(query, results, n_results)
+
+
+async def search_user_chunks_advanced(
+    user_id: str,
+    query: str,
+    document_ids: list[str] = None,
+    n_results: int = 5,
+) -> list[dict]:
+    """
+    Search relevant chunks across all or selected documents owned by the user.
+    """
+    if not query.strip():
+        return []
+
+    source, query_embedding = _build_query_embedding(query)
+    dimension = len(query_embedding) if query_embedding else EMBEDDING_DIMENSION
+    collection = _get_collection(source, dimension)
+
+    # Build ChromaDB filter
+    if document_ids:
+        if len(document_ids) == 1:
+            where_filter = {
+                "$and": [
+                    {"user_id": user_id},
+                    {"document_id": document_ids[0]}
+                ]
+            }
+        else:
+            where_filter = {
+                "$and": [
+                    {"user_id": user_id},
+                    {"document_id": {"$in": document_ids}}
+                ]
+            }
+    else:
+        where_filter = {"user_id": user_id}
+
+    fetch_limit = max(n_results, min(n_results * 3, 30))
+    raw_results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=fetch_limit,
+        where=where_filter,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    ids = raw_results.get("ids", [[]])[0]
+    documents = raw_results.get("documents", [[]])[0]
+    metadatas = raw_results.get("metadatas", [[]])[0]
+    distances = raw_results.get("distances", [[]])[0]
+
+    results = []
+    for index, chunk_id in enumerate(ids):
+        metadata = metadatas[index] or {}
+        results.append(
+            {
+                "id": chunk_id,
+                "text": documents[index],
+                "metadata": {
+                    "chunk_index": int(metadata.get("chunk_index", index)),
+                    "document_id": metadata.get("document_id", ""),
+                    "text_preview": metadata.get("text_preview", ""),
+                    "created_at": metadata.get("created_at"),
+                },
+                "distance": float(distances[index]) if index < len(distances) else 0.0,
+            }
+        )
+
+    return _rerank_chunks(query, results, n_results)
+
+
+def ping_chroma() -> bool:
+    """Check health connection to ChromaDB"""
+    try:
+        cl = init_chroma_client()
+        cl.heartbeat()
+        return True
+    except Exception:
+        return False

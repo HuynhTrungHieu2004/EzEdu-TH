@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
+import { getApiErrorDetail } from '../api/errors';
 
-const RegisterPage: React.FC = () => {
+const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'student' | 'lecturer'>('student');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +22,7 @@ const RegisterPage: React.FC = () => {
     }
   }, [navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -40,17 +43,16 @@ const RegisterPage: React.FC = () => {
         email,
         full_name: fullName,
         password,
+        role,
       });
       // Redirect to login page with success message
       navigate('/login', {
         state: { message: 'Đăng ký tài khoản thành công! Vui lòng đăng nhập.' },
       });
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err: unknown) {
+      const detail = getApiErrorDetail(err);
       setError(
-        typeof detail === 'string'
-          ? detail
-          : 'Đăng ký không thành công. Email có thể đã tồn tại hoặc không hợp lệ.'
+        detail ?? 'Đăng ký không thành công. Email có thể đã tồn tại hoặc không hợp lệ.'
       );
     } finally {
       setLoading(false);
@@ -58,19 +60,19 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.logoContainer}>
-          <div style={styles.logoBadge}>AI</div>
-          <h2 style={styles.title}>Đăng Ký Tài Khoản</h2>
-          <p style={styles.subtitle}>Tạo tài khoản để sử dụng hệ thống</p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-header">
+          <div className="auth-mark" translate="no">AI</div>
+          <h2 className="auth-title">Đăng ký tài khoản</h2>
+          <p className="auth-subtitle">Tạo tài khoản để sử dụng hệ thống</p>
         </div>
 
-        {error && <div style={styles.errorAlert}>{error}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
-            <label htmlFor="register-full-name" style={styles.label}>Họ và tên</label>
+        <form onSubmit={handleSubmit} className="form-stack">
+          <div className="form-group">
+            <label htmlFor="register-full-name" className="form-label">Họ và tên</label>
             <input
               id="register-full-name"
               type="text"
@@ -79,12 +81,12 @@ const RegisterPage: React.FC = () => {
               placeholder="Nguyễn Văn A"
               required
               disabled={loading}
-              style={styles.input}
+              className="form-input"
             />
           </div>
 
-          <div style={styles.formGroup}>
-            <label htmlFor="register-email" style={styles.label}>Email</label>
+          <div className="form-group">
+            <label htmlFor="register-email" className="form-label">Email</label>
             <input
               id="register-email"
               type="email"
@@ -93,12 +95,26 @@ const RegisterPage: React.FC = () => {
               placeholder="name@example.com"
               required
               disabled={loading}
-              style={styles.input}
+              className="form-input"
             />
           </div>
 
-          <div style={styles.formGroup}>
-            <label htmlFor="register-password" style={styles.label}>Mật khẩu (tối thiểu 6 ký tự)</label>
+          <div className="form-group">
+            <label htmlFor="register-role" className="form-label">Bạn là</label>
+            <select
+              id="register-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'student' | 'lecturer')}
+              disabled={loading}
+              className="form-select"
+            >
+              <option value="student">Sinh viên</option>
+              <option value="lecturer">Giảng viên</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="register-password" className="form-label">Mật khẩu (tối thiểu 6 ký tự)</label>
             <input
               id="register-password"
               type="password"
@@ -107,12 +123,12 @@ const RegisterPage: React.FC = () => {
               placeholder="••••••••"
               required
               disabled={loading}
-              style={styles.input}
+              className="form-input"
             />
           </div>
 
-          <div style={styles.formGroup}>
-            <label htmlFor="register-confirm-password" style={styles.label}>Xác nhận mật khẩu</label>
+          <div className="form-group">
+            <label htmlFor="register-confirm-password" className="form-label">Xác nhận mật khẩu</label>
             <input
               id="register-confirm-password"
               type="password"
@@ -121,132 +137,24 @@ const RegisterPage: React.FC = () => {
               placeholder="••••••••"
               required
               disabled={loading}
-              style={styles.input}
+              className="form-input"
             />
           </div>
 
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Đang đăng ký...' : 'Đăng Ký Tài Khoản'}
+          <button type="submit" disabled={loading} className="btn-primary btn-full">
+            {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
           </button>
         </form>
 
-        <div style={styles.footer}>
+        <div className="auth-footer">
           Đã có tài khoản?{' '}
-          <span onClick={() => navigate('/login')} style={styles.link}>
+          <button type="button" onClick={() => navigate('/login')} className="text-link">
             Đăng nhập
-          </span>
+          </button>
         </div>
       </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexGrow: 1,
-    padding: '24px',
-    backgroundColor: 'var(--bg)',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '420px',
-    padding: '40px 32px',
-    borderRadius: '16px',
-    border: '1px solid var(--border)',
-    boxShadow: 'var(--shadow)',
-    backgroundColor: 'var(--bg)',
-    textAlign: 'left' as const,
-  },
-  logoContainer: {
-    textAlign: 'center' as const,
-    marginBottom: '32px',
-  },
-  logoBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '48px',
-    height: '48px',
-    borderRadius: '12px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    fontSize: '20px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    border: '1px solid var(--accent-border)',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '600',
-    margin: '0 0 6px 0',
-    color: 'var(--text-h)',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: 'var(--text)',
-    margin: 0,
-  },
-  errorAlert: {
-    padding: '12px 16px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#ef4444',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '16px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text-h)',
-  },
-  input: {
-    padding: '12px 16px',
-    fontSize: '15px',
-    borderRadius: '8px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text-h)',
-    outline: 'none',
-    transition: 'all 0.2s ease',
-  },
-  button: {
-    padding: '14px',
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: 'var(--accent)',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    marginTop: '10px',
-  },
-  footer: {
-    marginTop: '24px',
-    textAlign: 'center' as const,
-    fontSize: '14px',
-    color: 'var(--text)',
-  },
-  link: {
-    color: 'var(--accent)',
-    fontWeight: '600',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-  },
 };
 
 export default RegisterPage;
