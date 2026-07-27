@@ -9,6 +9,81 @@ export interface DateRangeFilter {
   bucket?: BucketType;
 }
 
+export type BackendHealthStatus = 'healthy' | 'degraded' | 'down' | 'unknown';
+export type BackendServiceStatus = BackendHealthStatus;
+export type HealthAlertSeverity = 'info' | 'warning' | 'critical';
+
+export interface HealthComponent {
+  name: string;
+  status: BackendHealthStatus;
+  checked_at: string;
+  latency_ms: number | null;
+  message: string;
+  details: Record<string, unknown>;
+}
+
+export interface HealthAlert {
+  severity: HealthAlertSeverity;
+  message: string;
+  component: string | null;
+  value: number | null;
+  threshold: number | null;
+}
+
+export interface BackendHealthResponse {
+  status: BackendHealthStatus;
+  services: Record<string, BackendServiceStatus>;
+  components: HealthComponent[];
+  history: HealthComponent[];
+  alerts: HealthAlert[];
+  project_name: string;
+  api_v1_path: string;
+  generated_at: string;
+}
+
+export type ErrorSeverity = 'info' | 'warning' | 'critical';
+
+export interface ErrorLogItem {
+  error_id: string;
+  timestamp: string;
+  service: string;
+  endpoint: string;
+  method: string;
+  status_code: number;
+  error_code: string;
+  message_safe: string;
+  request_id: string | null;
+  user_id: string | null;
+  duration_ms: number;
+  severity: ErrorSeverity;
+  occurrence_count: number;
+}
+
+export interface ErrorMonitoringSummary {
+  total_errors: number;
+  by_severity: Record<string, number>;
+  top_endpoints: Array<{ endpoint: string; count: number }>;
+  top_ai_models: Array<{ model: string; provider: string; count: number }>;
+  timeout_count: number;
+  error_rate: number | null;
+  latency: {
+    p50_ms: number | null;
+    p95_ms: number | null;
+    p99_ms: number | null;
+  };
+  warnings: HealthAlert[];
+}
+
+export interface ErrorMonitoringResponse {
+  summary: ErrorMonitoringSummary;
+  items: ErrorLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  generated_at: string;
+}
+
 // ── Overview ─────────────────────────────────────────────────
 export interface OverviewResponse {
   generated_at: string;
@@ -123,5 +198,50 @@ export interface EvaluationResponse {
     report_timestamp: string | null;
     report_path_configured: boolean;
   } | null;
+  generated_at: string;
+}
+
+// ── Admin User Management ─────────────────────────────────────
+export type AdminManagedRole = 'student' | 'lecturer' | 'admin';
+export type AdminUserStatusFilter = 'active' | 'locked';
+
+export interface AdminUserItem {
+  id: string;
+  email: string;
+  full_name: string;
+  role: AdminManagedRole | 'user';
+  is_active: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUserItem[];
+  total: number;
+  limit: number;
+  skip: number;
+  generated_at: string;
+}
+
+// ── Audit Logs ────────────────────────────────────────────────
+export type AuditLogSeverity = 'info' | 'warning' | 'error';
+
+export interface AuditLogItem {
+  id: string;
+  event_type: string;
+  severity: AuditLogSeverity;
+  message: string;
+  actor_user_id: string | null;
+  target_user_id: string | null;
+  user_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AuditLogResponse {
+  items: AuditLogItem[];
+  total: number;
+  limit: number;
+  skip: number;
   generated_at: string;
 }

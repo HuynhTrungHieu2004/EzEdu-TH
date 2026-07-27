@@ -22,7 +22,7 @@ export default function LearningHistoryPage() {
       <div className="page-wide">
         <div className="page-header">
           <div>
-            <p className="eyebrow">Hồ sơ sinh viên</p>
+            <p className="eyebrow">Hồ sơ học sinh</p>
             <h2 className="section-title">Lịch sử bài thi và ôn tập</h2>
             <p className="section-subtitle">Theo dõi kết quả các lần làm bài và tiếp tục ôn tập.</p>
           </div>

@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
@@ -31,6 +31,7 @@ from app.services.verification_service import (
     run_verification_task,
 )
 from app.services.llm_service import is_gemini_available, is_groq_available
+from app.services.ai_quota_service import enforce_ai_quota
 from app.services.text_chunking_service import split_text_into_chunks
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ async def trigger_verification(
     document_id: str,
     background_tasks: BackgroundTasks,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Khởi tạo quá trình kiểm tra kiến thức đầu vào cho tài liệu.
@@ -115,6 +117,15 @@ async def trigger_verification(
             status_code=400,
             detail="Không tìm thấy nội dung đã trích xuất để kiểm tra.",
         )
+    await enforce_ai_quota(
+        user_id=user_id,
+        role=current_user.role,
+        feature="document_verification",
+        resource_type="document",
+        resource_id=document_id,
+        request=request,
+        database=db,
+    )
 
     # Check for completed session with same hash to prevent duplicate AI verification calls
     current_hash = compute_content_revision_hash(raw_text)

@@ -1,4 +1,5 @@
-const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? '';
+const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
+const rawApiBaseUrl = viteEnv.VITE_API_BASE_URL?.trim() ?? '';
 
 export const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, '');
 export const isApiBaseUrlConfigured = API_BASE_URL.length > 0;

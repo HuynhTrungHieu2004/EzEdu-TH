@@ -1,0 +1,17 @@
+{
+  "is_synthetic": true,
+  "policy_version": "v0",
+  "interaction_count": 4,
+  "cumulative_reward": 0.95,
+  "regret": 0.7,
+  "learning_gain_proxy": 0.0575,
+  "safety_violation_rate": 0.0,
+  "coverage": 0.8,
+  "exploration_distribution": {
+    "weak_knowledge": 1,
+    "forgetting_review": 1,
+    "exploration": 1,
+    "current_learning_goal": 1
+  },
+  "generated_at": "2026-07-23T02:57:29.365517Z"
+}

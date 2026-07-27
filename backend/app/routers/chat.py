@@ -1,7 +1,8 @@
+import time
 from typing import List, Optional, Tuple
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
@@ -28,6 +29,9 @@ from app.services.learning_chat_service import (
     release_lock
 )
 from app.services.feedback_service import submit_or_update_feedback, hydrate_messages_with_feedback
+from app.services.activity_log_service import record_activity
+from app.services.ai_quota_service import enforce_ai_quota
+from app.services.system_settings_service import require_feature_enabled_flag
 
 router = APIRouter()
 
@@ -57,6 +61,12 @@ async def get_owned_document_or_404(document_id: str, current_user: UserResponse
             detail="You do not have permission to access this document.",
         )
 
+    if document.get("quarantined_at") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài liệu đang bị tạm khoá để kiểm duyệt.",
+        )
+
     return document
 
 
@@ -64,6 +74,7 @@ async def get_owned_document_or_404(document_id: str, current_user: UserResponse
 async def ask_question_api(
     payload: ChatAskRequest,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Ask a question grounded only in the indexed content of one owned document.
@@ -74,7 +85,27 @@ async def ask_question_api(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Bạn cần index tài liệu trước khi hỏi đáp.",
         )
+    await enforce_ai_quota(
+        user_id=current_user.id,
+        role=current_user.role,
+        feature="advanced_chat",
+        resource_type="document",
+        resource_id=payload.document_id,
+        request=request,
+        database=get_database(),
+    )
 
+    started = time.perf_counter()
+    await record_activity(
+        action="ai_chat_started",
+        category="chat",
+        status="started",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=payload.document_id,
+        request=request,
+        metadata={"mode": "document_chat"},
+    )
     try:
         response = await ask_document_question(
             document_id=payload.document_id,
@@ -82,16 +113,55 @@ async def ask_question_api(
             question=payload.question,
         )
     except ValueError as exc:
+        await record_activity(
+            action="ai_chat_failed",
+            category="chat",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=payload.document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="CHAT_INVALID_INPUT",
+            metadata={"mode": "document_chat"},
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        await record_activity(
+            action="ai_chat_failed",
+            category="chat",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=payload.document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="CHAT_FAILED",
+            metadata={"mode": "document_chat"},
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Hệ thống hỏi đáp học liệu tạm thời gặp lỗi.",
         ) from exc
 
+    await record_activity(
+        action="ai_chat_completed",
+        category="chat",
+        status="success",
+        user_id=current_user.id,
+        resource_type="chat_message",
+        resource_id=str(response.get("id", "")),
+        request=request,
+        duration_ms=int((time.perf_counter() - started) * 1000),
+        metadata={
+            "mode": "document_chat",
+            "document_id": payload.document_id,
+            "source_chunk_count": len(response.get("source_chunks", [])),
+        },
+    )
     return ChatMessageResponse(**response)
 
 
@@ -120,10 +190,39 @@ async def get_history_api(
 async def ask_advanced_question_api(
     payload: AdvancedChatAskRequest,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Advanced learning Q&A with document RAG context and Internet Search Grounding.
     """
+    await require_feature_enabled_flag("enable_advanced_chat", user_role=current_user.role, user_id=current_user.id)
+    if payload.use_web_search:
+        await require_feature_enabled_flag("enable_web_search", user_role=current_user.role, user_id=current_user.id)
+    await enforce_ai_quota(
+        user_id=current_user.id,
+        role=current_user.role,
+        feature="advanced_chat",
+        resource_type="conversation",
+        resource_id=payload.conversation_id,
+        request=request,
+        database=get_database(),
+    )
+    await record_activity(
+        action="ai_chat_started",
+        category="chat",
+        status="started",
+        user_id=current_user.id,
+        resource_type="conversation",
+        resource_id=payload.conversation_id,
+        request=request,
+        request_id=payload.request_id,
+        metadata={
+            "mode": "advanced_chat",
+            "scope": payload.scope,
+            "document_count": len(payload.document_ids or []),
+            "use_web_search": payload.use_web_search,
+        },
+    )
     try:
         response = await ask_advanced_question(
             user_id=current_user.id,
@@ -131,6 +230,18 @@ async def ask_advanced_question_api(
         )
         return AdvancedChatResponse(**response)
     except HTTPException as exc:
+        if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            await record_activity(
+                action="quota_exceeded",
+                category="ai",
+                status="failure",
+                user_id=current_user.id,
+                resource_type="advanced_chat",
+                request=request,
+                request_id=payload.request_id,
+                error_code="CHAT_RATE_LIMIT",
+                metadata={"mode": "advanced_chat", "limit_type": "per_minute"},
+            )
         raise exc
     except Exception as exc:
         raise HTTPException(

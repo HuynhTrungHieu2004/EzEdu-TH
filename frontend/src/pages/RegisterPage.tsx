@@ -45,7 +45,14 @@ const RegisterPage = () => {
         password,
         role,
       });
-      // Redirect to login page with success message
+      if (role === 'student') {
+        const data = await authApi.login({ email, password });
+        localStorage.setItem('access_token', data.access_token);
+        navigate('/student-onboarding', { replace: true });
+        return;
+      }
+
+      // Redirect lecturers to login page with success message
       navigate('/login', {
         state: { message: 'Đăng ký tài khoản thành công! Vui lòng đăng nhập.' },
       });
@@ -63,9 +70,9 @@ const RegisterPage = () => {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-mark" translate="no">AI</div>
-          <h2 className="auth-title">Đăng ký tài khoản</h2>
-          <p className="auth-subtitle">Tạo tài khoản để sử dụng hệ thống</p>
+          <div className="auth-mark" translate="no">Ez</div>
+          <h2 className="auth-title">Đăng ký EzEdu AI</h2>
+          <p className="auth-subtitle">Biến học liệu thành đề thi dễ dàng</p>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -108,7 +115,7 @@ const RegisterPage = () => {
               disabled={loading}
               className="form-select"
             >
-              <option value="student">Sinh viên</option>
+              <option value="student">Học sinh</option>
               <option value="lecturer">Giảng viên</option>
             </select>
           </div>

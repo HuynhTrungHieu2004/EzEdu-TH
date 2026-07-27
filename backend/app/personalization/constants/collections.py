@@ -1,0 +1,23 @@
+KNOWLEDGE_COMPONENTS = "knowledge_components"
+KNOWLEDGE_GRAPH_EDGES = "knowledge_graph_edges"
+LEARNING_ITEMS = "learning_items"
+LEARNING_EVENTS = "learning_events"
+LEARNING_SESSIONS = "learning_sessions"
+LEARNER_PROFILES = "learner_profiles"
+LEARNER_KNOWLEDGE_STATES = "learner_knowledge_states"
+RECOMMENDATION_LOGS = "recommendation_logs"
+CLUSTER_MODELS = "cluster_models"
+BANDIT_POLICIES = "bandit_policies"
+
+PERSONALIZATION_COLLECTIONS = (
+    KNOWLEDGE_COMPONENTS,
+    KNOWLEDGE_GRAPH_EDGES,
+    LEARNING_ITEMS,
+    LEARNING_EVENTS,
+    LEARNING_SESSIONS,
+    LEARNER_PROFILES,
+    LEARNER_KNOWLEDGE_STATES,
+    RECOMMENDATION_LOGS,
+    CLUSTER_MODELS,
+    BANDIT_POLICIES,
+)

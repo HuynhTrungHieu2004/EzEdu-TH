@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -10,235 +8,191 @@ import QuestionGeneratePage from './pages/QuestionGeneratePage';
 import QuickGeneratePage from './pages/QuickGeneratePage';
 import QuestionSetDetailPage from './pages/QuestionSetDetailPage';
 import QuestionHistoryPage from './pages/QuestionHistoryPage';
+import ClassesPage from './pages/ClassesPage';
+import ClassDetailPage from './pages/ClassDetailPage';
 import PublishedQuestionSetsPage from './pages/PublishedQuestionSetsPage';
 import AdvancedChatPage from './pages/AdvancedChatPage';
 import LearningHistoryPage from './pages/LearningHistoryPage';
 import StudentStatisticsPage from './pages/StudentStatisticsPage';
+import PersonalizationPage from './pages/PersonalizationPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminActivityLogsPage from './pages/AdminActivityLogsPage';
+import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminUserDetailPage from './pages/AdminUserDetailPage';
+import AdminDocumentsPage from './pages/AdminDocumentsPage';
+import AdminDocumentDetailPage from './pages/AdminDocumentDetailPage';
+import AdminQuestionsPage from './pages/AdminQuestionsPage';
+import AdminQuestionDetailPage from './pages/AdminQuestionDetailPage';
+import AdminExamsPage from './pages/AdminExamsPage';
+import AdminAIPage from './pages/AdminAIPage';
+import AdminWebsiteContentPage from './pages/AdminWebsiteContentPage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
+import AdminFeatureFlagsPage from './pages/AdminFeatureFlagsPage';
+import AdminNotificationsPage from './pages/AdminNotificationsPage';
+import AdminReportsPage from './pages/AdminReportsPage';
+import StudentOnboardingPage from './pages/StudentOnboardingPage';
+import MaintenancePage from './pages/MaintenancePage';
+import LandingPage from './pages/landing';
 import AppLayout from './components/AppLayout';
+import PublicLayout from './components/PublicLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
-import { buildApiUrl, isApiBaseUrlConfigured } from './config/api';
-
-function WelcomeScreen() {
-  const [backendStatus, setBackendStatus] = useState(
-    isApiBaseUrlConfigured ? 'Đang kết nối...' : 'Thiếu cấu hình VITE_API_BASE_URL'
-  );
-  const [isConnected, setIsConnected] = useState<'connecting' | 'connected' | 'disconnected'>(
-    isApiBaseUrlConfigured ? 'connecting' : 'disconnected'
-  );
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isApiBaseUrlConfigured) {
-      return;
-    }
-
-    axios
-      .get(buildApiUrl('/health'))
-      .then((res) => {
-        setBackendStatus(`Kết nối backend thành công (Trạng thái: ${res.data.status})`);
-        setIsConnected('connected');
-      })
-      .catch((error) => {
-        console.error(error);
-        setBackendStatus('Lỗi: Không kết nối được tới máy chủ backend');
-        setIsConnected('disconnected');
-      });
-  }, []);
-
-  const hasToken = !!localStorage.getItem('access_token');
-
-  return (
-    <section className="hero-home">
-      <div className="hero-content">
-        <div className="hero-mark" translate="no">AI</div>
-        <div>
-          <p className="eyebrow">Learning Assessment Studio</p>
-          <h1 className="hero-title">Tạo câu hỏi đánh giá từ học liệu trong vài phút</h1>
-        </div>
-        <p className="hero-copy">
-          Tải lên tài liệu hoặc video, trích xuất nội dung, hỏi đáp theo ngữ cảnh và sinh bộ câu hỏi
-          có đáp án, giải thích, mức độ khó và xuất file phục vụ giảng dạy.
-        </p>
-
-        <div className="hero-status">
-          <span className={`status-indicator ${isConnected}`} />
-          <span>{backendStatus}</span>
-        </div>
-
-        <div className="hero-actions">
-          {hasToken ? (
-            <button type="button" onClick={() => navigate('/dashboard')} className="btn-primary">
-              Vào Dashboard
-            </button>
-          ) : (
-            <>
-              <button type="button" onClick={() => navigate('/login')} className="btn-primary">
-                Đăng nhập
-              </button>
-              <button type="button" onClick={() => navigate('/register')} className="btn-secondary">
-                Tạo tài khoản
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <figure className="hero-visual" aria-label="Minh họa không gian AI phân tích học liệu">
-        <img src="/visuals/ai-education-hero.png" alt="" />
-        <figcaption className="hero-visual-caption">
-          <span className="hero-chip">
-            <strong>PDF</strong>
-            <span>Word, slide, video</span>
-          </span>
-          <span className="hero-chip">
-            <strong>RAG</strong>
-            <span>Tìm kiếm theo ngữ nghĩa</span>
-          </span>
-          <span className="hero-chip">
-            <strong>Quiz</strong>
-            <span>Đáp án và giải thích</span>
-          </span>
-        </figcaption>
-      </figure>
-
-      <div className="feature-grid" aria-label="Tính năng chính">
-        <article className="feature-tile">
-          <span className="feature-kicker">01</span>
-          <h2 className="feature-title">Đọc học liệu</h2>
-          <p className="feature-text">Nhận PDF, DOCX, PPTX và video để trích xuất nội dung học tập.</p>
-        </article>
-        <article className="feature-tile">
-          <span className="feature-kicker">02</span>
-          <h2 className="feature-title">Lập chỉ mục</h2>
-          <p className="feature-text">Chia nhỏ nội dung và tạo dữ liệu truy xuất cho hỏi đáp theo ngữ nghĩa.</p>
-        </article>
-        <article className="feature-tile">
-          <span className="feature-kicker">03</span>
-          <h2 className="feature-title">Sinh câu hỏi</h2>
-          <p className="feature-text">Tạo câu hỏi theo số lượng, độ khó, dạng câu hỏi và mức Bloom.</p>
-        </article>
-        <article className="feature-tile">
-          <span className="feature-kicker">04</span>
-          <h2 className="feature-title">Xuất bộ đề</h2>
-          <p className="feature-text">Xem đáp án, giải thích và tải bộ câu hỏi phục vụ kiểm tra đánh giá.</p>
-        </article>
-      </div>
-    </section>
-  );
-}
 
 function App() {
   return (
     <BrowserRouter>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<WelcomeScreen />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/documents" 
-            element={
-              <ProtectedRoute>
-                <DocumentsPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/documents/:documentId" 
-            element={
-              <ProtectedRoute>
-                <DocumentDetailPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/documents/:documentId/questions" 
-            element={
-              <ProtectedRoute>
-                <QuestionGeneratePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/generate" 
-            element={
-              <ProtectedRoute>
-                <QuickGeneratePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/question-sets/:questionSetId" 
-            element={
-              <ProtectedRoute>
-                <QuestionSetDetailPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/question-history" 
-            element={
-              <ProtectedRoute>
-                <QuestionHistoryPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route
-            path="/published-questions"
-            element={
-              <ProtectedRoute>
-                <PublishedQuestionSetsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/learning-history"
-            element={
-              <ProtectedRoute>
-                <LearningHistoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student-statistics"
-            element={
-              <ProtectedRoute>
-                <StudentStatisticsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/chat-advanced" 
-            element={
-              <ProtectedRoute>
-                <AdvancedChatPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route
-            path="/admin/dashboard"
-            element={
-              <AdminRoute>
-                <AdminDashboardPage />
-              </AdminRoute>
-            }
-          />
+      <Routes>
+        {/*
+         * ── PUBLIC ROUTES (không sidebar) ──────────────────────────────
+         * LandingPage tự quản lý LandingHeader + LandingFooter bên trong.
+         * LoginPage, RegisterPage dùng PublicLayout (mini header + footer).
+         */}
+        <Route path="/" element={<LandingPage />} />
 
-          <Route path="*" element={<WelcomeScreen />} />
-        </Routes>
-      </AppLayout>
+        <Route
+          path="/login"
+          element={<PublicLayout><LoginPage /></PublicLayout>}
+        />
+        <Route
+          path="/register"
+          element={<PublicLayout><RegisterPage /></PublicLayout>}
+        />
+        <Route
+          path="/student-onboarding"
+          element={<ProtectedRoute><StudentOnboardingPage /></ProtectedRoute>}
+        />
+        <Route path="/maintenance" element={<PublicLayout><MaintenancePage /></PublicLayout>} />
+
+        {/*
+         * ── AUTHENTICATED ROUTES (có sidebar) ──────────────────────────
+         * Tất cả route bên dưới đều bọc trong AppLayout (sidebar + nav).
+         * Sidebar không xuất hiện ở bất kỳ route public nào ở trên.
+         */}
+        <Route
+          path="/dashboard"
+          element={<AppLayout><ProtectedRoute><DashboardPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/documents"
+          element={<AppLayout><ProtectedRoute><DocumentsPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/documents/:documentId"
+          element={<AppLayout><ProtectedRoute><DocumentDetailPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/documents/:documentId/questions"
+          element={<AppLayout><ProtectedRoute><QuestionGeneratePage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/generate"
+          element={<AppLayout><ProtectedRoute><QuickGeneratePage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/question-sets/:questionSetId"
+          element={<AppLayout><ProtectedRoute><QuestionSetDetailPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/question-history"
+          element={<AppLayout><ProtectedRoute><QuestionHistoryPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/classes"
+          element={<AppLayout><ProtectedRoute><ClassesPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/classes/:classId"
+          element={<AppLayout><ProtectedRoute><ClassDetailPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/published-questions"
+          element={<AppLayout><ProtectedRoute><PublishedQuestionSetsPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/learning-history"
+          element={<AppLayout><ProtectedRoute><LearningHistoryPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/student-statistics"
+          element={<AppLayout><ProtectedRoute><StudentStatisticsPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/personalization"
+          element={<AppLayout><ProtectedRoute><PersonalizationPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/chat-advanced"
+          element={<AppLayout><ProtectedRoute><AdvancedChatPage /></ProtectedRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/dashboard"
+          element={<AppLayout><AdminRoute><AdminDashboardPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/users"
+          element={<AppLayout><AdminRoute><AdminUsersPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/users/:userId"
+          element={<AppLayout><AdminRoute><AdminUserDetailPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/documents"
+          element={<AppLayout><AdminRoute><AdminDocumentsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/documents/:documentId"
+          element={<AppLayout><AdminRoute><AdminDocumentDetailPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/questions"
+          element={<AppLayout><AdminRoute><AdminQuestionsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/questions/:questionId"
+          element={<AppLayout><AdminRoute><AdminQuestionDetailPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/exams"
+          element={<AppLayout><AdminRoute><AdminExamsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/ai"
+          element={<AppLayout><AdminRoute><AdminAIPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/website-content"
+          element={<AppLayout><AdminRoute><AdminWebsiteContentPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/settings"
+          element={<AppLayout><AdminRoute><AdminSettingsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/feature-flags"
+          element={<AppLayout><AdminRoute><AdminFeatureFlagsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/notifications"
+          element={<AppLayout><AdminRoute><AdminNotificationsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/reports"
+          element={<AppLayout><AdminRoute><AdminReportsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/activity-logs"
+          element={<AppLayout><AdminRoute><AdminActivityLogsPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/audit-logs"
+          element={<AppLayout><AdminRoute><AdminAuditLogsPage /></AdminRoute></AppLayout>}
+        />
+
+        {/* Fallback — mọi route không khớp → landing */}
+        <Route path="*" element={<LandingPage />} />
+      </Routes>
     </BrowserRouter>
   );
 }

@@ -1,0 +1,33 @@
+"""Constants shared inside the personalization module."""
+
+from app.personalization.constants.boundaries import DEPENDENCY_BOUNDARIES
+from app.personalization.constants.collections import (
+    BANDIT_POLICIES,
+    CLUSTER_MODELS,
+    KNOWLEDGE_COMPONENTS,
+    KNOWLEDGE_GRAPH_EDGES,
+    LEARNER_KNOWLEDGE_STATES,
+    LEARNER_PROFILES,
+    LEARNING_EVENTS,
+    LEARNING_ITEMS,
+    LEARNING_SESSIONS,
+    PERSONALIZATION_COLLECTIONS,
+    RECOMMENDATION_LOGS,
+)
+from app.personalization.constants.versions import DEFAULT_MODEL_VERSIONS
+
+__all__ = [
+    "CLUSTER_MODELS",
+    "BANDIT_POLICIES",
+    "DEFAULT_MODEL_VERSIONS",
+    "DEPENDENCY_BOUNDARIES",
+    "KNOWLEDGE_COMPONENTS",
+    "KNOWLEDGE_GRAPH_EDGES",
+    "LEARNER_KNOWLEDGE_STATES",
+    "LEARNER_PROFILES",
+    "LEARNING_EVENTS",
+    "LEARNING_ITEMS",
+    "LEARNING_SESSIONS",
+    "PERSONALIZATION_COLLECTIONS",
+    "RECOMMENDATION_LOGS",
+]

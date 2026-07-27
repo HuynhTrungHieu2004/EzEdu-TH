@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import List, Optional
 import aiofiles
 import httpx
 from bson import ObjectId
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status, BackgroundTasks
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -32,6 +33,10 @@ from app.services.document_parser import extract_text
 from app.services.rag_service import add_document_chunks, search_relevant_chunks
 from app.services.text_chunking_service import split_text_into_chunks
 from app.services.llm_service import transcribe_video
+from app.services.activity_log_service import record_activity
+from app.services.admin_audit_service import record_admin_audit, require_reason
+from app.services.ai_quota_service import enforce_ai_quota
+from app.services.system_settings_service import get_setting_value, require_feature_enabled_flag
 
 router = APIRouter()
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -46,7 +51,7 @@ CONTENT_PREVIEW_LENGTH = 1000
 
 
 def ensure_lecturer_or_admin(current_user: UserResponse) -> None:
-    if getattr(current_user, "role", "user") not in {"lecturer", "admin", "user"}:
+    if getattr(current_user, "role", "user") not in {"lecturer", "admin", "super_admin", "user"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ giảng viên mới được quản lý học liệu.",
@@ -57,9 +62,31 @@ BUSY_DOCUMENT_STATUSES = {"extracting", "indexing", "transcribing", "deleting"}
 INDEXABLE_DOCUMENT_STATUSES = {"processed", "transcribed", "indexed", "index_failed"}
 
 
+def _is_admin_actor(current_user: UserResponse) -> bool:
+    return getattr(current_user, "role", "user") in {"admin", "super_admin"}
+
+
+def _audit_document_snapshot(document: dict) -> dict:
+    return {
+        "id": str(document.get("_id")),
+        "user_id": document.get("user_id"),
+        "original_filename": document.get("original_filename"),
+        "file_type": document.get("file_type"),
+        "file_size": document.get("file_size"),
+        "media_kind": document.get("media_kind"),
+        "status": document.get("status"),
+        "error_message": document.get("error_message"),
+        "updated_at": document.get("updated_at"),
+    }
+
+
 class SearchRequest(BaseModel):
     query: str
     n_results: int = Field(5, ge=1, le=20)
+
+
+class ReasonRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class SearchResultItem(BaseModel):
@@ -162,12 +189,29 @@ def build_extract_response(
     )
 
 
+def ensure_not_quarantined(document: dict) -> None:
+    """Block further processing (extract/index/transcribe/chat/question-generation)
+    of a document an admin has quarantined for review. Viewing/deleting one's own
+    quarantined document is still allowed — only re-use of its content is blocked."""
+    if document.get("quarantined_at") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài liệu đang bị tạm khoá để kiểm duyệt.",
+        )
+
+
 async def get_owned_document(document_id: str, current_user: UserResponse) -> dict:
     object_id = ensure_valid_document_id(document_id)
     db = get_database()
     document = await db["documents"].find_one({"_id": object_id})
 
     if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+
+    if document.get("deleted_at") is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
@@ -411,6 +455,7 @@ async def fail_document_indexing(document: dict, error_message: str) -> None:
 async def upload_document(
     file: UploadFile = File(...),
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Upload a learning material (document or video), store metadata, and extract text if it is a document.
@@ -418,17 +463,22 @@ async def upload_document(
     ensure_lecturer_or_admin(current_user)
     filename = Path(file.filename or "unnamed_file").name
     file_ext = filename.split(".")[-1].lower() if "." in filename else ""
-    if file_ext not in ALLOWED_EXTENSIONS:
+    allowed_file_types = set(await get_setting_value("allowed_file_types", sorted(ALLOWED_EXTENSIONS)))
+    if file_ext not in allowed_file_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only PDF, DOCX, PPTX, MP4, MOV, WEBM, MKV files are allowed. Got type: {file_ext}",
+            detail=f"Định dạng file không được phép: {file_ext}",
         )
 
     if file_ext in DOCUMENT_EXTENSIONS:
         media_kind = "document"
-        max_size = MAX_DOCUMENT_SIZE
+        max_file_size_mb = int(await get_setting_value("max_file_size_mb", MAX_DOCUMENT_SIZE // (1024 * 1024)))
+        max_size = max_file_size_mb * 1024 * 1024
         resource_type = "auto"
     else:
+        if not bool(await get_setting_value("enable_video_upload", True)):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Upload video đang bị tắt.")
+        await require_feature_enabled_flag("enable_video_upload", user_role=current_user.role, user_id=current_user.id)
         media_kind = "video"
         max_size = MAX_VIDEO_SIZE
         resource_type = "video"
@@ -449,7 +499,7 @@ async def upload_document(
                     else:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="File size exceeds the limit of 20MB.",
+                            detail=f"File vượt quá giới hạn {max_size // (1024 * 1024)}MB.",
                         )
                 await output_file.write(chunk)
     except HTTPException:
@@ -463,7 +513,30 @@ async def upload_document(
         ) from exc
 
     db = get_database()
+    max_documents = int(await get_setting_value("max_documents_per_user", 200, database=db))
+    if max_documents > 0:
+        document_count = await db["documents"].count_documents({"user_id": current_user.id, "deleted_at": None})
+        if document_count >= max_documents:
+            cleanup_temp_file(temp_file_path)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Bạn đã đạt giới hạn {max_documents} học liệu.",
+            )
+    try:
+        await enforce_ai_quota(
+            user_id=current_user.id,
+            role=current_user.role,
+            feature="document_upload",
+            document_size_bytes=file_size,
+            resource_type="document",
+            request=request,
+            database=db,
+        )
+    except HTTPException:
+        cleanup_temp_file(temp_file_path)
+        raise
     now = datetime.now(timezone.utc)
+    started = time.perf_counter()
     document_id = ObjectId()
     content_doc = None
     metadata_saved = False
@@ -504,12 +577,70 @@ async def upload_document(
 
         await db["documents"].insert_one(document_metadata)
         metadata_saved = True
+        await record_activity(
+            action="document_uploaded",
+            category="document",
+            status="success",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=str(document_id),
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            metadata={
+                "file_type": file_ext,
+                "file_size": file_size,
+                "media_kind": media_kind,
+                "status": document_metadata["status"],
+            },
+            database=db,
+        )
 
         if media_kind == "document":
+            await record_activity(
+                action="document_processing_started",
+                category="document",
+                status="started",
+                user_id=current_user.id,
+                resource_type="document",
+                resource_id=str(document_id),
+                request=request,
+                metadata={"operation": "upload_extract", "file_type": file_ext, "file_size": file_size},
+                database=db,
+            )
             try:
                 content_doc = await extract_and_store_document_content(document_metadata, temp_file_path)
+                await record_activity(
+                    action="document_processing_completed",
+                    category="document",
+                    status="success",
+                    user_id=current_user.id,
+                    resource_type="document",
+                    resource_id=str(document_id),
+                    request=request,
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                    metadata={
+                        "operation": "upload_extract",
+                        "file_type": file_ext,
+                        "file_size": file_size,
+                        "text_length": content_doc.get("text_length") if content_doc else None,
+                    },
+                    database=db,
+                )
             except DocumentProcessingError as exc:
                 await fail_document_processing(document_metadata, exc.message)
+                await record_activity(
+                    action="document_processing_failed",
+                    category="document",
+                    status="failure",
+                    user_id=current_user.id,
+                    resource_type="document",
+                    resource_id=str(document_id),
+                    request=request,
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                    error_code=f"DOCUMENT_PROCESSING_{exc.http_status}",
+                    metadata={"operation": "upload_extract", "file_type": file_ext, "file_size": file_size},
+                    database=db,
+                )
     except HTTPException:
         cloudinary_public_id = document_metadata.get("cloudinary_public_id")
         if cloudinary_public_id and not metadata_saved:
@@ -559,7 +690,7 @@ async def list_documents(current_user: UserResponse = Depends(get_current_user))
     documents = []
 
     try:
-        cursor = db["documents"].find({"user_id": current_user.id}).sort("created_at", -1)
+        cursor = db["documents"].find({"user_id": current_user.id, "deleted_at": None}).sort("created_at", -1)
         async for document in cursor:
             documents.append(serialize_document(document))
     except Exception as exc:
@@ -588,12 +719,15 @@ async def extract_document_content(
     document_id: str,
     force: bool = Query(False, description="Set true to re-extract text even if it is already processed."),
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Download the uploaded file from Cloudinary when needed and extract text for the owner.
     """
     ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
+    ensure_not_quarantined(document)
+    document_before = dict(document)
     if document.get("media_kind") == "video":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -645,6 +779,18 @@ async def extract_document_content(
             detail="Học liệu vừa được thay đổi bởi một yêu cầu khác. Vui lòng thử lại.",
         )
 
+    started = time.perf_counter()
+    await record_activity(
+        action="document_processing_started",
+        category="document",
+        status="started",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=document_id,
+        request=request,
+        metadata={"operation": "extract", "force": force, "file_type": document.get("file_type")},
+        database=db,
+    )
     temp_file_path = build_temp_file_path(document["original_filename"])
     lock_finished = False
     content_saved = False
@@ -671,6 +817,23 @@ async def extract_document_content(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Mất quyền cập nhật học liệu trong khi trích xuất.",
             )
+        await record_activity(
+            action="document_processing_completed",
+            category="document",
+            status="success",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            metadata={
+                "operation": "extract",
+                "force": force,
+                "file_type": document.get("file_type"),
+                "text_length": content_doc.get("text_length"),
+            },
+            database=db,
+        )
     except DocumentProcessingError as exc:
         lock_finished = await finalize_document_mutation(
             db,
@@ -680,6 +843,19 @@ async def extract_document_content(
             final_status=failure_status,
             error_message=exc.message if failure_status == "failed" else document.get("error_message"),
             required_status="extracting",
+        )
+        await record_activity(
+            action="document_processing_failed",
+            category="document",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code=f"DOCUMENT_PROCESSING_{exc.http_status}",
+            metadata={"operation": "extract", "force": force, "file_type": document.get("file_type")},
+            database=db,
         )
         raise HTTPException(status_code=exc.http_status, detail=exc.message) from exc
     finally:
@@ -702,6 +878,18 @@ async def extract_document_content(
     document = await db["documents"].find_one(
         {"_id": ObjectId(document_id), "user_id": current_user.id}
     )
+    if force and _is_admin_actor(current_user):
+        await record_admin_audit(
+            admin=current_user,
+            action="document_reprocessed",
+            target_type="document",
+            target_id=document_id,
+            before=_audit_document_snapshot(document_before),
+            after=_audit_document_snapshot(document or {}),
+            changed=["status", "updated_at", "error_message"],
+            request=request,
+            database=db,
+        )
 
     return build_extract_response(
         document,
@@ -743,12 +931,15 @@ async def index_document_api(
     document_id: str,
     force: bool = Query(False, description="Set true to rebuild chunks and ChromaDB vectors even if already indexed."),
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Split extracted text into chunks, index them into vector storage, and mark the document as indexed.
     """
     ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
+    ensure_not_quarantined(document)
+    document_before = dict(document)
     db = get_database()
     content_doc = await db["document_contents"].find_one(
         {"document_id": document_id, "user_id": current_user.id}
@@ -800,6 +991,18 @@ async def index_document_api(
 
     lock_finished = False
     indexing_started = False
+    started = time.perf_counter()
+    await record_activity(
+        action="document_processing_started",
+        category="document",
+        status="started",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=document_id,
+        request=request,
+        metadata={"operation": "index", "force": force, "file_type": document.get("file_type")},
+        database=db,
+    )
     try:
         # Re-read after acquiring the lock. A request that read an older
         # document snapshot must never index that stale content.
@@ -852,9 +1055,52 @@ async def index_document_api(
         )
         if not lock_finished:
             raise RuntimeError("Document indexing lock is no longer owned.")
+        await record_activity(
+            action="document_processing_completed",
+            category="document",
+            status="success",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            metadata={
+                "operation": "index",
+                "force": force,
+                "file_type": document.get("file_type"),
+                "chunk_count": len(chunks),
+            },
+            database=db,
+        )
     except HTTPException:
+        await record_activity(
+            action="document_processing_failed",
+            category="document",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="DOCUMENT_INDEX_HTTP_ERROR",
+            metadata={"operation": "index", "force": force, "file_type": document.get("file_type")},
+            database=db,
+        )
         raise
     except Exception as exc:
+        await record_activity(
+            action="document_processing_failed",
+            category="document",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="DOCUMENT_INDEX_FAILED",
+            metadata={"operation": "index", "force": force, "file_type": document.get("file_type")},
+            database=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to index this document into ChromaDB.",
@@ -874,6 +1120,20 @@ async def index_document_api(
                 ),
                 required_status="indexing",
             )
+
+    document_after = await db["documents"].find_one({"_id": ObjectId(document_id), "user_id": current_user.id})
+    if force and _is_admin_actor(current_user):
+        await record_admin_audit(
+            admin=current_user,
+            action="document_reprocessed",
+            target_type="document",
+            target_id=document_id,
+            before=_audit_document_snapshot(document_before),
+            after=_audit_document_snapshot(document_after or {}),
+            changed=["status", "updated_at", "error_message"],
+            request=request,
+            database=db,
+        )
 
     return {
         "status": "indexed",
@@ -1039,7 +1299,8 @@ async def transcribe_video_api(
     """
     ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
-    
+    ensure_not_quarantined(document)
+
     if document.get("media_kind") != "video":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1146,6 +1407,8 @@ async def get_video_transcript(
 @router.delete("/{document_id}", status_code=status.HTTP_200_OK)
 async def delete_document(
     document_id: str,
+    payload: ReasonRequest | None = None,
+    request: Request = None,
     current_user: UserResponse = Depends(get_current_user),
 ):
     """
@@ -1153,6 +1416,9 @@ async def delete_document(
     """
     ensure_lecturer_or_admin(current_user)
     document = await get_owned_document(document_id, current_user)
+    reason = None
+    if _is_admin_actor(current_user):
+        reason = require_reason(payload.reason if payload else None, "xóa tài liệu")
     db = get_database()
 
     if document.get("status") in BUSY_DOCUMENT_STATUSES:
@@ -1225,6 +1491,35 @@ async def delete_document(
             "user_id": current_user.id,
             "status": "deleting",
         }
+    )
+    if _is_admin_actor(current_user):
+        await record_admin_audit(
+            admin=current_user,
+            action="document_deleted",
+            target_type="document",
+            target_id=document_id,
+            reason=reason,
+            before=_audit_document_snapshot(document),
+            after={**_audit_document_snapshot(document), "status": "deleted"},
+            changed=["status"],
+            request=request,
+            database=db,
+        )
+    
+    await record_activity(
+        action="document_deleted",
+        category="document",
+        status="success",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=document_id,
+        request=request,
+        metadata={
+            "file_type": document.get("file_type"),
+            "media_kind": document.get("media_kind"),
+            "status": "deleted",
+        },
+        database=db,
     )
 
     return {

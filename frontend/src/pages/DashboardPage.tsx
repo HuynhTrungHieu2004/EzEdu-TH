@@ -68,12 +68,12 @@ const DashboardPage = () => {
         <div className="page-wide">
           <section className="welcome-panel">
             <div>
-              <p className="eyebrow">Hồ sơ Sinh viên</p>
+              <p className="eyebrow">Hồ sơ học sinh</p>
               <h2>Chào mừng trở lại, {user.full_name}</h2>
-              <p>Không gian học tập dành cho sinh viên: làm bài thi, ôn tập và theo dõi kết quả học tập.</p>
+              <p>Không gian học tập dành cho học sinh: làm bài thi, ôn tập và theo dõi kết quả học tập.</p>
             </div>
-            <div className="welcome-metric" aria-label="Tóm tắt khu vực sinh viên">
-              <span className="metric-pill"><strong>Sinh viên</strong><span>Vai trò tài khoản</span></span>
+            <div className="welcome-metric" aria-label="Tóm tắt khu vực học sinh">
+              <span className="metric-pill"><strong>Học sinh</strong><span>Bạn Là</span></span>
               <span className="metric-pill"><strong>Ôn tập</strong><span>Làm lại bộ câu hỏi</span></span>
               <span className="metric-pill"><strong>Lịch sử</strong><span>Theo dõi kết quả</span></span>
             </div>
@@ -150,7 +150,7 @@ const DashboardPage = () => {
           <article className="dashboard-card">
             <span className="dashboard-kicker">02</span>
             <h3>Ngân hàng câu hỏi</h3>
-            <p>Xem các bộ câu hỏi AI đã soạn, duyệt và ban hành đề thi cho sinh viên.</p>
+            <p>Xem các bộ câu hỏi AI đã soạn, duyệt và ban hành đề thi cho học sinh.</p>
             <button type="button" onClick={() => navigate('/question-history')} className="btn-secondary">
               Mở ngân hàng câu hỏi
             </button>
@@ -176,7 +176,7 @@ const DashboardPage = () => {
         </section>
 
         <footer className="page-footer">
-          © 2026 AI Question Generator. Hệ thống hỗ trợ giảng dạy và đánh giá năng lực.
+          © 2026 EzEdu AI. Hệ thống hỗ trợ giảng dạy và đánh giá năng lực.
         </footer>
       </div>
     </div>

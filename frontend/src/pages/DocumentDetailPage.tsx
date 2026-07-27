@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse, SearchResultItem } from '../api/documentApi';
+import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../api/learningEventApi';
 import ChatBox from '../components/ChatBox';
 import VerificationPanel from '../components/VerificationPanel';
 import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
@@ -85,6 +86,33 @@ const DocumentDetailPage: React.FC = () => {
     }
     void Promise.resolve().then(() => fetchDocument());
   }, [documentId, fetchDocument, navigate]);
+
+  useEffect(() => {
+    if (!document?.id) return;
+    const session = getLearningSession('document', document.id);
+    const startedAt = Date.now();
+    const baseParts = [session.sessionId, document.id];
+
+    trackLearningEvent({
+      event_type: 'lesson_started',
+      item_id: document.id,
+      document_id: document.id,
+      session_id: session.sessionId,
+      idempotency_key: buildEventIdempotencyKey([...baseParts, 'lesson_started']),
+    });
+
+    return () => {
+      trackLearningEvent({
+        event_type: 'lesson_completed',
+        item_id: document.id,
+        document_id: document.id,
+        session_id: session.sessionId,
+        idempotency_key: buildEventIdempotencyKey([...baseParts, 'lesson_completed']),
+        response_time_ms: Math.max(0, Date.now() - startedAt),
+        completed: true,
+      });
+    };
+  }, [document?.id]);
 
   // Poll document operations that run outside the current request/tab.
   useEffect(() => {

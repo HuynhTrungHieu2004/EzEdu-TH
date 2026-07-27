@@ -1,16 +1,18 @@
 import re
 import hashlib
+import time
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.database.mongodb import get_database
 from app.schemas.auth import UserResponse
 from app.schemas.question import (
     HistoryListResponse,
+    PublishQuestionSetRequest,
     QuestionAttemptResponse,
     QuestionAttemptSubmitRequest,
     QuestionGenerateRequest,
@@ -26,9 +28,45 @@ from app.services.export_service import (
     export_question_set_to_docx,
     export_question_set_to_pdf,
 )
+from app.services.activity_log_service import record_activity
+from app.services.admin_audit_service import record_admin_audit, require_reason
+from app.services.ai_quota_service import enforce_ai_quota
+from app.services.analytics_service import new_attempt_id, new_event_id, new_logical_request_id, record_event
+from app.services.system_settings_service import get_setting_value, require_feature_enabled_flag
+from app.schemas.analytics import UsageEventCreate
 from app.utils.cursor import serialize_cursor, deserialize_cursor
 
 router = APIRouter()
+
+
+async def _record_question_generation_usage(
+    *,
+    user_id: str,
+    document_id: str,
+    logical_request_id: str,
+    started: float,
+    status_value: str,
+    error_code: str | None = None,
+) -> None:
+    await record_event(UsageEventCreate(
+        event_id=new_event_id(),
+        logical_request_id=logical_request_id,
+        attempt_id=new_attempt_id(),
+        attempt_number=1,
+        is_final=True,
+        event_kind="logical_operation",
+        user_id=user_id,
+        operation_type="question_generation",
+        feature="question_generation",
+        provider="mixed",
+        model_name="groq+gemini",
+        model="groq+gemini",
+        status=status_value,
+        error_code=error_code,
+        latency_ms=int((time.perf_counter() - started) * 1000),
+        document_id=document_id,
+        created_at=datetime.now(timezone.utc),
+    ))
 
 # ── Valid enum values (reuse production enums from generation) ──
 VALID_QUESTION_TYPES = {"multiple_choice", "true_false", "short_answer"}
@@ -44,6 +82,10 @@ CURSOR_KIND = "question_history"
 def _not_deleted_filter() -> dict:
     """MongoDB filter clause: document is NOT soft-deleted."""
     return {"deleted_at": {"$in": [None]}}
+
+
+def _is_admin_actor(current_user: UserResponse) -> bool:
+    return getattr(current_user, "role", "user") in {"admin", "super_admin"}
 
 
 async def _get_owned_active_qs_or_404(
@@ -87,11 +129,11 @@ async def _get_owned_active_qs_or_404(
 
 
 def _can_manage_questions(current_user: UserResponse) -> bool:
-    return getattr(current_user, "role", "user") in {"user", "lecturer", "admin"}
+    return getattr(current_user, "role", "user") in {"user", "lecturer", "admin", "super_admin"}
 
 
 def _can_review_questions(current_user: UserResponse) -> bool:
-    return getattr(current_user, "role", "user") in {"user", "lecturer", "admin"}
+    return getattr(current_user, "role", "user") in {"user", "lecturer", "admin", "super_admin"}
 
 
 def _normalize_question_item(question: dict) -> dict:
@@ -105,7 +147,11 @@ def _normalize_question_item(question: dict) -> dict:
 
 
 def _normalize_question_items(qs: dict) -> list[dict]:
-    return [_normalize_question_item(item) for item in qs.get("questions", [])]
+    return [
+        _normalize_question_item(item)
+        for item in qs.get("questions", [])
+        if item.get("deleted_at") is None
+    ]
 
 
 def _workflow_counts(questions: list[dict]) -> dict:
@@ -192,6 +238,8 @@ def _qs_to_response(qs: dict) -> QuestionSetResponse:
         bloom_distribution=qs.get("bloom_distribution"),
         workflow_counts=counts,
         published_question_count=counts.get("published", 0),
+        audience_type=qs.get("audience_type") or "all",
+        target_class_ids=qs.get("target_class_ids") or [],
         created_at=qs["created_at"],
         updated_at=qs.get("updated_at", qs["created_at"]),
     )
@@ -212,6 +260,8 @@ def _qs_to_summary(qs: dict) -> QuestionSetSummary:
         bloom_distribution=qs.get("bloom_distribution"),
         workflow_counts=counts,
         published_question_count=counts.get("published", 0),
+        audience_type=qs.get("audience_type") or "all",
+        target_class_ids=qs.get("target_class_ids") or [],
         created_at=qs["created_at"],
     )
 
@@ -237,6 +287,7 @@ def _query_hash(filters: dict) -> str:
 async def generate_questions_api(
     payload: QuestionGenerateRequest,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Generate assessment questions using the configured AI providers based
@@ -265,6 +316,12 @@ async def generate_questions_api(
             detail="You do not have permission to access this document.",
         )
 
+    if doc.get("quarantined_at") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài liệu đang bị tạm khoá để kiểm duyệt.",
+        )
+
     # Question generation consumes document_chunks. Block the request while a
     # verification apply/re-index is in progress (or has failed), otherwise it
     # could generate from stale vectors/chunks.
@@ -273,6 +330,47 @@ async def generate_questions_api(
             status_code=status.HTTP_409_CONFLICT,
             detail="Học liệu phải được lập chỉ mục thành công trước khi sinh câu hỏi.",
         )
+    max_questions = int(await get_setting_value("max_questions_per_request", 50, database=db))
+    if payload.question_count > max_questions:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Số câu hỏi tối đa mỗi lần là {max_questions}.",
+        )
+    allowed_question_types = set(await get_setting_value("allowed_question_types", sorted(VALID_QUESTION_TYPES), database=db))
+    if payload.question_type not in allowed_question_types:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Loại câu hỏi hiện không được bật bởi quản trị viên.",
+        )
+    await enforce_ai_quota(
+        user_id=current_user.id,
+        role=current_user.role,
+        feature="question_generation",
+        question_count=payload.question_count,
+        resource_type="document",
+        resource_id=payload.document_id,
+        request=request,
+        database=db,
+    )
+
+    started = time.perf_counter()
+    logical_request_id = new_logical_request_id()
+    await record_activity(
+        action="question_generation_started",
+        category="question",
+        status="started",
+        user_id=current_user.id,
+        resource_type="document",
+        resource_id=payload.document_id,
+        request=request,
+        metadata={
+            "question_count": payload.question_count,
+            "difficulty": payload.difficulty,
+            "question_type": payload.question_type,
+            "bloom_level": payload.bloom_level,
+        },
+        database=db,
+    )
 
     # 2. Call generation service
     try:
@@ -285,10 +383,52 @@ async def generate_questions_api(
             bloom_level=payload.bloom_level,
         )
     except FileNotFoundError as fnf_err:
+        await _record_question_generation_usage(
+            user_id=current_user.id,
+            document_id=payload.document_id,
+            logical_request_id=logical_request_id,
+            started=started,
+            status_value="failure",
+            error_code="INVALID_RESPONSE",
+        )
+        await record_activity(
+            action="question_generation_failed",
+            category="question",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=payload.document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="QUESTION_SOURCE_NOT_FOUND",
+            metadata={"question_count": payload.question_count, "question_type": payload.question_type},
+            database=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(fnf_err)
         )
     except ValueError as val_err:
+        await _record_question_generation_usage(
+            user_id=current_user.id,
+            document_id=payload.document_id,
+            logical_request_id=logical_request_id,
+            started=started,
+            status_value="failure",
+            error_code="INVALID_RESPONSE",
+        )
+        await record_activity(
+            action="question_generation_failed",
+            category="question",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=payload.document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="QUESTION_GENERATION_INVALID_INPUT",
+            metadata={"question_count": payload.question_count, "question_type": payload.question_type},
+            database=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(val_err)
         )
@@ -296,11 +436,69 @@ async def generate_questions_api(
         import traceback
 
         traceback.print_exc()
+        await _record_question_generation_usage(
+            user_id=current_user.id,
+            document_id=payload.document_id,
+            logical_request_id=logical_request_id,
+            started=started,
+            status_value="failure",
+            error_code="500_INTERNAL",
+        )
+        await record_activity(
+            action="question_generation_failed",
+            category="question",
+            status="failure",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=payload.document_id,
+            request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="QUESTION_GENERATION_FAILED",
+            metadata={"question_count": payload.question_count, "question_type": payload.question_type},
+            database=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred during question generation: {str(e)}",
         )
 
+    question_set_id = str(question_set.get("_id", ""))
+    await _record_question_generation_usage(
+        user_id=current_user.id,
+        document_id=payload.document_id,
+        logical_request_id=logical_request_id,
+        started=started,
+        status_value="success",
+    )
+    safe_metadata = {
+        "question_count": len(question_set.get("questions", [])) or payload.question_count,
+        "difficulty": payload.difficulty,
+        "question_type": payload.question_type,
+        "bloom_level": payload.bloom_level,
+    }
+    await record_activity(
+        action="question_generation_completed",
+        category="question",
+        status="success",
+        user_id=current_user.id,
+        resource_type="question_set",
+        resource_id=question_set_id,
+        request=request,
+        duration_ms=int((time.perf_counter() - started) * 1000),
+        metadata=safe_metadata,
+        database=db,
+    )
+    await record_activity(
+        action="exam_created",
+        category="exam",
+        status="success",
+        user_id=current_user.id,
+        resource_type="question_set",
+        resource_id=question_set_id,
+        request=request,
+        metadata=safe_metadata,
+        database=db,
+    )
     return _qs_to_response(question_set)
 
 
@@ -494,6 +692,30 @@ async def get_questions_by_document(
 
 # ─── 4. Published question sets for learners ─────────────────────────────────
 
+async def _student_class_ids(current_user: UserResponse, db) -> list[str]:
+    cursor = db["classes"].find(
+        {"student_ids": current_user.id, "deleted_at": None}, {"_id": 1}
+    )
+    return [str(doc["_id"]) async for doc in cursor]
+
+
+async def _visible_published_filter(current_user: UserResponse, db) -> dict:
+    """Question sets visible to the current student: published to "all", or
+    published to a class the student belongs to. Sets published before this
+    feature existed have no audience_type field and are treated as "all" for
+    backward compatibility."""
+    my_class_ids = await _student_class_ids(current_user, db)
+    return {
+        "deleted_at": None,
+        "published_question_count": {"$gt": 0},
+        "$or": [
+            {"audience_type": "all"},
+            {"audience_type": {"$exists": False}},
+            {"audience_type": "classes", "target_class_ids": {"$in": my_class_ids}},
+        ],
+    }
+
+
 @router.get("/published", response_model=HistoryListResponse)
 async def list_published_question_sets(
     current_user: UserResponse = Depends(get_current_user),
@@ -501,13 +723,12 @@ async def list_published_question_sets(
     limit: int = Query(20, ge=1, le=50),
 ):
     """
-    List question sets that contain at least one published question.
+    List question sets that contain at least one published question and are
+    visible to the current student (published to everyone, or to a class they
+    belong to).
     """
     db = get_database()
-    mongo_filter: dict = {
-        "deleted_at": None,
-        "published_question_count": {"$gt": 0},
-    }
+    mongo_filter = await _visible_published_filter(current_user, db)
     search_trimmed = search.strip() if search else None
     if search_trimmed:
         mongo_filter["document_name"] = {"$regex": _escape_regex(search_trimmed[:200]), "$options": "i"}
@@ -527,6 +748,24 @@ async def list_published_question_sets(
     )
 
 
+@router.get("/published/pending-count")
+async def count_pending_published_question_sets(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Server-side count of published sets visible to the current student that
+    they have not attempted yet — used for the "bài thi của bạn" badge, which
+    previously undercounted past the first page of results."""
+    db = get_database()
+    mongo_filter = await _visible_published_filter(current_user, db)
+    attempted_ids = await db["question_attempts"].distinct(
+        "question_set_id", {"user_id": current_user.id}
+    )
+    if attempted_ids:
+        mongo_filter["_id"] = {"$nin": [ObjectId(sid) for sid in attempted_ids if ObjectId.is_valid(sid)]}
+    count = await db["question_sets"].count_documents(mongo_filter)
+    return {"pending_count": count}
+
+
 # ─── 5. Edit, tag, review, approve, publish ──────────────────────────────────
 
 @router.patch("/{question_set_id}/items/{question_index}", response_model=QuestionSetResponse)
@@ -534,6 +773,7 @@ async def update_question_item(
     question_set_id: str,
     question_index: int,
     payload: QuestionItemUpdateRequest,
+    request: Request = None,
     current_user: UserResponse = Depends(get_current_user),
 ):
     """
@@ -547,11 +787,12 @@ async def update_question_item(
     if question_index < 0 or question_index >= len(questions):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy câu hỏi.")
 
-    changes = payload.model_dump(exclude_unset=True)
+    changes = payload.model_dump(exclude_unset=True, exclude={"reason"})
     if not changes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không có thay đổi hợp lệ.")
 
     question = questions[question_index]
+    before_question = dict(question)
     for key, value in changes.items():
         if value is not None:
             question[key] = value
@@ -576,6 +817,19 @@ async def update_question_item(
             "updated_at": now,
         }},
     )
+    if _is_admin_actor(current_user):
+        await record_admin_audit(
+            admin=current_user,
+            action="question_updated",
+            target_type="question",
+            target_id=f"{question_set_id}:{question_index}",
+            reason=payload.reason,
+            before=before_question,
+            after=question,
+            changed=sorted(changes.keys()),
+            request=request,
+            database=db,
+        )
     return _qs_to_response(qs)
 
 
@@ -646,9 +900,13 @@ async def update_question_workflow(
 @router.post("/{question_set_id}/publish", response_model=QuestionSetResponse)
 async def publish_entire_question_set(
     question_set_id: str,
+    payload: PublishQuestionSetRequest = PublishQuestionSetRequest(),
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
-    """Review and publish every question in a set for student access."""
+    """Review and publish every question in a set for student access, either to
+    every student ("all", the historical/default behavior) or scoped to specific
+    classes the lecturer owns."""
     if not _can_review_questions(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền ban hành đề thi.")
 
@@ -656,6 +914,21 @@ async def publish_entire_question_set(
     questions = _normalize_question_items(qs)
     if not questions:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bộ đề chưa có câu hỏi để ban hành.")
+
+    db = get_database()
+    target_class_ids: list[str] = []
+    if payload.audience_type == "classes":
+        if not payload.target_class_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cần chọn ít nhất một lớp để giao đề.")
+        object_ids = [ObjectId(cid) for cid in payload.target_class_ids if ObjectId.is_valid(cid)]
+        owned_classes = await db["classes"].find(
+            {"_id": {"$in": object_ids}, "owner_id": current_user.id, "deleted_at": None},
+            {"_id": 1},
+        ).to_list(None)
+        owned_ids = {str(doc["_id"]) for doc in owned_classes}
+        if len(owned_ids) != len(payload.target_class_ids):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn chỉ có thể giao đề cho lớp học của chính mình.")
+        target_class_ids = payload.target_class_ids
 
     now = datetime.now(timezone.utc)
     for question in questions:
@@ -666,16 +939,30 @@ async def publish_entire_question_set(
 
     qs["questions"] = questions
     qs["updated_at"] = now
+    qs["audience_type"] = payload.audience_type
+    qs["target_class_ids"] = target_class_ids
     _with_workflow_metadata(qs)
-    db = get_database()
     await db["question_sets"].update_one(
         {"_id": ObjectId(question_set_id), "user_id": current_user.id, "deleted_at": None},
         {"$set": {
             "questions": qs["questions"],
             "workflow_counts": qs["workflow_counts"],
             "published_question_count": qs["published_question_count"],
+            "audience_type": payload.audience_type,
+            "target_class_ids": target_class_ids,
             "updated_at": now,
         }},
+    )
+    await record_activity(
+        action="exam_published",
+        category="exam",
+        status="success",
+        user_id=current_user.id,
+        resource_type="question_set",
+        resource_id=question_set_id,
+        request=request,
+        metadata={"audience_type": payload.audience_type, "target_class_count": len(target_class_ids)},
+        database=db,
     )
     return _qs_to_response(qs)
 
@@ -833,6 +1120,8 @@ async def get_question_set(
 @router.delete("/{question_set_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_question_set(
     question_set_id: str,
+    payload: dict[str, Optional[str]] | None = None,
+    request: Request = None,
     current_user: UserResponse = Depends(get_current_user),
 ):
     """
@@ -843,14 +1132,42 @@ async def delete_question_set(
     if not _can_manage_questions(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ giảng viên mới được xóa bộ đề.")
 
+    reason = None
+    if _is_admin_actor(current_user):
+        reason = require_reason((payload or {}).get("reason"), "xóa câu hỏi")
+
     # This will raise 404 if not found / wrong owner / already deleted
-    await _get_owned_active_qs_or_404(question_set_id, current_user)
+    qs_before = await _get_owned_active_qs_or_404(question_set_id, current_user)
 
     db = get_database()
+    deleted_at = datetime.now(timezone.utc)
     await db["question_sets"].update_one(
         {"_id": ObjectId(question_set_id)},
-        {"$set": {"deleted_at": datetime.now(timezone.utc)}},
+        {"$set": {"deleted_at": deleted_at}},
     )
+    if _is_admin_actor(current_user):
+        await record_admin_audit(
+            admin=current_user,
+            action="question_deleted",
+            target_type="question_set",
+            target_id=question_set_id,
+            reason=reason,
+            before={
+                "id": question_set_id,
+                "document_id": qs_before.get("document_id"),
+                "question_count": qs_before.get("question_count"),
+                "deleted_at": qs_before.get("deleted_at"),
+            },
+            after={
+                "id": question_set_id,
+                "document_id": qs_before.get("document_id"),
+                "question_count": qs_before.get("question_count"),
+                "deleted_at": deleted_at,
+            },
+            changed=["deleted_at"],
+            request=request,
+            database=db,
+        )
     # Return 204 No Content (no body)
     return None
 
@@ -861,10 +1178,12 @@ async def delete_question_set(
 async def export_docx_api(
     question_set_id: str,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Export question set to Microsoft Word (.docx) file download.
     """
+    await require_feature_enabled_flag("enable_question_export", user_role=current_user.role, user_id=current_user.id)
     qs = await _get_owned_active_qs_or_404(question_set_id, current_user)
 
     try:
@@ -876,6 +1195,21 @@ async def export_docx_api(
         ) from exc
 
     filename = build_export_filename(qs, "docx")
+    db = get_database()
+    await db["question_sets"].update_one(
+        {"_id": ObjectId(question_set_id)}, {"$set": {"last_exported_at": datetime.now(timezone.utc)}}
+    )
+    await record_activity(
+        action="exam_exported",
+        category="export",
+        status="success",
+        user_id=current_user.id,
+        resource_type="question_set",
+        resource_id=question_set_id,
+        request=request,
+        metadata={"format": "docx", "question_count": len(qs.get("questions", []))},
+        database=db,
+    )
     return StreamingResponse(
         file_stream,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -889,10 +1223,12 @@ async def export_docx_api(
 async def export_pdf_api(
     question_set_id: str,
     current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
 ):
     """
     Export question set to PDF (.pdf) file download.
     """
+    await require_feature_enabled_flag("enable_question_export", user_role=current_user.role, user_id=current_user.id)
     qs = await _get_owned_active_qs_or_404(question_set_id, current_user)
 
     try:
@@ -904,6 +1240,21 @@ async def export_pdf_api(
         ) from exc
 
     filename = build_export_filename(qs, "pdf")
+    db = get_database()
+    await db["question_sets"].update_one(
+        {"_id": ObjectId(question_set_id)}, {"$set": {"last_exported_at": datetime.now(timezone.utc)}}
+    )
+    await record_activity(
+        action="exam_exported",
+        category="export",
+        status="success",
+        user_id=current_user.id,
+        resource_type="question_set",
+        resource_id=question_set_id,
+        request=request,
+        metadata={"format": "pdf", "question_count": len(qs.get("questions", []))},
+        database=db,
+    )
     return StreamingResponse(
         file_stream,
         media_type="application/pdf",

@@ -1,0 +1,90 @@
+{
+  "readiness": {
+    "user_count": 0,
+    "item_count": 0,
+    "interaction_count": 0,
+    "average_interactions_per_user": 0.0,
+    "knowledge_component_count": 0,
+    "q_matrix_coverage": 0.0,
+    "data_sparsity": 1.0,
+    "median_sequence_length": 0.0,
+    "max_sequence_length": 0,
+    "train_validation_test_split_feasible": false,
+    "production_ready": false,
+    "blocking_reasons": [
+      "not_enough_users",
+      "not_enough_items",
+      "not_enough_interactions",
+      "not_enough_interactions_per_user",
+      "not_enough_knowledge_components",
+      "low_q_matrix_coverage",
+      "data_too_sparse",
+      "sequence_too_short",
+      "train_validation_test_split_not_feasible"
+    ],
+    "thresholds": {
+      "min_users": 100,
+      "min_items": 300,
+      "min_interactions": 5000,
+      "min_interactions_per_user": 20.0,
+      "min_knowledge_components": 20,
+      "min_q_matrix_coverage": 0.8,
+      "max_sparsity": 0.98,
+      "min_sequence_length": 10
+    },
+    "generated_at": "2026-07-23T02:44:46.956943Z"
+  },
+  "production_model": "bkt_irt",
+  "neuralcd": {
+    "model_name": "neuralcd",
+    "status": "skipped",
+    "mode": "research_only",
+    "version": "v0-research",
+    "checkpoint": null,
+    "split_strategy": "time_ordered_per_user_or_user_holdout_without_future_leakage",
+    "metrics": {},
+    "notes": [
+      "BKT/IRT remains the production learner model.",
+      "No AI API is allowed to create labels, interactions, or accuracy metrics.",
+      "Readiness gate failed; use only a separate research dataset or fixture.",
+      "NEURALCD feature flag is disabled."
+    ]
+  },
+  "akt": {
+    "model_name": "akt",
+    "status": "skipped",
+    "mode": "research_only",
+    "version": "v0-research",
+    "checkpoint": null,
+    "split_strategy": "time_ordered_per_user_or_user_holdout_without_future_leakage",
+    "metrics": {},
+    "notes": [
+      "BKT/IRT remains the production learner model.",
+      "No AI API is allowed to create labels, interactions, or accuracy metrics.",
+      "Readiness gate failed; use only a separate research dataset or fixture.",
+      "AKT feature flag is disabled."
+    ]
+  },
+  "baseline_comparison": {
+    "planned": [
+      "bkt",
+      "irt",
+      "bkt_irt",
+      "neuralcd",
+      "akt"
+    ],
+    "metrics": [
+      "auc",
+      "accuracy",
+      "log_loss",
+      "brier",
+      "calibration",
+      "training_time",
+      "inference_time",
+      "memory",
+      "interpretability"
+    ],
+    "status": "blocked_until_real_or_research_dataset_available"
+  },
+  "generated_at": "2026-07-23T02:44:46.957009Z"
+}

@@ -241,7 +241,7 @@ const QuestionHistoryPage: React.FC = () => {
         <div>
           <h1 style={S.title}>📋 Ngân hàng câu hỏi</h1>
           <p style={S.subtitle}>
-            Quản lý bộ câu hỏi AI đã soạn, duyệt nội dung và ban hành đề thi cho sinh viên.
+            Quản lý bộ câu hỏi AI đã soạn, duyệt nội dung và ban hành đề thi cho học sinh.
           </p>
         </div>
         <button type="button" onClick={() => navigate('/generate')} className="btn-primary">

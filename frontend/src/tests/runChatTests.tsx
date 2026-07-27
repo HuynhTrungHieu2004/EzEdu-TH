@@ -1,6 +1,16 @@
 import { renderAnswerWithCitations, formatConfidence } from '../utils/chatCitations';
 import { getChatErrorMessage } from '../utils/chatErrors';
 import { SCOPE_LABELS, RETRIEVAL_MODE_LABELS, EVIDENCE_STATUS_LABELS } from '../constants/advancedChat';
+import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../api/learningEventApi';
+import {
+  formatMasteryEstimate,
+  isPersonalizationFeatureDisabled,
+  knowledgeStatusLabel,
+  profileConfidenceLabel,
+  reasonCodeLabel,
+  splitPreferenceInput,
+} from '../utils/personalizationUi';
+import type { RecommendationFeedbackPayload } from '../api/personalizationApi';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -270,6 +280,38 @@ function runTests() {
   assert(step2.updated.pinned_at === pinnedConv.pinned_at, "Idempotent pin preserves old pinned_at");
 
   console.log("✅ 8. Test conversation management validation & state changes: OK");
+
+  // 9. Test Learning Event client helpers
+  const session = getLearningSession('question_set', 'qs-1');
+  assert(session.sessionId.startsWith('ls_question_set_qs-1_'), 'Learning session id prefix');
+  const eventKey = buildEventIdempotencyKey(['session-1', 'item-1', 'question_answered']);
+  assert(eventKey.length >= 8, 'Event idempotency key length');
+  trackLearningEvent({
+    event_type: 'question_started',
+    item_id: 'qs-1:0',
+    session_id: session.sessionId,
+    idempotency_key: eventKey,
+  });
+  console.log("✅ 9. Test learning event client không crash khi API/môi trường không khả dụng: OK");
+
+  // 10. Test Personalization UI helpers and API payload contracts
+  assert(formatMasteryEstimate(0.724) === 'Ước tính thành thạo 72%', 'Mastery estimate wording');
+  assert(formatMasteryEstimate(null) === 'Cần thêm bài làm để đánh giá', 'Unassessed mastery wording');
+  assert(profileConfidenceLabel(0.2) === 'Dữ liệu còn hạn chế', 'Low confidence label');
+  assert(profileConfidenceLabel(0.82) === 'Độ tin cậy tốt', 'High confidence label');
+  assert(knowledgeStatusLabel('at_risk_of_forgetting') === 'Nguy cơ quên', 'Knowledge map status label');
+  assert(reasonCodeLabel('IMPROVE_WEAK_SKILL') === 'Củng cố phần còn yếu', 'Recommendation reason label');
+  const preferences = splitPreferenceInput(' Toán, Vật lý, Toán, ');
+  assert(preferences.length === 3 && preferences[0] === 'Toán', 'Preference input keeps ordered choices');
+  const disabledError = { response: { status: 404, data: { detail: 'Personalization recommendations are disabled.' } } };
+  assert(isPersonalizationFeatureDisabled(disabledError), 'Disabled personalization error detected');
+  const feedbackPayload: RecommendationFeedbackPayload = {
+    recommendation_log_id: 'log-1',
+    item_id: 'item-1',
+    feedback_type: 'too_hard',
+  };
+  assert(feedbackPayload.feedback_type === 'too_hard', 'Recommendation feedback payload typed');
+  console.log("✅ 10. Test personalization empty/error/feedback helpers: OK");
 
   console.log("=== TẤT CẢ UNIT TESTS ĐỀU ĐẠT CHUẨN ===");
 }

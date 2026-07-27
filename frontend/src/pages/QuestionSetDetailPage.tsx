@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { questionApi } from '../api/questionApi';
 import type { QuestionAttemptResponse, QuestionItemUpdatePayload, QuestionSetResponse } from '../api/questionApi';
+import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../api/learningEventApi';
 import QuestionCard from '../components/QuestionCard';
 import { getApiErrorDetail, getBlobErrorDetail, isUnauthorizedError } from '../api/errors';
+import type { UserResponse } from '../types/auth';
+import { classesApi } from '../api/classesApi';
+import type { ClassSummary } from '../types/classes';
 
 type WorkflowStatus = 'draft' | 'review_pending' | 'approved' | 'published';
 
@@ -40,14 +44,86 @@ const QuestionSetDetailPage: React.FC = () => {
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [workflowBusy, setWorkflowBusy] = useState<WorkflowStatus | null>(null);
   const [publishingSet, setPublishingSet] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishAudience, setPublishAudience] = useState<'all' | 'classes'>('all');
+  const [myClasses, setMyClasses] = useState<ClassSummary[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [attemptAnswers, setAttemptAnswers] = useState<Record<number, string>>({});
   const [attemptSubmitting, setAttemptSubmitting] = useState(false);
   const [attemptResult, setAttemptResult] = useState<QuestionAttemptResponse | null>(null);
-  const [currentRole, setCurrentRole] = useState<'student' | 'lecturer' | 'admin' | 'user'>('student');
+  const [currentRole, setCurrentRole] = useState<NonNullable<UserResponse['role']>>('student');
+  const questionSessionRef = useRef<string | null>(null);
+  const pageStartedAtRef = useRef(0);
+  const questionStartedAtRef = useRef<Record<number, number>>({});
+  const answerChangeCountRef = useRef<Record<number, number>>({});
+  const startedQuestionsRef = useRef<Set<number>>(new Set());
+  const explanationViewedRef = useRef<Set<string>>(new Set());
 
   const navigate = useNavigate();
-  const canManageQuestions = ['lecturer', 'admin', 'user'].includes(currentRole);
+  const canManageQuestions = ['lecturer', 'admin', 'super_admin', 'user'].includes(currentRole);
   const canTakeExam = currentRole === 'student';
+
+  useEffect(() => {
+    if (!questionSet?.id) return;
+    const session = getLearningSession('question_set', questionSet.id);
+    questionSessionRef.current = session.sessionId;
+    pageStartedAtRef.current = Date.now();
+    questionStartedAtRef.current = {};
+    answerChangeCountRef.current = {};
+    startedQuestionsRef.current = new Set();
+    explanationViewedRef.current = new Set();
+  }, [questionSet]);
+
+  const getQuestionSessionId = useCallback(() => {
+    if (!questionSet?.id) return null;
+    if (!questionSessionRef.current) {
+      questionSessionRef.current = getLearningSession('question_set', questionSet.id).sessionId;
+    }
+    return questionSessionRef.current;
+  }, [questionSet]);
+
+  const recordQuestionStarted = useCallback((questionIndex: number) => {
+    if (!questionSet || !canTakeExam) return;
+    const sessionId = getQuestionSessionId();
+    if (!sessionId || startedQuestionsRef.current.has(questionIndex)) return;
+
+    startedQuestionsRef.current.add(questionIndex);
+    questionStartedAtRef.current[questionIndex] = Date.now();
+    const itemId = `${questionSet.id}:${questionIndex}`;
+    trackLearningEvent({
+      event_type: 'question_started',
+      item_id: itemId,
+      document_id: questionSet.document_id,
+      session_id: sessionId,
+      idempotency_key: buildEventIdempotencyKey([sessionId, itemId, 'question_started']),
+      metadata: {
+        question_set_id: questionSet.id,
+        question_index: questionIndex,
+      },
+    });
+  }, [canTakeExam, getQuestionSessionId, questionSet]);
+
+  const recordExplanationViewed = useCallback((questionIndex: number) => {
+    if (!questionSet) return;
+    const sessionId = getQuestionSessionId();
+    if (!sessionId) return;
+    const itemId = `${questionSet.id}:${questionIndex}`;
+    const key = buildEventIdempotencyKey([sessionId, itemId, 'explanation_viewed']);
+    if (explanationViewedRef.current.has(key)) return;
+
+    explanationViewedRef.current.add(key);
+    trackLearningEvent({
+      event_type: 'explanation_viewed',
+      item_id: itemId,
+      document_id: questionSet.document_id,
+      session_id: sessionId,
+      idempotency_key: key,
+      metadata: {
+        question_set_id: questionSet.id,
+        question_index: questionIndex,
+      },
+    });
+  }, [getQuestionSessionId, questionSet]);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -162,17 +238,37 @@ const QuestionSetDetailPage: React.FC = () => {
     }
   };
 
-  const handlePublishSet = async () => {
+  const openPublishModal = () => {
     if (!questionSet) return;
-    const confirmed = window.confirm(
-      `Ban hành toàn bộ ${questionSet.question_count} câu hỏi cho sinh viên?\n\nHãy bảo đảm bạn đã kiểm tra nội dung, đáp án và lời giải trước khi tiếp tục.`
+    setPublishAudience('all');
+    setSelectedClassIds([]);
+    setShowPublishModal(true);
+    classesApi.list()
+      .then((data) => setMyClasses(data.items))
+      .catch(() => setMyClasses([]));
+  };
+
+  const toggleSelectedClass = (classId: string) => {
+    setSelectedClassIds((prev) =>
+      prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]
     );
-    if (!confirmed) return;
+  };
+
+  const confirmPublish = async () => {
+    if (!questionSet) return;
+    if (publishAudience === 'classes' && selectedClassIds.length === 0) {
+      setActionError('Vui lòng chọn ít nhất một lớp để giao đề.');
+      return;
+    }
     setPublishingSet(true);
     setActionError(null);
     try {
-      const updated = await questionApi.publishQuestionSet(questionSet.id);
+      const updated = await questionApi.publishQuestionSet(questionSet.id, {
+        audience_type: publishAudience,
+        target_class_ids: publishAudience === 'classes' ? selectedClassIds : [],
+      });
       setQuestionSet(updated);
+      setShowPublishModal(false);
     } catch (err: unknown) {
       setActionError(getApiErrorDetail(err) ?? 'Không ban hành được đề thi.');
     } finally {
@@ -181,14 +277,20 @@ const QuestionSetDetailPage: React.FC = () => {
   };
 
   const handleAnswerChange = (questionIndex: number, answer: string) => {
+    recordQuestionStarted(questionIndex);
+    answerChangeCountRef.current[questionIndex] = (answerChangeCountRef.current[questionIndex] || 0) + 1;
     setAttemptAnswers((prev) => ({ ...prev, [questionIndex]: answer }));
   };
 
   const handleSubmitAttempt = async () => {
     if (!questionSet) return;
+    const submittedAt = Date.now();
     setAttemptSubmitting(true);
     setActionError(null);
     try {
+      Object.keys(attemptAnswers).forEach((questionIndex) => {
+        recordQuestionStarted(Number(questionIndex));
+      });
       const result = await questionApi.submitAttempt(
         questionSet.id,
         Object.entries(attemptAnswers).map(([questionIndex, answer]) => ({
@@ -197,6 +299,37 @@ const QuestionSetDetailPage: React.FC = () => {
         })),
       );
       setAttemptResult(result);
+      const sessionId = getQuestionSessionId();
+      if (sessionId) {
+        result.answers.forEach((answerResult) => {
+          const itemId = `${questionSet.id}:${answerResult.question_index}`;
+          const startedAt = questionStartedAtRef.current[answerResult.question_index] || pageStartedAtRef.current;
+          trackLearningEvent({
+            event_type: 'question_answered',
+            item_id: itemId,
+            document_id: result.document_id,
+            session_id: sessionId,
+            idempotency_key: buildEventIdempotencyKey([
+              sessionId,
+              itemId,
+              result.id,
+              'question_answered',
+            ]),
+            is_correct: answerResult.is_correct,
+            score: answerResult.is_correct ? 1 : 0,
+            response_time_ms: Math.max(0, submittedAt - startedAt),
+            attempt_number: 1,
+            hint_count: 0,
+            answer_change_count: answerChangeCountRef.current[answerResult.question_index] || 0,
+            completed: true,
+            metadata: {
+              attempt_id: result.id,
+              question_set_id: questionSet.id,
+              question_index: answerResult.question_index,
+            },
+          });
+        });
+      }
     } catch (err: unknown) {
       setActionError(getApiErrorDetail(err) ?? 'Không lưu được kết quả làm bài.');
     } finally {
@@ -247,14 +380,14 @@ const QuestionSetDetailPage: React.FC = () => {
               <div style={styles.exportButtons}>
                 <button
                   type="button"
-                  onClick={handlePublishSet}
+                  onClick={openPublishModal}
                   disabled={publishingSet || questionSet.published_question_count === questionSet.question_count}
                   style={{ ...styles.exportButton, background: 'linear-gradient(135deg, #16a34a, #22c55e)', border: 'none' }}
                 >
                   {publishingSet
                     ? 'Đang ban hành...'
                     : questionSet.published_question_count === questionSet.question_count
-                      ? '✅ Đã ban hành cho sinh viên'
+                      ? '✅ Đã ban hành cho học sinh'
                       : '🚀 Duyệt & ban hành toàn bộ'}
                 </button>
                 <button
@@ -280,6 +413,85 @@ const QuestionSetDetailPage: React.FC = () => {
         )}
 
         {actionError && <div style={styles.errorAlert}>{actionError}</div>}
+
+        {showPublishModal && questionSet && (
+          <div
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            }}
+            onClick={() => !publishingSet && setShowPublishModal(false)}
+          >
+            <div
+              style={{
+                background: 'var(--surface, #fff)', borderRadius: 16, padding: 24,
+                width: '100%', maxWidth: 480, maxHeight: '80vh', overflowY: 'auto',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ marginTop: 0 }}>Ban hành đề thi</h3>
+              <p style={{ color: 'var(--text-muted, #666)' }}>
+                Chọn đối tượng học sinh sẽ nhìn thấy {questionSet.question_count} câu hỏi này.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="publish-audience"
+                  checked={publishAudience === 'all'}
+                  onChange={() => setPublishAudience('all')}
+                />
+                Tất cả học sinh (mặc định, như hiện tại)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="publish-audience"
+                  checked={publishAudience === 'classes'}
+                  onChange={() => setPublishAudience('classes')}
+                />
+                Chỉ giao cho lớp cụ thể
+              </label>
+
+              {publishAudience === 'classes' && (
+                <div style={{ marginBottom: 12, paddingLeft: 4 }}>
+                  {myClasses.length === 0 ? (
+                    <p style={{ fontSize: 14, color: 'var(--text-muted, #666)' }}>
+                      Bạn chưa có lớp học nào.{' '}
+                      <button type="button" onClick={() => navigate('/classes')} style={{ padding: 0, background: 'none', border: 'none', color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }}>
+                        Tạo lớp học ngay
+                      </button>.
+                    </p>
+                  ) : (
+                    myClasses.map((cls) => (
+                      <label key={cls.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedClassIds.includes(cls.id)}
+                          onChange={() => toggleSelectedClass(cls.id)}
+                        />
+                        {cls.name} ({cls.student_count} học sinh)
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button type="button" onClick={() => setShowPublishModal(false)} disabled={publishingSet} style={styles.backButton}>
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPublish}
+                  disabled={publishingSet}
+                  style={{ ...styles.exportButton, background: 'linear-gradient(135deg, #16a34a, #22c55e)', border: 'none' }}
+                >
+                  {publishingSet ? 'Đang ban hành...' : 'Xác nhận ban hành'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Metadata Header */}
         {questionSet && (
@@ -603,6 +815,7 @@ const QuestionSetDetailPage: React.FC = () => {
                 forceReveal={forceReveal}
                 savedAnswer={attemptAnswers[qIdx]}
                 onAnswerChange={handleAnswerChange}
+                onExplanationViewed={recordExplanationViewed}
                 examMode={canTakeExam}
                 submittedResult={attemptResult?.answers.find((answer) => answer.question_index === qIdx)}
               />

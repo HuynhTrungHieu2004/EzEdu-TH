@@ -360,6 +360,11 @@ async def generate_questions(
             avg_score = (float(g_score) + float(m_score)) / 2.0
 
             if is_valid:
+                question["g_verdict"] = g_verdict
+                question["g_score"] = g_score
+                question["m_verdict"] = m_verdict
+                question["m_score"] = m_score
+                question["avg_score"] = avg_score
                 evaluated_pool.append({
                     "question": question,
                     "avg_score": avg_score
@@ -417,6 +422,19 @@ async def generate_questions(
     for q in selected_questions:
         q.setdefault("tags", [])
         q.setdefault("status", "draft")
+        # Reuse the dual-provider cross-validation score (if it ran) as an honest
+        # hallucination-risk signal instead of leaving it permanently null. When
+        # only one provider is configured there is no cross-validation score, so
+        # the risk is reported as "unknown" rather than fabricated.
+        avg_score = q.get("avg_score")
+        if avg_score is None:
+            q["hallucination_risk"] = "unknown"
+        elif avg_score >= 4:
+            q["hallucination_risk"] = "low"
+        elif avg_score >= 2.5:
+            q["hallucination_risk"] = "medium"
+        else:
+            q["hallucination_risk"] = "high"
 
     # 4. Save to MongoDB
     now = datetime.now(timezone.utc)
@@ -444,5 +462,68 @@ async def generate_questions(
     
     result = await db["question_sets"].insert_one(question_set)
     question_set["_id"] = str(result.inserted_id)
-    
+
     return question_set
+
+
+async def regenerate_single_question(
+    document_id: str,
+    difficulty: str,
+    question_type: str,
+    bloom_level: str | None = None,
+    avoid_question_texts: list[str] | None = None,
+    database=None,
+) -> dict:
+    """Generate ONE replacement question from the same document, preserving the
+    original question's difficulty/type/bloom level. Unlike the bulk `generate_questions`
+    pipeline, this uses a single available provider (no dual cross-validation) —
+    reasonable for a one-off admin regeneration rather than a full re-run of the
+    dual-generation/dual-validation pipeline. Only supports text documents (and
+    videos with an existing transcript); does not re-download/re-transcribe video.
+    """
+    db = database if database is not None else get_database()
+    document = await db["documents"].find_one({"_id": ObjectId(document_id)})
+    if not document:
+        raise FileNotFoundError("Document not found.")
+
+    cursor = db["document_chunks"].find({"document_id": document_id}).sort("chunk_index", 1)
+    chunks_list = [doc["content"] async for doc in cursor]
+    if not chunks_list:
+        content_doc = await db["document_contents"].find_one({"document_id": document_id})
+        if content_doc and content_doc.get("extracted_text"):
+            chunks_list = [content_doc["extracted_text"]]
+        else:
+            raise ValueError("Nội dung học liệu chưa được trích xuất hoặc lập chỉ mục.")
+    context = "\n\n".join(chunks_list)
+
+    keywords = extract_keywords(chunks_list, top_n=15) if chunks_list else []
+    prompt = build_question_prompt(context, 1, difficulty, question_type, bloom_level, keywords=keywords)
+
+    avoid_set = {text.strip().lower() for text in (avoid_question_texts or []) if text}
+    candidates: list[dict] = []
+    if is_groq_available():
+        try:
+            candidates = parse_raw_questions(generate_json(prompt))
+        except Exception as e:
+            logger.error(f"Groq single-question regeneration failed: {e}")
+    if not candidates and is_gemini_available():
+        try:
+            candidates = parse_raw_questions(gemini_generate_json(prompt))
+        except Exception as e:
+            logger.error(f"Gemini single-question regeneration failed: {e}")
+
+    if not candidates:
+        raise ValueError("Không thể sinh lại câu hỏi từ các mô hình AI. Vui lòng kiểm tra lại cấu hình API.")
+
+    chosen = next(
+        (q for q in candidates if q.get("question", "").strip().lower() not in avoid_set),
+        candidates[0],
+    )
+    chosen["tags"] = []
+    chosen["status"] = "draft"
+    chosen["hallucination_risk"] = "unknown"
+    chosen.setdefault("bloom_level", bloom_level or "understand")
+    chosen["reviewed_by"] = None
+    chosen["reviewed_at"] = None
+    chosen["published_at"] = None
+    return chosen

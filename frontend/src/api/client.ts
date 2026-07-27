@@ -26,7 +26,8 @@ client.interceptors.request.use(
   }
 );
 
-// Interceptor to handle authentication expiration (401 Unauthorized)
+// Interceptor to handle authentication expiration (401 Unauthorized) and
+// system-wide maintenance mode (503 Service Unavailable, error_code MAINTENANCE_MODE)
 client.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -36,6 +37,14 @@ client.interceptors.response.use(
       if (!window.location.pathname.endsWith('/login') && !window.location.pathname.endsWith('/register')) {
         window.location.href = '/login';
       }
+    }
+    if (
+      error.response &&
+      error.response.status === 503 &&
+      error.response.data?.error_code === 'MAINTENANCE_MODE' &&
+      !window.location.pathname.endsWith('/maintenance')
+    ) {
+      window.location.href = '/maintenance';
     }
     return Promise.reject(error);
   }

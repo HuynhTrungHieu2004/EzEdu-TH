@@ -26,6 +26,7 @@ from bson import ObjectId
 from app.core.config import settings
 from app.database.mongodb import get_database
 from app.schemas.analytics import UsageEventCreate
+from app.services.ai_pricing import estimate_cost
 
 logger = logging.getLogger("app.analytics")
 
@@ -72,6 +73,18 @@ async def record_event(event: UsageEventCreate) -> None:
     try:
         db = get_database()
         doc = event.model_dump()
+        doc["feature"] = doc.get("feature") or doc.get("operation_type")
+        doc["model"] = doc.get("model") or doc.get("model_name")
+        doc["request_id"] = doc.get("request_id") or doc.get("logical_request_id")
+        if doc.get("estimated_cost") is None:
+            cost, currency = estimate_cost(
+                provider=doc.get("provider"),
+                model=doc.get("model_name"),
+                input_tokens=doc.get("input_tokens"),
+                output_tokens=doc.get("output_tokens"),
+            )
+            doc["estimated_cost"] = cost
+            doc["currency"] = doc.get("currency") or currency
         # Replace event_id with a unique MongoDB-level unique index field
         await asyncio.wait_for(
             db[COLLECTION].insert_one(doc),

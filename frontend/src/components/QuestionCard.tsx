@@ -10,6 +10,7 @@ interface QuestionCardProps {
   forceReveal?: boolean;
   savedAnswer?: string;
   onAnswerChange?: (questionIndex: number, answer: string) => void;
+  onExplanationViewed?: (questionIndex: number) => void;
   examMode?: boolean;
   submittedResult?: {
     is_correct: boolean;
@@ -24,6 +25,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   forceReveal = false,
   savedAnswer,
   onAnswerChange,
+  onExplanationViewed,
   examMode = false,
   submittedResult,
 }) => {
@@ -53,6 +55,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   useEffect(() => {
     void Promise.resolve().then(() => {
       setManualReveal(forceReveal);
+      if (forceReveal) {
+        onExplanationViewed?.(index - 1);
+      }
       if (!forceReveal) {
         // Reset interactive state when hiding answers
         setSelectedAnswer(null);
@@ -60,7 +65,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
         setShortAnswerInput('');
       }
     });
-  }, [forceReveal]);
+  }, [forceReveal, index, onExplanationViewed]);
+
+  useEffect(() => {
+    if (submittedResult) {
+      onExplanationViewed?.(index - 1);
+    }
+  }, [submittedResult, index, onExplanationViewed]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -150,6 +161,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                     setSelectedAnswer(null);
                     setShortAnswerChecked(false);
                     setShortAnswerInput('');
+                  } else {
+                    onExplanationViewed?.(index - 1);
                   }
                   return !prev;
                 });

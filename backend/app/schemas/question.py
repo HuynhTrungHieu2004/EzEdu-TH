@@ -38,6 +38,7 @@ class QuestionItemUpdateRequest(BaseModel):
     question_type: Optional[Literal["multiple_choice", "true_false", "short_answer"]] = None
     bloom_level: Optional[Literal["remember", "understand", "apply", "analyze"]] = None
     tags: Optional[List[str]] = None
+    reason: Optional[str] = Field(None, max_length=500)
 
     @field_validator("tags")
     @classmethod
@@ -59,6 +60,26 @@ class QuestionItemUpdateRequest(BaseModel):
 
 class QuestionWorkflowRequest(BaseModel):
     status: QuestionWorkflowStatus
+
+
+PublishAudienceType = Literal["all", "classes"]
+
+
+class PublishQuestionSetRequest(BaseModel):
+    audience_type: PublishAudienceType = "all"
+    target_class_ids: List[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("target_class_ids")
+    @classmethod
+    def dedupe_class_ids(cls, value: List[str]) -> List[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for item in value:
+            item = item.strip()
+            if item and item not in seen:
+                seen.add(item)
+                deduped.append(item)
+        return deduped
 
 
 class QuestionAttemptAnswer(BaseModel):
@@ -119,6 +140,8 @@ class QuestionSetResponse(BaseModel):
     bloom_distribution: Optional[Dict[str, int]] = None  # e.g. {"remember": 2, "understand": 3}
     workflow_counts: Optional[Dict[str, int]] = None
     published_question_count: int = 0
+    audience_type: PublishAudienceType = "all"
+    target_class_ids: List[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -134,6 +157,8 @@ class QuestionSetSummary(BaseModel):
     bloom_distribution: Optional[Dict[str, int]] = None
     workflow_counts: Optional[Dict[str, int]] = None
     published_question_count: int = 0
+    audience_type: PublishAudienceType = "all"
+    target_class_ids: List[str] = Field(default_factory=list)
     created_at: datetime
 
 

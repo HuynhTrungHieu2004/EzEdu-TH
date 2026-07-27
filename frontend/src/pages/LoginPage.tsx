@@ -35,7 +35,8 @@ const LoginPage = () => {
       const data = await authApi.login({ email, password });
       localStorage.setItem('access_token', data.access_token);
       const user = await authApi.getMe();
-      if (user.role === 'student') navigate('/published-questions');
+      if (user.role === 'student' && !user.student_profile_completed) navigate('/student-onboarding');
+      else if (user.role === 'student') navigate('/published-questions');
       else if (user.role === 'admin') navigate('/admin/dashboard');
       else navigate('/dashboard');
     } catch (err: unknown) {
@@ -52,9 +53,9 @@ const LoginPage = () => {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-mark" translate="no">AI</div>
-          <h2 className="auth-title">Đăng nhập hệ thống</h2>
-          <p className="auth-subtitle">Sinh câu hỏi đánh giá năng lực tự động</p>
+          <div className="auth-mark" translate="no">Ez</div>
+          <h2 className="auth-title">Đăng nhập EzEdu AI</h2>
+          <p className="auth-subtitle">Biến học liệu thành đề thi dễ dàng</p>
         </div>
 
         {success && <div className="alert alert-success">{success}</div>}

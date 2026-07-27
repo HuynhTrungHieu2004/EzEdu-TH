@@ -44,6 +44,8 @@ export interface QuestionSetResponse {
   bloom_distribution?: Record<string, number> | null;
   workflow_counts?: Record<string, number> | null;
   published_question_count: number;
+  audience_type?: 'all' | 'classes';
+  target_class_ids?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +61,8 @@ export interface QuestionSetSummary {
   bloom_distribution?: Record<string, number> | null;
   workflow_counts?: Record<string, number> | null;
   published_question_count: number;
+  audience_type?: 'all' | 'classes';
+  target_class_ids?: string[];
   created_at: string;
 }
 
@@ -213,6 +217,11 @@ export const questionApi = {
     return response.data;
   },
 
+  pendingPublishedCount: async (signal?: AbortSignal): Promise<number> => {
+    const response = await client.get<{ pending_count: number }>('/questions/published/pending-count', { signal });
+    return response.data.pending_count;
+  },
+
   /** Soft-delete a question set. */
   deleteQuestionSet: async (id: string): Promise<void> => {
     await client.delete(`/questions/${id}`);
@@ -228,8 +237,11 @@ export const questionApi = {
     return response.data;
   },
 
-  publishQuestionSet: async (id: string): Promise<QuestionSetResponse> => {
-    const response = await client.post<QuestionSetResponse>(`/questions/${id}/publish`);
+  publishQuestionSet: async (
+    id: string,
+    payload?: { audience_type: 'all' | 'classes'; target_class_ids?: string[] },
+  ): Promise<QuestionSetResponse> => {
+    const response = await client.post<QuestionSetResponse>(`/questions/${id}/publish`, payload ?? { audience_type: 'all' });
     return response.data;
   },
 

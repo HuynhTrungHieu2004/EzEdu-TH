@@ -9,15 +9,21 @@ EventKind = Literal["logical_operation", "provider_attempt"]
 # ─────────────────────────── Operation Types ───────────────────────
 OperationType = Literal[
     "advanced_chat",
+    "document_chat",
     "material_verification",
+    "document_verification",
     "question_generation",
     "embedding_document",
     "embedding_query",
+    "embedding",
     "web_grounding",
+    "web_search",
+    "summarization",
+    "personalization",
 ]
 
 # ─────────────────────────── Provider ──────────────────────────────
-ProviderType = Literal["google", "groq", "local"]
+ProviderType = Literal["google", "groq", "local", "mixed", "unknown"]
 
 # ─────────────────────────── Retrieval Modes ───────────────────────
 # Exact production values from AdvancedChatResponse.retrieval_mode
@@ -62,6 +68,8 @@ class UsageEventCreate(BaseModel):
     operation_type: OperationType
     provider: ProviderType
     model_name: str
+    feature: Optional[str] = None
+    model: Optional[str] = None
 
     # Only present on advanced_chat logical operations
     retrieval_mode: Optional[RetrievalModeType] = None
@@ -76,6 +84,11 @@ class UsageEventCreate(BaseModel):
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    estimated_cost: Optional[float] = None
+    currency: str = "USD"
+    request_id: Optional[str] = None
+    document_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
     # Number of real web-grounding HTTP calls (for web_grounding provider_attempts)
     grounding_request_count: int = 0

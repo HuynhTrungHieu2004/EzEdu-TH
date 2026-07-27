@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.database.mongodb import get_database
 from app.services.llm_service import get_gemini_client, get_groq_client
 from app.services.rag_service import search_user_chunks_advanced
+from app.services.system_settings_service import get_setting_value
 from app.schemas.chat import (
     AdvancedChatAskRequest,
     AdvancedChatResponse,
@@ -136,11 +137,12 @@ async def retrieve_context(user_id: str, query: str, document_ids: List[str]) ->
     
     filtered = []
     seen_texts = set()
+    distance_threshold = float(await get_setting_value("rag_distance_threshold", settings.RAG_DISTANCE_THRESHOLD))
     
     for chunk in raw_chunks:
         distance = chunk.get("distance", 0.0)
         relevance = max(0.0, min(1.0, 1.0 - distance))
-        if relevance >= 0.25:  # distance <= 0.75 threshold
+        if distance <= distance_threshold:
             text = chunk.get("text", "").strip()
             if text and text not in seen_texts:
                 seen_texts.add(text)
@@ -538,6 +540,9 @@ async def ask_advanced_question(
                     del assistant_msg_doc["message_id"]
                     res_msg = await db["conversation_messages"].insert_one(assistant_msg_doc)
                     ans_response["message_id"] = str(res_msg.inserted_id)
+                    _event_status = "success"
+                    _retrieval_mode_logged = retrieval_mode
+                    _evidence_status_logged = ans_response.get("evidence_status")
                     return ans_response
 
         # 9. Format History for LLM Prompt
@@ -780,6 +785,30 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
 
         # 16. Record analytics event (fire-and-forget, non-critical)
         _latency_ms = int((_time.perf_counter() - _t_start) * 1000)
+        from app.services.activity_log_service import record_activity
+
+        await record_activity(
+            action="ai_chat_completed" if _event_status == "success" else "ai_chat_failed",
+            category="chat",
+            status="success" if _event_status == "success" else "failure",
+            user_id=user_id,
+            resource_type="conversation",
+            resource_id=str(conversation_id) if "conversation_id" in locals() and conversation_id else None,
+            request_id=request_id if "request_id" in locals() else None,
+            duration_ms=_latency_ms,
+            error_code=_error_code,
+            metadata={
+                "mode": "advanced_chat",
+                "model_ai": _model_name_logged,
+                "retrieval_mode": _retrieval_mode_logged,
+                "evidence_status": _evidence_status_logged,
+                "input_tokens": _input_tokens,
+                "output_tokens": _output_tokens,
+                "total_tokens": _total_tokens,
+                "grounding_request_count": _grounding_count,
+            },
+            database=db,
+        )
         await record_event(UsageEventCreate(
             event_id=new_event_id(),
             logical_request_id=_logical_request_id,

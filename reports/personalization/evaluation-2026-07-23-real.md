@@ -1,0 +1,119 @@
+# Personalization Evaluation Report
+
+- Generated at: `2026-07-23T03:44:09.039013+00:00`
+- Dataset type: `real`
+
+## Data Inventory
+
+- `is_synthetic`: `False`
+- `learning_events`: `0`
+- `question_answered_events`: `0`
+- `learner_profiles`: `0`
+- `learner_knowledge_states`: `0`
+- `learning_items`: `0`
+- `recommendation_logs`: `0`
+- `cluster_models`: `0`
+
+## Kmeans
+
+```json
+{
+  "status": "no_active_models",
+  "message": "No active cluster model is stored; K-Means validity metrics require training samples or stored model metrics."
+}
+```
+
+## Learner Model
+
+```json
+{
+  "bkt_irt": {
+    "status": "no_data",
+    "message": "No valid prediction rows."
+  },
+  "notes": [
+    "ROC-AUC is reported only when both positive and negative labels exist.",
+    "Partial scores are converted to binary labels with threshold >= 0.5."
+  ]
+}
+```
+
+## Recommendations
+
+```json
+{
+  "status": "no_data",
+  "message": "No recommendation sessions supplied."
+}
+```
+
+## Baseline Comparison
+
+```json
+{
+  "random": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "popular_item": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "kmeans_cluster_only": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "weighted_ranking": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "weighted_ranking_reranking": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  }
+}
+```
+
+## Ablation Study
+
+```json
+{
+  "without_knowledge_graph": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_bkt": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_irt": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_kmeans": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_interest": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_forgetting": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  },
+  "without_diversity_reranking": {
+    "status": "no_data",
+    "message": "No recommendation sessions supplied."
+  }
+}
+```
+
+## Ai Explanations
+
+```json
+{
+  "status": "no_data",
+  "message": "No AI explanation rows supplied."
+}
+```

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m unittest tests.test_activity_logs tests.test_admin_audit_logs -v)",
+      "Bash(pip3 show *)",
+      "Bash(python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(find / -maxdepth 4 -iname \"pytest\")",
+      "Bash(python3 -c \"import pytest\")",
+      "Bash(python3 -m unittest tests.test_admin_content tests.test_admin_ai -v)",
+      "Bash(.venv/bin/python -m unittest tests.test_rbac tests.test_admin_users -v)",
+      "Bash(\"/Users/macos/Documents/Zalo Received Files/chuyende-thunghiem-1/.venv/bin/python3\" -m pip list)",
+      "Bash(lsof -ti:8000 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "Bash(nohup .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(disown)",
+      "Bash(\"/Users/macos/Documents/Zalo Received Files/chuyende-thunghiem-1/.venv/bin/python3\" -m pip install -q -r requirements.txt --dry-run)",
+      "Bash(curl -sS -i --max-time 5 http://127.0.0.1:8000/health)",
+      "Bash(timeout 40 \"/Users/macos/Documents/Zalo Received Files/chuyende-thunghiem-1/.venv/bin/python3\" -m pip install -q pymongo mongomock_motor motor bson pytest fastapi pydantic)",
+      "Bash(curl -sS --max-time 5 http://127.0.0.1:8000/openapi.json)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" --max-time 5 http://127.0.0.1:8000/openapi.json)",
+      "Bash(\"/Users/macos/Documents/Zalo Received Files/chuyende-thunghiem-1/.venv/bin/python3\" -m pip install -q pymongo mongomock_motor)",
+      "Bash(\"/Users/macos/Documents/Zalo Received Files/chuyende-thunghiem-1/.venv/bin/python3\" -m pip install -q -r requirements.txt)"
+    ]
+  }
+}

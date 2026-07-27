@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { authApi } from '../api/authApi';
 import { questionApi } from '../api/questionApi';
+import { hasPermission, isAdminAreaRole } from '../utils/adminPermissions';
 import ThemeToggle from './ThemeToggle';
 
 
@@ -15,7 +16,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const token = localStorage.getItem('access_token');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [currentRole, setCurrentRole] = useState<'student' | 'lecturer' | 'admin' | 'user'>('student');
+  const [currentRole, setCurrentRole] = useState<'student' | 'lecturer' | 'analyst' | 'support' | 'moderator' | 'admin' | 'super_admin' | 'user'>('student');
+  const [permissionOverride, setPermissionOverride] = useState<string[]>([]);
   const [currentName, setCurrentName] = useState('');
   const [pendingExamCount, setPendingExamCount] = useState(0);
 
@@ -27,37 +29,51 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     authApi.getMe()
       .then((u) => {
         if (!cancelled) {
-          setIsAdmin(u.role === 'admin');
+          setIsAdmin(isAdminAreaRole(u.role));
           setCurrentRole(u.role || 'student');
+          setPermissionOverride(u.permissions_override || []);
           setCurrentName(u.full_name);
+          if (u.role === 'student' && !u.student_profile_completed && location.pathname !== '/student-onboarding') {
+            navigate('/student-onboarding', { replace: true });
+          }
         }
       })
       .catch(() => {
         if (!cancelled) {
           setIsAdmin(false);
           setCurrentRole('student');
+          setPermissionOverride([]);
         }
       });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, location.pathname, navigate]);
 
   useEffect(() => {
     if (!token || currentRole !== 'student' || !currentName) return;
     let cancelled = false;
-    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
-      .then(([published, attempts]) => {
-        if (cancelled) return;
-        const completedIds = new Set(attempts.map((item) => item.question_set_id));
-        setPendingExamCount(published.items.filter((item) => !completedIds.has(item.id)).length);
-      })
+    questionApi.pendingPublishedCount()
+      .then((count) => { if (!cancelled) setPendingExamCount(count); })
       .catch(() => { if (!cancelled) setPendingExamCount(0); });
     return () => { cancelled = true; };
   }, [token, currentRole, currentName, location.pathname]);
 
   // Reset admin state synchronously when token is removed
   const derivedIsAdmin = token ? isAdmin : false;
-  const isLecturerRole = token ? ['lecturer', 'admin', 'user'].includes(currentRole) : false;
+  const isLecturerRole = token ? ['lecturer', 'admin', 'super_admin', 'user'].includes(currentRole) : false;
   const isStudentRole = token ? currentRole === 'student' : false;
+  const canViewUsers = token ? hasPermission(currentRole, 'users.view', permissionOverride) : false;
+  const canViewDashboard = token
+    ? hasPermission(currentRole, 'analytics.view', permissionOverride) || hasPermission(currentRole, 'system_health.view', permissionOverride)
+    : false;
+  const canViewActivityLogs = token ? hasPermission(currentRole, 'activity_logs.view', permissionOverride) : false;
+  const canViewAuditLogs = token ? hasPermission(currentRole, 'admin_audit_logs.view', permissionOverride) : false;
+  const canViewDocuments = token ? hasPermission(currentRole, 'documents.view', permissionOverride) : false;
+  const canViewQuestions = token ? hasPermission(currentRole, 'questions.view', permissionOverride) : false;
+  const canViewAI = token ? hasPermission(currentRole, 'ai_usage.view', permissionOverride) : false;
+  const canViewWebsiteContent = token ? hasPermission(currentRole, 'website_content.view', permissionOverride) : false;
+  const canViewSettings = token ? hasPermission(currentRole, 'system_settings.view', permissionOverride) : false;
+  const canManageNotifications = token ? hasPermission(currentRole, 'notifications.manage', permissionOverride) : false;
+  const canExportReports = token ? hasPermission(currentRole, 'reports.export', permissionOverride) : false;
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -74,10 +90,10 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       {/* ── Crystal Sidebar ── */}
       <aside className="app-sidebar">
         <button type="button" className="sidebar-brand" onClick={() => navigate('/')}>
-          <span className="sidebar-brand-icon" translate="no">AI</span>
+          <span className="sidebar-brand-icon" translate="no">Ez</span>
           <span className="sidebar-brand-text">
-            <h1>AI Quiz Studio</h1>
-            <p>Sinh đề thông minh</p>
+            <h1>EzEdu AI</h1>
+            <p>Biến học liệu thành đề thi</p>
           </span>
         </button>
 
@@ -124,12 +140,21 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                   <span className="nav-icon">📋</span>
                   <span className="nav-label">Ngân hàng câu hỏi</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/classes')}
+                  className={isActive('/classes') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">🏫</span>
+                  <span className="nav-label">Lớp học của tôi</span>
+                </button>
               </>
             )}
 
             {isStudentRole && (
               <>
-                <span className="sidebar-label">Sinh viên</span>
+                <span className="sidebar-label">Học sinh</span>
                 <button
                   type="button"
                   onClick={() => navigate('/published-questions')}
@@ -157,6 +182,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => navigate('/personalization')}
+                  className={isActive('/personalization') ? 'nav-item-active' : 'nav-item'}
+                >
+                  <span className="nav-icon">🎯</span>
+                  <span className="nav-label">Cá nhân hóa</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => navigate('/student-statistics')}
                   className={isActive('/student-statistics') ? 'nav-item-active' : 'nav-item'}
                 >
@@ -171,14 +204,136 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             {derivedIsAdmin && (
               <>
                 <span className="sidebar-label">Quản trị</span>
-                <button
-                  type="button"
-                  onClick={() => navigate('/admin/dashboard')}
-                  className={isActive('/admin/dashboard') ? 'nav-item-active' : 'nav-item'}
-                >
-                  <span className="nav-icon">🛡️</span>
-                  <span className="nav-label">Admin Dashboard</span>
-                </button>
+                {canViewDashboard && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/dashboard')}
+                    className={isActive('/admin/dashboard') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">🛡️</span>
+                    <span className="nav-label">Dashboard</span>
+                  </button>
+                )}
+                {canViewUsers && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/users')}
+                    className={isActive('/admin/users') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">👥</span>
+                    <span className="nav-label">Người dùng</span>
+                  </button>
+                )}
+                {canViewDocuments && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/documents')}
+                    className={isActive('/admin/documents') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">📄</span>
+                    <span className="nav-label">Tài liệu</span>
+                  </button>
+                )}
+                {canViewQuestions && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/admin/questions')}
+                      className={isActive('/admin/questions') ? 'nav-item-active' : 'nav-item'}
+                    >
+                      <span className="nav-icon">❓</span>
+                      <span className="nav-label">Câu hỏi</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/admin/exams')}
+                      className={isActive('/admin/exams') ? 'nav-item-active' : 'nav-item'}
+                    >
+                      <span className="nav-icon">📝</span>
+                      <span className="nav-label">Đề thi</span>
+                    </button>
+                  </>
+                )}
+                {canViewAI && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/ai')}
+                    className={isActive('/admin/ai') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">⚡</span>
+                    <span className="nav-label">AI</span>
+                  </button>
+                )}
+                {canViewWebsiteContent && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/website-content')}
+                    className={isActive('/admin/website-content') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">🌐</span>
+                    <span className="nav-label">Website CMS</span>
+                  </button>
+                )}
+                {canViewSettings && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/admin/settings')}
+                      className={isActive('/admin/settings') ? 'nav-item-active' : 'nav-item'}
+                    >
+                      <span className="nav-icon">⚙️</span>
+                      <span className="nav-label">Cấu hình</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/admin/feature-flags')}
+                      className={isActive('/admin/feature-flags') ? 'nav-item-active' : 'nav-item'}
+                    >
+                      <span className="nav-icon">🚦</span>
+                      <span className="nav-label">Feature Flags</span>
+                    </button>
+                  </>
+                )}
+                {canManageNotifications && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/notifications')}
+                    className={isActive('/admin/notifications') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">🔔</span>
+                    <span className="nav-label">Thông báo</span>
+                  </button>
+                )}
+                {canExportReports && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/reports')}
+                    className={isActive('/admin/reports') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">📤</span>
+                    <span className="nav-label">Reports</span>
+                  </button>
+                )}
+                {canViewActivityLogs && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/activity-logs')}
+                    className={isActive('/admin/activity-logs') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">🕘</span>
+                    <span className="nav-label">Nhật ký hoạt động</span>
+                  </button>
+                )}
+                {canViewAuditLogs && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/audit-logs')}
+                    className={isActive('/admin/audit-logs') ? 'nav-item-active' : 'nav-item'}
+                  >
+                    <span className="nav-icon">🧾</span>
+                    <span className="nav-label">Nhật ký quản trị</span>
+                  </button>
+                )}
               </>
             )}
 
@@ -200,7 +355,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
               <span className="nav-icon">👤</span>
               <span className="nav-label">
                 <strong style={{ display: 'block' }}>{currentName || 'Người dùng'}</strong>
-                <small>{currentRole === 'student' ? 'Sinh viên' : currentRole === 'admin' ? 'Quản trị viên' : 'Giảng viên'}</small>
+                <small>{currentRole === 'student' ? 'Học sinh' : derivedIsAdmin ? 'Quản trị' : 'Giảng viên'}</small>
               </span>
             </div>
 

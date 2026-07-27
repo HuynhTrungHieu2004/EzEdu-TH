@@ -1,0 +1,46 @@
+metric,value
+generated_at,2026-07-23T03:44:09.039013+00:00
+is_synthetic,False
+synthetic_notice,
+data_inventory.is_synthetic,False
+data_inventory.learning_events,0
+data_inventory.question_answered_events,0
+data_inventory.learner_profiles,0
+data_inventory.learner_knowledge_states,0
+data_inventory.learning_items,0
+data_inventory.recommendation_logs,0
+data_inventory.cluster_models,0
+kmeans.status,no_active_models
+kmeans.message,No active cluster model is stored; K-Means validity metrics require training samples or stored model metrics.
+learner_model.bkt_irt.status,no_data
+learner_model.bkt_irt.message,No valid prediction rows.
+learner_model.notes[0],ROC-AUC is reported only when both positive and negative labels exist.
+learner_model.notes[1],Partial scores are converted to binary labels with threshold >= 0.5.
+recommendations.status,no_data
+recommendations.message,No recommendation sessions supplied.
+baseline_comparison.random.status,no_data
+baseline_comparison.random.message,No recommendation sessions supplied.
+baseline_comparison.popular_item.status,no_data
+baseline_comparison.popular_item.message,No recommendation sessions supplied.
+baseline_comparison.kmeans_cluster_only.status,no_data
+baseline_comparison.kmeans_cluster_only.message,No recommendation sessions supplied.
+baseline_comparison.weighted_ranking.status,no_data
+baseline_comparison.weighted_ranking.message,No recommendation sessions supplied.
+baseline_comparison.weighted_ranking_reranking.status,no_data
+baseline_comparison.weighted_ranking_reranking.message,No recommendation sessions supplied.
+ablation_study.without_knowledge_graph.status,no_data
+ablation_study.without_knowledge_graph.message,No recommendation sessions supplied.
+ablation_study.without_bkt.status,no_data
+ablation_study.without_bkt.message,No recommendation sessions supplied.
+ablation_study.without_irt.status,no_data
+ablation_study.without_irt.message,No recommendation sessions supplied.
+ablation_study.without_kmeans.status,no_data
+ablation_study.without_kmeans.message,No recommendation sessions supplied.
+ablation_study.without_interest.status,no_data
+ablation_study.without_interest.message,No recommendation sessions supplied.
+ablation_study.without_forgetting.status,no_data
+ablation_study.without_forgetting.message,No recommendation sessions supplied.
+ablation_study.without_diversity_reranking.status,no_data
+ablation_study.without_diversity_reranking.message,No recommendation sessions supplied.
+ai_explanations.status,no_data
+ai_explanations.message,No AI explanation rows supplied.

@@ -116,6 +116,18 @@ async def create_database_indexes():
     global mongodb_indexes_created
     try:
         db = get_database()
+        # Users / RBAC indexes. Keep email non-unique here to avoid breaking
+        # startup on legacy databases that may already contain duplicates.
+        await db["users"].create_index([("email", 1)])
+        await db["users"].create_index([("role", 1)])
+        await db["users"].create_index([("status", 1)])
+        await db["users"].create_index([("created_at", -1)])
+        await db["users"].create_index([("last_login_at", -1)])
+        await db["users"].create_index([("deleted_at", 1)])
+        await db["users"].create_index([("role", 1), ("status", 1), ("created_at", -1)])
+        await db["users"].create_index([("is_active", 1), ("created_at", -1)])
+        await db["users"].create_index([("deleted_at", 1), ("created_at", -1)])
+
         # Conversations index 1: user_id + deleted_at + is_pinned + pinned_at + updated_at + _id (for cursor-based list/sorting)
         await db["conversations"].create_index([
             ("user_id", 1),
@@ -165,14 +177,81 @@ async def create_database_indexes():
         await db["ai_usage_events"].create_index([("created_at", 1)])
         # By operation type + time (usage tab aggregation)
         await db["ai_usage_events"].create_index([("operation_type", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("feature", 1), ("created_at", 1)])
         # By status + time (error rate)
         await db["ai_usage_events"].create_index([("status", 1), ("created_at", 1)])
         # Per-user quota queries
         await db["ai_usage_events"].create_index([("user_id", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("provider", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("model", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("model_name", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("request_id", 1)])
+        await db["ai_usage_events"].create_index([("document_id", 1), ("created_at", 1)])
+        await db["ai_usage_events"].create_index([("conversation_id", 1), ("created_at", 1)])
         # Final logical operation queries (most dashboard queries)
         await db["ai_usage_events"].create_index([
             ("is_final", 1), ("event_kind", 1), ("created_at", 1)
         ])
+
+        # Admin audit logs
+        await db["audit_logs"].create_index([("created_at", -1)])
+        await db["audit_logs"].create_index([("event_type", 1), ("created_at", -1)])
+        await db["audit_logs"].create_index([("actor_user_id", 1), ("created_at", -1)])
+
+        # User activity logs. Retention is configured separately and no TTL
+        # index is created unless a cleanup job is explicitly introduced later.
+        await db["user_activity_logs"].create_index([("user_id", 1), ("timestamp", -1)])
+        await db["user_activity_logs"].create_index([("action", 1), ("timestamp", -1)])
+        await db["user_activity_logs"].create_index([("category", 1), ("timestamp", -1)])
+        await db["user_activity_logs"].create_index([("status", 1), ("timestamp", -1)])
+        await db["user_activity_logs"].create_index([("resource_id", 1)])
+        await db["user_activity_logs"].create_index([("resource_type", 1), ("timestamp", -1)])
+
+        # Immutable admin audit logs for administrative mutations.
+        await db["admin_audit_logs"].create_index([("admin_user_id", 1), ("timestamp", -1)])
+        await db["admin_audit_logs"].create_index([("target_type", 1), ("target_id", 1)])
+        await db["admin_audit_logs"].create_index([("action", 1), ("timestamp", -1)])
+        await db["admin_audit_logs"].create_index([("result", 1), ("timestamp", -1)])
+
+        # Website CMS content and immutable version snapshots.
+        await db["website_content"].create_index([("section_key", 1)], unique=True)
+        await db["website_content"].create_index([("status", 1), ("updated_at", -1)])
+        await db["website_content_versions"].create_index([("section_key", 1), ("version", -1)])
+        await db["website_content_versions"].create_index([("section_key", 1), ("created_at", -1)])
+
+        # Runtime System Settings and Feature Flags.
+        await db["system_settings"].create_index([("key", 1)], unique=True)
+        await db["system_settings"].create_index([("category", 1), ("key", 1)])
+        await db["system_settings"].create_index([("is_public", 1)])
+        await db["feature_flags"].create_index([("key", 1)], unique=True)
+        await db["feature_flags"].create_index([("enabled", 1), ("key", 1)])
+
+        # System health and standardized error monitoring.
+        await db["system_error_logs"].create_index([("timestamp", -1)])
+        await db["system_error_logs"].create_index([("endpoint", 1), ("timestamp", -1)])
+        await db["system_error_logs"].create_index([("severity", 1), ("timestamp", -1)])
+        await db["system_error_logs"].create_index([("error_code", 1), ("timestamp", -1)])
+        await db["system_error_logs"].create_index([("request_id", 1)])
+        await db["system_health_snapshots"].create_index([("checked_at", -1)])
+
+        # Notification Center and exportable admin reports.
+        await db["admin_notifications"].create_index([("status", 1), ("starts_at", -1)])
+        await db["admin_notifications"].create_index([("type", 1), ("created_at", -1)])
+        await db["admin_notifications"].create_index([("audience_type", 1), ("created_at", -1)])
+        await db["admin_notifications"].create_index([("target_roles", 1), ("starts_at", -1)])
+        await db["admin_notifications"].create_index([("target_user_ids", 1), ("starts_at", -1)])
+        await db["admin_notifications"].create_index([("expires_at", 1)])
+        await db["notification_reads"].create_index([("notification_id", 1), ("user_id", 1)], unique=True)
+        await db["notification_reads"].create_index([("user_id", 1), ("read_at", -1)])
+
+        # Admin content management indexes
+        await db["documents"].create_index([("user_id", 1), ("created_at", -1)])
+        await db["documents"].create_index([("file_type", 1), ("created_at", -1)])
+        await db["documents"].create_index([("status", 1), ("created_at", -1)])
+        await db["documents"].create_index([("deleted_at", 1), ("created_at", -1)])
+        await db["documents"].create_index([("quarantined_at", 1), ("created_at", -1)])
+        await db["verification_sessions"].create_index([("document_id", 1), ("created_at", -1)])
+        await db["verification_sessions"].create_index([("status", 1), ("created_at", -1)])
 
         # Question Sets indexes
         # Primary: user history listing with soft-delete filter and sort
@@ -195,6 +274,11 @@ async def create_database_indexes():
             ("published_question_count", -1),
             ("updated_at", -1),
         ])
+        await db["question_sets"].create_index([("user_id", 1), ("created_at", -1)])
+        await db["question_sets"].create_index([("document_id", 1), ("created_at", -1)])
+        await db["question_sets"].create_index([("deleted_at", 1), ("created_at", -1)])
+        await db["question_sets"].create_index([("question_type", 1), ("created_at", -1)])
+        await db["question_sets"].create_index([("difficulty", 1), ("created_at", -1)])
         # Learner attempt history
         await db["question_attempts"].create_index([
             ("question_set_id", 1),
@@ -206,6 +290,11 @@ async def create_database_indexes():
             ("user_id", 1),
             ("created_at", -1),
         ])
+
+        # Lecturer classes / student groups (exam assignment targeting)
+        await db["classes"].create_index([("owner_id", 1), ("deleted_at", 1)])
+        await db["classes"].create_index([("student_ids", 1)])
+        await db["classes"].create_index([("deleted_at", 1), ("created_at", -1)])
 
         logger.info("Đã khởi tạo thành công các chỉ mục MongoDB cho hỏi đáp nâng cao.")
         mongodb_indexes_created = True

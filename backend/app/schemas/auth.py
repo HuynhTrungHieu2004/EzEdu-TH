@@ -20,14 +20,37 @@ class UserResponse(BaseModel):
             "email": "user@example.com",
             "full_name": "Nguyen Van A",
             "role": "student",
-            "created_at": "2026-06-16T03:20:00Z"
+            "status": "active",
+            "student_profile_completed": False,
+            "is_active": True,
+            "permissions_override": [],
+            "created_at": "2026-06-16T03:20:00Z",
+            "updated_at": None,
+            "last_login_at": None,
+            "deleted_at": None
         }
     })
     id: str
     email: EmailStr
     full_name: str
-    role: Literal["user", "student", "lecturer", "admin"] = "student"
+    role: Literal[
+        "user",
+        "student",
+        "lecturer",
+        "analyst",
+        "support",
+        "moderator",
+        "admin",
+        "super_admin",
+    ] = "student"
+    status: Literal["active", "locked", "deleted"] = "active"
+    student_profile_completed: bool = False
+    is_active: bool = True
+    permissions_override: list[str] = Field(default_factory=list)
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
 
 class Token(BaseModel):
     access_token: str

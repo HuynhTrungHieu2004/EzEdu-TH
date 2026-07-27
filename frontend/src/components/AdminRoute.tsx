@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
+import { isAdminAreaRole } from '../utils/adminPermissions';
 import type { ReactNode } from 'react';
 
 interface AdminRouteProps {
@@ -26,7 +27,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
     // Always fetch the latest user info to get the most recent role.
     authApi.getMe()
       .then((user) => {
-        if (user.role === 'admin') {
+        if (isAdminAreaRole(user.role)) {
           setStatus('allowed');
         } else {
           setStatus('denied');

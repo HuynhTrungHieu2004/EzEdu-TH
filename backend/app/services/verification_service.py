@@ -22,6 +22,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app.core.config import settings
 from app.database.mongodb import get_database
+from app.schemas.analytics import UsageEventCreate
 from app.schemas.verification import VerificationIssue
 from app.services.document_mutation_service import (
     acquire_document_mutation_lock,
@@ -37,6 +38,7 @@ from app.services.llm_service import (
 )
 from app.services.text_chunking_service import split_text_into_chunks
 from app.services.rag_service import add_document_chunks
+from app.services.analytics_service import new_attempt_id, new_event_id, record_event
 
 logger = logging.getLogger(__name__)
 
@@ -923,6 +925,9 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
     Called by the router via BackgroundTasks.
     """
     db = get_database()
+    started_at = asyncio.get_running_loop().time()
+    usage_status = "failure"
+    usage_error_code = "500_INTERNAL"
     successful_chunks = 0
     failed_chunks = 0
     errors_list: list[str] = []
@@ -1037,12 +1042,15 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
             current_revision_hash,
         )
         await complete_session(session_id, len(all_issues))
+        usage_status = "success"
+        usage_error_code = None
 
         logger.info(f"✅ Verification completed: {len(all_issues)} issues found in {len(chunks)} chunks")
 
     except VerificationCancelledError as exc:
         logger.info("Verification task %s cancelled: %s", session_id, exc)
     except VerificationProviderError as exc:
+        usage_error_code = "PROVIDER_DOWN"
         logger.error("Verification task %s failed because providers were unavailable: %s", session_id, exc)
         await db["verification_issues"].delete_many({"session_id": session_id})
         await complete_session(
@@ -1052,6 +1060,7 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
             error="Dịch vụ AI không trả về được kết quả hợp lệ. Vui lòng thử lại sau.",
         )
     except VerificationContentChangedError as exc:
+        usage_error_code = "INVALID_RESPONSE"
         logger.info("Verification task %s stopped: %s", session_id, exc)
         await db["verification_issues"].delete_many({"session_id": session_id})
         await complete_session(
@@ -1064,6 +1073,27 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
         logger.exception("Verification task %s failed", session_id)
         await db["verification_issues"].delete_many({"session_id": session_id})
         await complete_session(session_id, 0, status="failed", error=f"Lỗi kiểm tra: {str(e)[:300]}")
+    finally:
+        await record_event(UsageEventCreate(
+            event_id=new_event_id(),
+            logical_request_id=session_id,
+            attempt_id=new_attempt_id(),
+            attempt_number=1,
+            is_final=True,
+            event_kind="logical_operation",
+            user_id=user_id,
+            operation_type="document_verification",
+            feature="document_verification",
+            provider="mixed",
+            model_name="groq+gemini",
+            model="groq+gemini",
+            status=usage_status,
+            error_code=usage_error_code,
+            latency_ms=int((asyncio.get_running_loop().time() - started_at) * 1000),
+            document_id=document_id,
+            request_id=session_id,
+            created_at=datetime.now(timezone.utc),
+        ))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
