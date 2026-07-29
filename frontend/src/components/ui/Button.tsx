@@ -13,7 +13,7 @@ export type ButtonVariant =
   | 'danger'
   | 'link';
 
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'hero';
 
 type ButtonBaseProps = ComponentPropsWithoutRef<'button'> & {
   variant?: ButtonVariant;

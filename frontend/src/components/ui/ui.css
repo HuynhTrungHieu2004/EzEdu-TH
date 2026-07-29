@@ -72,6 +72,13 @@
   font-size: var(--ez-text-h6);
 }
 
+.ez-btn-hero {
+  min-height: 56px;
+  padding: 0 var(--ez-space-8);
+  font-size: var(--ez-text-h5);
+  border-radius: var(--ez-radius-full);
+}
+
 .ez-btn-block {
   display: flex;
   width: 100%;
