@@ -12,6 +12,7 @@ import type {
 } from '../types/adminNotificationsReports';
 import { Badge, EmptyState, Pagination, dateEnd, dateStart, fmtDateTime, fmtNumber, ReasonModal } from './AdminContentShared';
 import { apiErrorMessage, isCanceledError } from '../utils/apiError';
+import { PageHeader } from '../components/ui';
 import './AdminContentPages.css';
 
 const TYPE_LABELS: Record<NotificationType, string> = {
@@ -99,7 +100,7 @@ export default function AdminNotificationsPage() {
         setStats(statistics);
       })
       .catch((err) => {
-        if (!isCanceledError(err)) setError(err.response?.data?.detail || 'Không tải được Notification Center.');
+        if (!isCanceledError(err)) setError(apiErrorMessage(err, 'Không tải được Notification Center.'));
       })
       .finally(() => setLoading(false));
   }, [params]);
@@ -150,13 +151,11 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Notification Center</h1>
-          <p>Tạo thông báo hệ thống, theo role hoặc theo danh sách user; xuất bản luôn ghi Admin Audit Log.</p>
-        </div>
-      </header>
+    <div className="admin-content-page">
+      <PageHeader
+        title="Trung tâm thông báo"
+        description="Tạo thông báo toàn hệ thống, theo vai trò hoặc theo danh sách người dùng; mọi lần xuất bản đều được ghi nhật ký."
+      />
 
       <section className="admin-content-detail-grid">
         <div className="admin-content-kv"><span>Tổng thông báo</span><strong>{fmtNumber(stats.total)}</strong></div>
@@ -254,6 +253,6 @@ export default function AdminNotificationsPage() {
           onConfirm={runReasonAction}
         />
       )}
-    </main>
+    </div>
   );
 }

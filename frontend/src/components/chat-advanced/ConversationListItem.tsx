@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MessageSquare, Pin } from 'lucide-react';
 import type { ConversationResponse } from '../../types/chat';
 import { ConversationActionsMenu } from './ConversationActionsMenu';
 
@@ -34,7 +35,9 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
       }}
     >
       <div style={styles.content}>
-        <span style={styles.itemIcon}>{isPinned ? '📌' : '💬'}</span>
+        <span style={styles.itemIcon} aria-hidden="true">
+          {isPinned ? <Pin size={14} /> : <MessageSquare size={14} />}
+        </span>
         <span style={styles.itemText} title={conversation.title}>
           {conversation.title}
         </span>
@@ -83,7 +86,8 @@ const styles = {
     flex: 1,
   },
   itemIcon: {
-    fontSize: '14px',
+    display: 'inline-flex',
+    alignItems: 'center',
     flexShrink: 0,
   },
   itemText: {

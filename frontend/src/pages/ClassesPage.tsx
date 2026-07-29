@@ -1,33 +1,72 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Pencil, Plus, School, Trash2, Users } from 'lucide-react';
 import { classesApi } from '../api/classesApi';
 import type { ClassSummary } from '../types/classes';
 import { apiErrorMessage } from '../utils/apiError';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  Dialog,
+  Dropdown,
+  DropdownItem,
+  EmptyState,
+  ErrorState,
+  FormField,
+  Input,
+  PageHeader,
+  Skeleton,
+  Textarea,
+  useToast,
+} from '../components/ui';
+import '../pages/dashboard.css';
 
-const ClassesPage: React.FC = () => {
+type Dialog_ =
+  | { kind: 'none' }
+  | { kind: 'rename'; cls: ClassSummary; name: string; description: string; saving: boolean; error: string }
+  | { kind: 'delete'; cls: ClassSummary; deleting: boolean };
+
+/**
+ * Lớp học của giáo viên.
+ *
+ * Bổ sung đổi tên và xoá lớp — backend (`PATCH`/`DELETE /classes/{id}`) và
+ * client API đã có từ trước nhưng chưa từng được gọi từ giao diện.
+ * Xem docs/ui-redesign/01-audit-report.md §6.3 (lỗi M8).
+ */
+export default function ClassesPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [classes, setClasses] = useState<ClassSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  const load = () => {
-    setLoading(true);
-    setError('');
-    classesApi.list()
-      .then((data) => setClasses(data.items))
-      .catch((err) => setError(apiErrorMessage(err, 'Không tải được danh sách lớp học.')))
-      .finally(() => setLoading(false));
-  };
+  const [dialog, setDialog] = useState<Dialog_>({ kind: 'none' });
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  function load() {
+    setState('loading');
+    classesApi
+      .list()
+      .then((data) => {
+        setClasses(data.items);
+        setState('ready');
+      })
+      .catch(() => setState('error'));
+  }
 
   useEffect(() => {
-    queueMicrotask(() => load());
+    load();
   }, []);
 
-  const handleCreate = async (event: React.FormEvent) => {
+  async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
       setCreateError('Vui lòng nhập tên lớp.');
@@ -40,126 +79,255 @@ const ClassesPage: React.FC = () => {
       setName('');
       setDescription('');
       load();
+      toast({ title: 'Đã tạo lớp học', tone: 'success' });
     } catch (err) {
       setCreateError(apiErrorMessage(err, 'Không tạo được lớp học.'));
     } finally {
       setCreating(false);
     }
-  };
+  }
 
-  if (loading) {
-    return (
-      <div className="page">
-        <div className="page-wide">
-          <div className="loading-stack">
-            <span className="spinner" />
-            <p>Đang tải danh sách lớp học...</p>
-          </div>
-        </div>
-      </div>
-    );
+  function openRename(cls: ClassSummary) {
+    setDialog({ kind: 'rename', cls, name: cls.name, description: cls.description ?? '', saving: false, error: '' });
+  }
+
+  async function submitRename() {
+    if (dialog.kind !== 'rename') return;
+    if (!dialog.name.trim()) {
+      setDialog({ ...dialog, error: 'Tên lớp không được để trống.' });
+      return;
+    }
+    setDialog({ ...dialog, saving: true, error: '' });
+    try {
+      await classesApi.update(dialog.cls.id, {
+        name: dialog.name.trim(),
+        description: dialog.description.trim() || undefined,
+      });
+      setDialog({ kind: 'none' });
+      load();
+      toast({ title: 'Đã cập nhật lớp học', tone: 'success' });
+    } catch (err) {
+      setDialog((current) =>
+        current.kind === 'rename'
+          ? { ...current, saving: false, error: apiErrorMessage(err, 'Không cập nhật được lớp học.') }
+          : current,
+      );
+    }
+  }
+
+  async function submitDelete() {
+    if (dialog.kind !== 'delete' || deleteConfirmation !== 'XÓA') return;
+    setDialog({ ...dialog, deleting: true });
+    try {
+      await classesApi.remove(dialog.cls.id);
+      setDialog({ kind: 'none' });
+      setDeleteConfirmation('');
+      load();
+      toast({ title: 'Đã xoá lớp học', tone: 'success' });
+    } catch (err) {
+      toast({
+        title: 'Không xoá được lớp học',
+        description: apiErrorMessage(err, 'Vui lòng thử lại.'),
+        tone: 'error',
+      });
+      setDialog({ kind: 'none' });
+    }
   }
 
   return (
-    <div className="page">
-      <div className="page-wide">
-        <div className="page-header">
-          <div>
-            <p className="eyebrow">Quản lý lớp học</p>
-            <h2 className="section-title">Lớp học của tôi</h2>
-            <p className="section-subtitle">
-              Tạo lớp và thêm học sinh để giao đề thi riêng cho từng lớp thay vì ban hành công khai cho mọi học sinh.
-            </p>
-          </div>
-          <button type="button" onClick={() => navigate('/question-history')} className="btn-secondary">
-            Quay lại Ngân hàng câu hỏi
-          </button>
-        </div>
+    <>
+      <PageHeader
+        eyebrow="Quản lý lớp học"
+        title="Lớp học của tôi"
+        description="Tạo lớp và thêm học sinh để giao đề riêng cho từng lớp thay vì ban hành công khai cho mọi học sinh."
+        actions={
+          <Button variant="outline" onClick={() => navigate('/question-history')}>
+            Về ngân hàng câu hỏi
+          </Button>
+        }
+      />
 
-        {error && <div className="alert alert-error">{error}</div>}
-
-        <section className="table-card" style={{ marginBottom: 24 }}>
-          <div className="table-card-header">
-            <h3 className="table-title">Tạo lớp mới</h3>
-          </div>
-          <form onSubmit={handleCreate} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '0 4px 4px' }}>
-            <input
-              type="text"
-              placeholder="Tên lớp (vd: Lớp 10A1 - Toán)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{ flex: '1 1 240px', minWidth: 200 }}
-              maxLength={200}
-            />
-            <input
-              type="text"
-              placeholder="Mô tả (không bắt buộc)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              style={{ flex: '2 1 320px', minWidth: 200 }}
-              maxLength={2000}
-            />
-            <button type="submit" className="btn-primary" disabled={creating}>
-              {creating ? 'Đang tạo...' : 'Tạo lớp'}
-            </button>
+      <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
+        <CardBody>
+          <form onSubmit={handleCreate} className="ez-stack-sm">
+            <div className="ez-row ez-row-wrap" style={{ alignItems: 'flex-end' }}>
+              <div style={{ flex: '1 1 240px' }}>
+                <FormField label="Tên lớp" required>
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Ví dụ: Lớp 10A1 - Toán"
+                    maxLength={200}
+                  />
+                </FormField>
+              </div>
+              <div style={{ flex: '2 1 320px' }}>
+                <FormField label="Mô tả" hint="Không bắt buộc">
+                  <Textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Ví dụ: Lớp ôn thi tốt nghiệp"
+                    maxLength={2000}
+                    rows={1}
+                  />
+                </FormField>
+              </div>
+              <Button type="submit" loading={creating} leadingIcon={<Plus size={16} aria-hidden="true" />}>
+                Tạo lớp
+              </Button>
+            </div>
+            {createError && <Alert tone="error">{createError}</Alert>}
           </form>
-          {createError && <div className="alert alert-error" style={{ margin: '8px 4px 0' }}>{createError}</div>}
-        </section>
+        </CardBody>
+      </Card>
 
-        <section className="table-card">
-          <div className="table-card-header">
-            <h3 className="table-title">Danh sách lớp</h3>
-            <span className="tag">{classes.length} lớp</span>
+      {state === 'loading' && (
+        <div className="ez-stack-sm">
+          <Skeleton height="4rem" />
+          <Skeleton height="4rem" />
+        </div>
+      )}
+
+      {state === 'error' && (
+        <ErrorState title="Không tải được danh sách lớp" onRetry={load} />
+      )}
+
+      {state === 'ready' && classes.length === 0 && (
+        <EmptyState
+          icon={<School size={28} />}
+          title="Bạn chưa tạo lớp học nào"
+          description="Tạo lớp ở trên để bắt đầu giao đề theo từng nhóm học sinh."
+        />
+      )}
+
+      {state === 'ready' && classes.length > 0 && (
+        <div className="ez-list">
+          {classes.map((cls) => (
+            <div key={cls.id} className="ez-list-item">
+              <span className="ez-list-item-icon" aria-hidden="true">
+                <School size={18} />
+              </span>
+              <button
+                type="button"
+                className="ez-list-item-main"
+                style={{ textAlign: 'left', cursor: 'pointer' }}
+                onClick={() => navigate(`/classes/${cls.id}`)}
+              >
+                <span className="ez-list-item-title">{cls.name}</span>
+                <span className="ez-list-item-meta">
+                  {cls.description ? <span>{cls.description}</span> : null}
+                  <span>{new Date(cls.created_at).toLocaleDateString('vi-VN')}</span>
+                </span>
+              </button>
+              <div className="ez-list-item-actions">
+                <Badge variant="secondary">{cls.student_count} học sinh</Badge>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/classes/${cls.id}`)}>
+                  <Users size={14} aria-hidden="true" style={{ marginRight: 6 }} />
+                  Quản lý học sinh
+                </Button>
+                <Dropdown
+                  align="end"
+                  menuLabel={`Thao tác với lớp ${cls.name}`}
+                  trigger={
+                    <Button variant="ghost" size="sm" iconOnly aria-label={`Thêm thao tác cho lớp ${cls.name}`}>
+                      <Pencil size={14} aria-hidden="true" />
+                    </Button>
+                  }
+                >
+                  <DropdownItem icon={<Pencil size={14} />} onClick={() => openRename(cls)}>
+                    Đổi tên / mô tả
+                  </DropdownItem>
+                  <DropdownItem
+                    icon={<Trash2 size={14} />}
+                    danger
+                    onClick={() => { setDeleteConfirmation(''); setDialog({ kind: 'delete', cls, deleting: false }); }}
+                  >
+                    Xoá lớp
+                  </DropdownItem>
+                </Dropdown>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog
+        open={dialog.kind === 'rename'}
+        onClose={dialog.kind === 'delete' && dialog.deleting ? () => undefined : () => setDialog({ kind: 'none' })}
+        title="Đổi tên lớp"
+        footer={
+          <>
+            <Button variant="outline" disabled={dialog.kind === 'delete' && dialog.deleting} onClick={() => setDialog({ kind: 'none' })}>
+              Huỷ
+            </Button>
+            <Button
+              onClick={submitRename}
+              loading={dialog.kind === 'rename' && dialog.saving}
+            >
+              Lưu thay đổi
+            </Button>
+          </>
+        }
+      >
+        {dialog.kind === 'rename' && (
+          <div className="ez-stack-sm">
+            <FormField label="Tên lớp" required>
+              <Input
+                value={dialog.name}
+                onChange={(event) => setDialog({ ...dialog, name: event.target.value })}
+                maxLength={200}
+              />
+            </FormField>
+            <FormField label="Mô tả">
+              <Textarea
+                value={dialog.description}
+                onChange={(event) => setDialog({ ...dialog, description: event.target.value })}
+                maxLength={2000}
+                rows={3}
+              />
+            </FormField>
+            {dialog.error && <Alert tone="error">{dialog.error}</Alert>}
           </div>
+        )}
+      </Dialog>
 
-          {classes.length === 0 ? (
-            <div className="empty-state">
-              Bạn chưa tạo lớp học nào. Tạo lớp ở trên để bắt đầu giao đề thi theo từng lớp.
-            </div>
-          ) : (
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Tên lớp</th>
-                    <th>Mô tả</th>
-                    <th>Sĩ số</th>
-                    <th>Ngày tạo</th>
-                    <th style={{ textAlign: 'right' }}>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classes.map((cls) => (
-                    <tr key={cls.id}>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/classes/${cls.id}`)}
-                          className="document-link"
-                        >
-                          {cls.name}
-                        </button>
-                      </td>
-                      <td>{cls.description || '—'}</td>
-                      <td><span className="tag">{cls.student_count} học sinh</span></td>
-                      <td>{new Date(cls.created_at).toLocaleString('vi-VN')}</td>
-                      <td>
-                        <div className="row-actions">
-                          <button type="button" onClick={() => navigate(`/classes/${cls.id}`)} className="btn-secondary">
-                            Quản lý học sinh
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
+      <Dialog
+        open={dialog.kind === 'delete'}
+        onClose={() => setDialog({ kind: 'none' })}
+        title="Xoá lớp học?"
+        description={
+          dialog.kind === 'delete'
+            ? `Lớp "${dialog.cls.name}" và danh sách ${dialog.cls.student_count} học sinh trong lớp sẽ không còn hiển thị. Đề đã ban hành cho lớp này vẫn giữ nguyên với những học sinh đã làm.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDialog({ kind: 'none' })}>
+              Huỷ
+            </Button>
+            <Button
+              variant="danger"
+              onClick={submitDelete}
+              disabled={deleteConfirmation !== 'XÓA'}
+              loading={dialog.kind === 'delete' && dialog.deleting}
+            >
+              Xoá lớp
+            </Button>
+          </>
+        }
+      >
+        <FormField
+          label="Nhập XÓA để xác nhận"
+          error={deleteConfirmation && deleteConfirmation !== 'XÓA' ? 'Nội dung xác nhận chưa đúng.' : undefined}
+        >
+          <Input
+            value={deleteConfirmation}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            autoComplete="off"
+            invalid={Boolean(deleteConfirmation && deleteConfirmation !== 'XÓA')}
+          />
+        </FormField>
+      </Dialog>
+    </>
   );
-};
-
-export default ClassesPage;
+}

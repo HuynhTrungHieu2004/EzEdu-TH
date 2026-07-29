@@ -4,7 +4,7 @@ import { adminContentApi } from '../api/adminContentApi';
 import type { AdminDocumentDetail } from '../types/adminContent';
 import { Badge, EmptyState, fmtDateTime, fmtFileSize, fmtNumber, renderObjectRows } from './AdminContentShared';
 import { apiErrorMessage, isCanceledError } from '../utils/apiError';
-import './AdminContentPages.css';
+import { Button, Card, CardBody, PageHeader, SectionHeader } from '../components/ui';
 
 export default function AdminDocumentDetailPage() {
   const { documentId = '' } = useParams();
@@ -27,42 +27,46 @@ export default function AdminDocumentDetailPage() {
     return () => controller.abort();
   }, [documentId]);
 
-  if (loading) return <main className="admin-content-page"><EmptyState title="Đang tải" text="Đang lấy chi tiết tài liệu." /></main>;
-  if (error || !item) return <main className="admin-content-page"><EmptyState title="Có lỗi" text={error || 'Không tìm thấy tài liệu.'} /></main>;
+  if (loading) return <div className="ez-admin-page"><EmptyState title="Đang tải" text="Đang lấy chi tiết tài liệu." /></div>;
+  if (error || !item) return <div className="ez-admin-page"><EmptyState title="Có lỗi" text={error || 'Không tìm thấy tài liệu.'} /></div>;
 
   return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>{item.original_filename}</h1>
-          <p>{item.id}</p>
-        </div>
-        <button type="button" className="admin-content-btn" onClick={() => navigate('/admin/documents')}>Quay lại</button>
-      </header>
+    <div className="ez-admin-page">
+      <PageHeader
+        title={item.original_filename}
+        description={item.id}
+        actions={<Button variant="outline" onClick={() => navigate('/admin/documents')}>Quay lại</Button>}
+      />
 
-      <section className="admin-content-detail">
-        <div className="admin-content-detail-grid">
-          <div className="admin-content-kv"><span>Chủ sở hữu</span><strong>{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Loại file</span><strong>{item.file_type || 'Không rõ'} · {fmtFileSize(item.file_size)}</strong></div>
-          <div className="admin-content-kv"><span>Trạng thái</span><strong><Badge tone={item.deleted_at || item.is_quarantined ? 'danger' : 'info'}>{item.deleted_at ? 'deleted' : item.is_quarantined ? 'quarantined' : item.processing_status}</Badge></strong></div>
-          <div className="admin-content-kv"><span>Ngày upload</span><strong>{fmtDateTime(item.uploaded_at)}</strong></div>
-          <div className="admin-content-kv"><span>Trang</span><strong>{item.page_count ?? 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Chunk / câu hỏi</span><strong>{fmtNumber(item.chunk_count)} / {fmtNumber(item.question_count)}</strong></div>
-          <div className="admin-content-kv"><span>Kiểm tra kiến thức</span><strong>{item.knowledge_verification_status || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Lỗi gần nhất</span><strong>{item.latest_error || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Media</span><strong>{item.media_kind || 'document'} / {item.cloudinary_resource_type || 'Không có dữ liệu'}</strong></div>
-        </div>
-      </section>
+      <Card>
+        <CardBody>
+          <dl className="ez-kv-grid">
+            <div><dt>Chủ sở hữu</dt><dd>{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Loại file</dt><dd>{item.file_type || 'Không rõ'} · {fmtFileSize(item.file_size)}</dd></div>
+            <div><dt>Trạng thái</dt><dd><Badge tone={item.deleted_at || item.is_quarantined ? 'danger' : 'info'}>{item.deleted_at ? 'deleted' : item.is_quarantined ? 'quarantined' : item.processing_status}</Badge></dd></div>
+            <div><dt>Ngày upload</dt><dd>{fmtDateTime(item.uploaded_at)}</dd></div>
+            <div><dt>Trang</dt><dd>{item.page_count ?? 'Không có dữ liệu'}</dd></div>
+            <div><dt>Chunk / câu hỏi</dt><dd>{fmtNumber(item.chunk_count)} / {fmtNumber(item.question_count)}</dd></div>
+            <div><dt>Kiểm tra kiến thức</dt><dd>{item.knowledge_verification_status || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Lỗi gần nhất</dt><dd>{item.latest_error || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Media</dt><dd>{item.media_kind || 'document'} / {item.cloudinary_resource_type || 'Không có dữ liệu'}</dd></div>
+          </dl>
+        </CardBody>
+      </Card>
 
-      <section className="admin-content-panel">
-        <h2>Lịch sử xử lý</h2>
-        {item.processing_history.length ? renderObjectRows(item.processing_history) : <p className="admin-content-muted">Chưa có activity log xử lý tài liệu.</p>}
-      </section>
+      <Card>
+        <CardBody>
+          <SectionHeader title="Lịch sử xử lý" />
+          {item.processing_history.length ? renderObjectRows(item.processing_history) : <p className="ez-muted">Chưa có activity log xử lý tài liệu.</p>}
+        </CardBody>
+      </Card>
 
-      <section className="admin-content-panel">
-        <h2>Nội dung riêng tư</h2>
-        <p className="admin-content-muted">Backend admin hiện không trả toàn bộ nội dung tài liệu. Nếu cần mở nội dung, phải bổ sung permission riêng, nhập lý do và ghi Admin Audit Log.</p>
-      </section>
-    </main>
+      <Card>
+        <CardBody>
+          <SectionHeader title="Nội dung riêng tư" />
+          <p className="ez-muted">Backend admin hiện không trả toàn bộ nội dung tài liệu. Nếu cần mở nội dung, phải bổ sung permission riêng, nhập lý do và ghi Admin Audit Log.</p>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

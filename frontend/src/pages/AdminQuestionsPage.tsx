@@ -6,7 +6,17 @@ import type { AdminQuestionListParams, AdminQuestionListResponse, AdminQuestionS
 import { hasPermission } from '../utils/adminPermissions';
 import { Badge, EmptyState, Pagination, ReasonModal, dateEnd, dateStart, fmtDateTime } from './AdminContentShared';
 import { apiErrorMessage, isCanceledError } from '../utils/apiError';
-import './AdminContentPages.css';
+import {
+  Button,
+  Card, CardBody,
+  DataTable,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Select,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
 
 export default function AdminQuestionsPage() {
   const navigate = useNavigate();
@@ -26,7 +36,9 @@ export default function AdminQuestionsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<AdminQuestionSummary | null>(null);
+  const [regenerateTarget, setRegenerateTarget] = useState<AdminQuestionSummary | null>(null);
   const [reason, setReason] = useState('');
+  const [regenerateReason, setRegenerateReason] = useState('');
   const [busy, setBusy] = useState(false);
 
   const canUpdate = hasPermission(role, 'questions.update', overrides);
@@ -111,10 +123,13 @@ export default function AdminQuestionsPage() {
     }
   };
 
-  const regenerate = async (item: AdminQuestionSummary) => {
+  const regenerate = async () => {
+    if (!regenerateTarget || busy) return;
     setBusy(true);
     try {
-      await adminContentApi.regenerateQuestion(item.id, 'Admin requested regeneration');
+      await adminContentApi.regenerateQuestion(regenerateTarget.id, regenerateReason.trim());
+      setRegenerateTarget(null);
+      setRegenerateReason('');
       load();
     } catch (err: unknown) {
       setError(apiErrorMessage(err, 'Backend hiện chưa hỗ trợ sinh lại câu hỏi đơn lẻ.'));
@@ -123,63 +138,111 @@ export default function AdminQuestionsPage() {
     }
   };
 
-  return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Quản lý câu hỏi</h1>
-          <p>Kiểm duyệt, chỉnh sửa và theo dõi nguồn dẫn chứng của câu hỏi đã sinh.</p>
+  const columns: DataTableColumn<AdminQuestionSummary>[] = [
+    {
+      key: 'question',
+      label: 'Câu hỏi',
+      render: (item) => (
+        <div className="ez-datatable-cell-title">
+          <strong>{item.question_preview || 'Không có nội dung'}</strong>
+          <span className="ez-muted">{item.id}</span>
         </div>
-      </header>
+      ),
+    },
+    {
+      key: 'type_difficulty',
+      label: 'Loại/độ khó',
+      render: (item) => <>{item.question_type || 'Không có dữ liệu'}<br /><span className="ez-muted">{item.difficulty || 'Không có dữ liệu'}</span></>,
+    },
+    {
+      key: 'subject_topic',
+      label: 'Môn/chủ đề',
+      render: (item) => <>{item.subject || 'Không có dữ liệu'}<br /><span className="ez-muted">{item.topic || 'Không có dữ liệu'}</span></>,
+    },
+    { key: 'source', label: 'Nguồn', render: (item) => item.source_document_name || item.source_document_id || 'Không có dữ liệu' },
+    { key: 'owner', label: 'Chủ sở hữu', render: (item) => item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu' },
+    { key: 'citation', label: 'Citation', render: (item) => item.citation_status || 'Không có dữ liệu' },
+    { key: 'risk', label: 'Rủi ro', render: (item) => item.hallucination_risk || 'Không có dữ liệu' },
+    {
+      key: 'moderation',
+      label: 'Kiểm duyệt',
+      render: (item) => (
+        <Badge tone={item.deleted_at ? 'danger' : item.moderation_status === 'approved' ? 'ok' : 'info'}>
+          {item.deleted_at ? 'deleted' : item.moderation_status}
+        </Badge>
+      ),
+    },
+    { key: 'created_at', label: 'Ngày tạo', render: (item) => fmtDateTime(item.created_at) },
+    {
+      key: 'actions',
+      label: 'Hành động',
+      render: (item) => (
+        <div className="ez-datatable-cell-actions">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/questions/${encodeURIComponent(item.id)}`)}>Xem</Button>
+          {canUpdate && !item.deleted_at && <Button variant="outline" size="sm" disabled={busy} onClick={() => moderate(item)}>Đã kiểm duyệt</Button>}
+          {canRegenerate && !item.deleted_at && <Button variant="outline" size="sm" disabled={busy} onClick={() => setRegenerateTarget(item)}>Sinh lại</Button>}
+          {canDelete && !item.deleted_at && <Button variant="danger" size="sm" onClick={() => setDeleteTarget(item)}>Xóa mềm</Button>}
+          {canUpdate && item.deleted_at && <Button variant="outline" size="sm" disabled={busy} onClick={() => restoreQuestion(item)}>Khôi phục</Button>}
+        </div>
+      ),
+    },
+  ];
 
-      <section className="admin-content-toolbar">
-        <label className="admin-content-field"><span>Tìm kiếm</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Nội dung câu hỏi" /></label>
-        <label className="admin-content-field"><span>User ID</span><input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Document ID</span><input value={documentId} onChange={(event) => { setDocumentId(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Loại câu hỏi</span><input value={questionType} onChange={(event) => { setQuestionType(event.target.value); setPage(1); }} placeholder="multiple_choice..." /></label>
-        <label className="admin-content-field"><span>Độ khó</span><input value={difficulty} onChange={(event) => { setDifficulty(event.target.value); setPage(1); }} placeholder="easy, medium, hard" /></label>
-        <label className="admin-content-field"><span>Kiểm duyệt</span><input value={moderationStatus} onChange={(event) => { setModerationStatus(event.target.value); setPage(1); }} placeholder="draft, approved..." /></label>
-        <label className="admin-content-field"><span>Trạng thái</span><select value={status} onChange={(event) => { setStatus(event.target.value as ContentStatus); setPage(1); }}><option value="active">Đang hoạt động</option><option value="deleted">Đã xóa</option><option value="all">Tất cả</option></select></label>
-        <label className="admin-content-field"><span>Từ ngày</span><input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Đến ngày</span><input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} /></label>
-      </section>
+  return (
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Quản lý câu hỏi"
+        description="Kiểm duyệt, chỉnh sửa và theo dõi nguồn dẫn chứng của câu hỏi đã sinh."
+      />
 
-      {error && <EmptyState title="Có lỗi" text={error} />}
-      {loading && <EmptyState title="Đang tải" text="Đang lấy dữ liệu câu hỏi từ backend." />}
-      {!loading && data && data.items.length === 0 && <EmptyState title="Chưa có câu hỏi phù hợp" text="Không có dữ liệu giả để hiển thị." />}
+      <Card>
+        <CardBody>
+          <FilterBar columns={5}>
+            <FormField label="Tìm kiếm">
+              <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Nội dung câu hỏi" />
+            </FormField>
+            <FormField label="User ID">
+              <Input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Document ID">
+              <Input value={documentId} onChange={(event) => { setDocumentId(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Loại câu hỏi">
+              <Input value={questionType} onChange={(event) => { setQuestionType(event.target.value); setPage(1); }} placeholder="multiple_choice..." />
+            </FormField>
+            <FormField label="Độ khó">
+              <Input value={difficulty} onChange={(event) => { setDifficulty(event.target.value); setPage(1); }} placeholder="easy, medium, hard" />
+            </FormField>
+            <FormField label="Kiểm duyệt">
+              <Input value={moderationStatus} onChange={(event) => { setModerationStatus(event.target.value); setPage(1); }} placeholder="draft, approved..." />
+            </FormField>
+            <FormField label="Trạng thái">
+              <Select value={status} onChange={(event) => { setStatus(event.target.value as ContentStatus); setPage(1); }}>
+                <option value="active">Đang hoạt động</option>
+                <option value="deleted">Đã xóa</option>
+                <option value="all">Tất cả</option>
+              </Select>
+            </FormField>
+            <FormField label="Từ ngày">
+              <Input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Đến ngày">
+              <Input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
+            </FormField>
+          </FilterBar>
 
-      {!loading && data && data.items.length > 0 && (
-        <>
-          <div className="admin-content-table-wrap">
-            <table className="admin-content-table">
-              <thead><tr><th>Câu hỏi</th><th>Loại/độ khó</th><th>Môn/chủ đề</th><th>Nguồn</th><th>Chủ sở hữu</th><th>Citation</th><th>Rủi ro</th><th>Kiểm duyệt</th><th>Ngày tạo</th><th>Hành động</th></tr></thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Câu hỏi"><div className="admin-content-title-cell"><strong>{item.question_preview || 'Không có nội dung'}</strong><span className="admin-content-muted">{item.id}</span></div></td>
-                    <td data-label="Loại/độ khó">{item.question_type || 'Không có dữ liệu'}<br /><span className="admin-content-muted">{item.difficulty || 'Không có dữ liệu'}</span></td>
-                    <td data-label="Môn/chủ đề">{item.subject || 'Không có dữ liệu'}<br /><span className="admin-content-muted">{item.topic || 'Không có dữ liệu'}</span></td>
-                    <td data-label="Nguồn">{item.source_document_name || item.source_document_id || 'Không có dữ liệu'}</td>
-                    <td data-label="Chủ sở hữu">{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</td>
-                    <td data-label="Citation">{item.citation_status || 'Không có dữ liệu'}</td>
-                    <td data-label="Rủi ro">{item.hallucination_risk || 'Không có dữ liệu'}</td>
-                    <td data-label="Kiểm duyệt"><Badge tone={item.deleted_at ? 'danger' : item.moderation_status === 'approved' ? 'ok' : 'info'}>{item.deleted_at ? 'deleted' : item.moderation_status}</Badge></td>
-                    <td data-label="Ngày tạo">{fmtDateTime(item.created_at)}</td>
-                    <td data-label="Hành động"><div className="admin-content-actions">
-                      <button className="admin-content-btn" type="button" onClick={() => navigate(`/admin/questions/${encodeURIComponent(item.id)}`)}>Xem</button>
-                      {canUpdate && !item.deleted_at && <button className="admin-content-btn" type="button" disabled={busy} onClick={() => moderate(item)}>Đã kiểm duyệt</button>}
-                      {canRegenerate && !item.deleted_at && <button className="admin-content-btn" type="button" disabled={busy} onClick={() => regenerate(item)}>Sinh lại</button>}
-                      {canDelete && !item.deleted_at && <button className="admin-content-btn admin-content-btn--danger" type="button" onClick={() => setDeleteTarget(item)}>Xóa mềm</button>}
-                      {canUpdate && item.deleted_at && <button className="admin-content-btn" type="button" disabled={busy} onClick={() => restoreQuestion(item)}>Khôi phục</button>}
-                    </div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
-        </>
-      )}
+          {error && <EmptyState title="Có lỗi" text={error} />}
+          {loading && <EmptyState title="Đang tải" text="Đang lấy dữ liệu câu hỏi từ backend." />}
+          {!loading && data && data.items.length === 0 && <EmptyState title="Chưa có câu hỏi phù hợp" text="Không có dữ liệu giả để hiển thị." />}
+
+          {!loading && data && data.items.length > 0 && (
+            <>
+              <DataTable columns={columns} data={data.items} rowKey={(item) => item.id} minWidth={1200} />
+              <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
+            </>
+          )}
+        </CardBody>
+      </Card>
 
       {deleteTarget && (
         <ReasonModal
@@ -187,11 +250,26 @@ export default function AdminQuestionsPage() {
           target={deleteTarget.question_preview || deleteTarget.id}
           reason={reason}
           busy={busy}
+          consequence="Câu hỏi sẽ bị ẩn khỏi các luồng sử dụng cho tới khi được khôi phục."
+          confirmationText="XÓA"
           onReason={setReason}
           onCancel={() => { setDeleteTarget(null); setReason(''); }}
           onConfirm={deleteQuestion}
         />
       )}
-    </main>
+      {regenerateTarget && (
+        <ReasonModal
+          title="Sinh lại câu hỏi bằng AI"
+          target={regenerateTarget.question_preview || regenerateTarget.id}
+          reason={regenerateReason}
+          busy={busy}
+          consequence="Hệ thống sẽ gọi dịch vụ AI cho 1 câu hỏi và thay đổi nội dung hiện tại."
+          reversible={false}
+          onReason={setRegenerateReason}
+          onCancel={() => { setRegenerateTarget(null); setRegenerateReason(''); }}
+          onConfirm={regenerate}
+        />
+      )}
+    </div>
   );
 }

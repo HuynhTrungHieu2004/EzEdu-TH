@@ -1,456 +1,304 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { questionApi } from '../api/questionApi';
 import type { QuestionSetResponse } from '../api/questionApi';
 import { documentApi } from '../api/documentApi';
 import type { DocumentResponse } from '../api/documentApi';
 import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  Chip,
+  ChipGroup,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  RadioCard,
+  Skeleton,
+} from '../components/ui';
+import './question-set.css';
+import './dashboard.css';
 
-const QuestionGeneratePage: React.FC = () => {
+const COUNTS = [3, 5, 10, 15, 20];
+
+const DIFFICULTIES = [
+  { value: 'easy', title: 'Dễ', description: 'Nhận biết & thông hiểu' },
+  { value: 'medium', title: 'Trung bình', description: 'Vận dụng thấp' },
+  { value: 'hard', title: 'Khó', description: 'Vận dụng cao' },
+];
+
+const BLOOM_LEVELS = [
+  { value: 'remember', title: 'Nhận biết', description: 'Ghi nhớ, liệt kê, nhận diện' },
+  { value: 'understand', title: 'Thông hiểu', description: 'Giải thích, so sánh, tóm tắt' },
+  { value: 'apply', title: 'Vận dụng', description: 'Áp dụng vào tình huống thực tế' },
+  { value: 'analyze', title: 'Vận dụng cao', description: 'Phân tích, đánh giá, sáng tạo' },
+];
+
+const QUESTION_TYPES = [
+  { value: 'multiple_choice', title: 'Trắc nghiệm', description: '4 lựa chọn A-B-C-D' },
+  { value: 'true_false', title: 'Đúng / Sai', description: 'Đúng hoặc Sai' },
+  { value: 'short_answer', title: 'Tự luận ngắn', description: 'Điền khuyết / tự luận' },
+];
+
+function typeLabel(value: string): string {
+  return QUESTION_TYPES.find((item) => item.value === value)?.title ?? value;
+}
+
+function difficultyLabel(value: string): string {
+  return DIFFICULTIES.find((item) => item.value === value)?.title ?? value;
+}
+
+/**
+ * Bước cấu hình & sinh câu hỏi — nơi DUY NHẤT trong ứng dụng thực hiện việc
+ * này, dù vào từ học liệu đã có sẵn (`/documents/:id/questions`) hay từ luồng
+ * tải nhanh vừa xử lý xong (`QuickGeneratePage` điều hướng tới đây khi sẵn
+ * sàng). Trước đây `QuickGeneratePage` tự dựng lại một bộ cấu hình + kết quả
+ * riêng, trùng lặp hoàn toàn với trang này — hai nơi cùng làm một việc theo
+ * hai cách khác nhau. Xem docs/ui-redesign/01-audit-report.md §6.3 (lỗi M1).
+ */
+export default function QuestionGeneratePage() {
   const { documentId } = useParams<{ documentId: string }>();
+  const navigate = useNavigate();
+
   const [document, setDocument] = useState<DocumentResponse | null>(null);
   const [historySets, setHistorySets] = useState<QuestionSetResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmGenerateOpen, setConfirmGenerateOpen] = useState(false);
 
-  // Form states
   const [count, setCount] = useState(5);
   const [difficulty, setDifficulty] = useState('medium');
-  const [type, setType] = useState('multiple_choice');
-
-  const navigate = useNavigate();
+  const [bloomLevel, setBloomLevel] = useState('understand');
+  const [questionType, setQuestionType] = useState('multiple_choice');
 
   const fetchHistory = useCallback(async () => {
     if (!documentId) return;
     try {
       const history = await questionApi.listByDocument(documentId);
       setHistorySets(history);
-    } catch (err) {
-      console.error('Failed to load question sets history:', err);
+    } catch {
+      // Lịch sử là thông tin phụ; lỗi ở đây không cần làm hỏng cả trang.
     }
   }, [documentId]);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!documentId) return;
+    let cancelled = false;
 
-    const fetchData = async () => {
-      if (!documentId) return;
-      setLoading(true);
+    async function load() {
       try {
-        const doc = await documentApi.get(documentId);
+        const doc = await documentApi.get(documentId as string);
+        if (cancelled) return;
         setDocument(doc);
-        
         await fetchHistory();
       } catch (err: unknown) {
+        if (cancelled) return;
         if (isUnauthorizedError(err)) {
           localStorage.removeItem('access_token');
           navigate('/login');
-        } else {
-          setError('Không tải được thông tin học liệu hoặc lịch sử sinh đề.');
+          return;
         }
+        setLoadError('Không tải được thông tin học liệu hoặc lịch sử sinh đề.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
+    }
 
-    fetchData();
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [documentId, fetchHistory, navigate]);
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!documentId || generating) return;
-
+  async function handleGenerate() {
+    if (!documentId || generating || count <= 0) return;
     setGenerating(true);
     setError(null);
-
     try {
-      const response = await questionApi.generate(documentId, count, difficulty, type);
+      const response = await questionApi.generate(documentId, count, difficulty, questionType, bloomLevel);
       navigate(`/question-sets/${response.id}`);
     } catch (err: unknown) {
-      const detail = getApiErrorDetail(err);
-      setError(
-        detail ?? 'Sinh câu hỏi thất bại. Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.'
-      );
+      setError(getApiErrorDetail(err) ?? 'Sinh câu hỏi thất bại. Vui lòng kiểm tra lại cấu hình hoặc thử lại sau.');
     } finally {
       setGenerating(false);
     }
-  };
+  }
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
-        <p style={{ marginTop: '16px', color: 'var(--text)' }}>Đang tải cấu hình sinh câu hỏi...</p>
+      <div className="ez-stack">
+        <Skeleton height="2rem" width="40%" />
+        <Skeleton height="16rem" />
       </div>
     );
   }
 
-  return (
-    <div style={styles.container}>
+  if (loadError || !document) {
+    return (
+      <ErrorState
+        title="Không tải được học liệu"
+        description={loadError ?? undefined}
+        actions={<Button onClick={() => navigate('/documents')}>Về danh sách học liệu</Button>}
+      />
+    );
+  }
 
-      {/* Main Content */}
-      <main style={styles.mainContent}>
-        {/* Navigation */}
-        <div style={styles.navigation}>
-          <button onClick={() => navigate(`/documents/${documentId}`)} style={styles.backButton}>
-            ← Quay lại Chi tiết học liệu
-          </button>
+  return (
+    <>
+      <PageHeader
+        backTo={`/documents/${documentId}`}
+        backLabel="Quay lại chi tiết học liệu"
+        eyebrow="Sinh câu hỏi"
+        title={document.original_filename}
+        description={`Tạo bộ câu hỏi kiểm tra năng lực bám sát nội dung ${document.media_kind === 'video' ? 'video' : 'tài liệu'} này.`}
+      />
+
+      {error && (
+        <Alert tone="error" style={{ marginBottom: 'var(--ez-space-6)' }}>
+          {error}
+        </Alert>
+      )}
+
+      <div className="qs-questions-list">
+        <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
+          <CardHeader>
+            <div>
+              <CardTitle as="h2">Cấu hình bộ câu hỏi</CardTitle>
+              <p className="ez-card-desc">Tuỳ chỉnh số lượng, độ khó, mức vận dụng và dạng câu hỏi.</p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="ez-stack-lg">
+              <div>
+                <h3 className="ez-label" style={{ marginBottom: 'var(--ez-space-2)' }}>Số lượng câu hỏi</h3>
+                <ChipGroup label="Số lượng câu hỏi">
+                  {COUNTS.map((c) => (
+                    <Chip key={c} selected={count === c} onClick={() => setCount(c)}>
+                      {c} câu
+                    </Chip>
+                  ))}
+                </ChipGroup>
+              </div>
+
+              <div>
+                <h3 className="ez-label" style={{ marginBottom: 'var(--ez-space-2)' }}>Mức độ khó</h3>
+                <div className="qs-audience-list">
+                  {DIFFICULTIES.map((item) => (
+                    <RadioCard
+                      key={item.value}
+                      name="difficulty"
+                      title={item.title}
+                      description={item.description}
+                      checked={difficulty === item.value}
+                      onChange={() => setDifficulty(item.value)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="ez-label" style={{ marginBottom: 'var(--ez-space-2)' }}>Mức vận dụng (Bloom&apos;s Taxonomy)</h3>
+                <div className="qs-audience-list">
+                  {BLOOM_LEVELS.map((item) => (
+                    <RadioCard
+                      key={item.value}
+                      name="bloom-level"
+                      title={item.title}
+                      description={item.description}
+                      checked={bloomLevel === item.value}
+                      onChange={() => setBloomLevel(item.value)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="ez-label" style={{ marginBottom: 'var(--ez-space-2)' }}>Dạng câu hỏi</h3>
+                <div className="qs-audience-list">
+                  {QUESTION_TYPES.map((item) => (
+                    <RadioCard
+                      key={item.value}
+                      name="question-type"
+                      title={item.title}
+                      description={item.description}
+                      checked={questionType === item.value}
+                      onChange={() => setQuestionType(item.value)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--ez-space-6)' }}>
+          <Button
+            size="lg"
+            loading={generating}
+            disabled={count <= 0}
+            leadingIcon={<Sparkles size={18} aria-hidden="true" />}
+            onClick={() => setConfirmGenerateOpen(true)}
+          >
+            {generating ? 'AI đang đọc và tạo câu hỏi...' : `Sinh ${count} câu hỏi bằng AI`}
+          </Button>
         </div>
 
-        {error && <div style={styles.errorAlert}>{error}</div>}
-
-        {document && (
-          <div style={styles.layout}>
-            {/* Form Section */}
-            <div style={styles.formColumn}>
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}>Cấu hình Ma trận đề thi</h3>
-                <p style={styles.cardSubtitle}>
-                  Tạo các câu hỏi kiểm tra năng lực bám sát nội dung của {document.media_kind === 'video' ? 'video' : 'tài liệu'}: <strong>{document.original_filename}</strong>.
-                </p>
-
-                <form onSubmit={handleGenerate} style={styles.form}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Số lượng câu hỏi</label>
-                    <select
-                      value={count}
-                      onChange={(e) => setCount(Number(e.target.value))}
-                      disabled={generating}
-                      style={styles.select}
-                    >
-                      <option value={3}>3 câu hỏi</option>
-                      <option value={5}>5 câu hỏi</option>
-                      <option value={10}>10 câu hỏi</option>
-                      <option value={15}>15 câu hỏi</option>
-                    </select>
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Mức độ nhận thức (Độ khó)</label>
-                    <select
-                      value={difficulty}
-                      onChange={(e) => setDifficulty(e.target.value)}
-                      disabled={generating}
-                      style={styles.select}
-                    >
-                      <option value="easy">Nhận biết & Thông hiểu (Dễ)</option>
-                      <option value="medium">Vận dụng thấp (Trung bình)</option>
-                      <option value="hard">Vận dụng cao (Khó)</option>
-                    </select>
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Dạng câu hỏi</label>
-                    <select
-                      value={type}
-                      onChange={(e) => setType(e.target.value)}
-                      disabled={generating}
-                      style={styles.select}
-                    >
-                      <option value="multiple_choice">Trắc nghiệm 4 lựa chọn (Multiple Choice)</option>
-                      <option value="true_false">Đúng / Sai (True / False)</option>
-                      <option value="short_answer">Điền khuyết / Tự luận ngắn (Short Answer)</option>
-                    </select>
-                  </div>
-
-                  <button type="submit" disabled={generating} style={styles.generateButton}>
-                    {generating ? '🤖 AI Đang đọc và tạo câu hỏi (Mất 10-20s)...' : '✨ Bắt Đầu Sinh Câu Hỏi Bằng AI'}
-                  </button>
-                </form>
-              </div>
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle as="h2">Lịch sử đề đã sinh cho học liệu này</CardTitle>
             </div>
-
-            {/* History Section */}
-            <div style={styles.historyColumn}>
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}>Lịch sử Đề thi đã sinh</h3>
-                
-                {historySets.length === 0 ? (
-                  <div style={styles.emptyHistory}>
-                    Tài liệu này chưa từng được sinh câu hỏi nào.
-                  </div>
-                ) : (
-                  <div style={styles.historyList}>
-                    {historySets.map((set) => {
-                      const typeLabel = 
-                        set.question_type === 'multiple_choice' ? 'Trắc nghiệm' : 
-                        set.question_type === 'true_false' ? 'Đúng/Sai' : 'Tự luận ngắn';
-                        
-                      const difficultyLabel = 
-                        set.difficulty === 'easy' ? 'Dễ' : 
-                        set.difficulty === 'medium' ? 'Trung bình' : 'Khó';
-
-                      return (
-                        <div
-                          key={set.id}
-                          onClick={() => navigate(`/question-sets/${set.id}`)}
-                          style={styles.historyItem}
-                        >
-                          <div style={styles.historyItemHeader}>
-                            <strong>Bộ đề {set.question_count} câu ({typeLabel})</strong>
-                            <span style={styles.historyDate}>
-                              {new Date(set.created_at).toLocaleDateString('vi-VN')}
-                            </span>
-                          </div>
-                          <div style={styles.historyItemMeta}>
-                            <span>Độ khó: {difficultyLabel}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+          </CardHeader>
+          <CardBody>
+            {historySets.length === 0 ? (
+              <EmptyState compact title="Chưa có bộ đề nào" description="Tài liệu này chưa từng được sinh câu hỏi." />
+            ) : (
+              historySets.map((set) => (
+                <button
+                  key={set.id}
+                  type="button"
+                  className="dash-row"
+                  style={{ width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer' }}
+                  onClick={() => navigate(`/question-sets/${set.id}`)}
+                >
+                  <span className="dash-row-main">
+                    <span className="dash-row-title">
+                      Bộ đề {set.question_count} câu ({typeLabel(set.question_type)})
+                    </span>
+                    <span className="dash-row-meta">
+                      <span>Độ khó: {difficultyLabel(set.difficulty)}</span>
+                      <span>{new Date(set.created_at).toLocaleDateString('vi-VN')}</span>
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
+          </CardBody>
+        </Card>
+      </div>
+      <ConfirmDialog
+        open={confirmGenerateOpen}
+        onClose={generating ? () => undefined : () => setConfirmGenerateOpen(false)}
+        onConfirm={() => void handleGenerate()}
+        title={`Sinh ${count} câu hỏi bằng AI?`}
+        description={`Phạm vi xử lý: 1 học liệu “${document.original_filename}”. Hệ thống sẽ gọi dịch vụ AI để tạo ${count} câu hỏi ${typeLabel(questionType).toLocaleLowerCase('vi-VN')} ở mức ${difficultyLabel(difficulty).toLocaleLowerCase('vi-VN')}.`}
+        confirmLabel="Bắt đầu sinh câu hỏi"
+        confirmVariant="primary"
+        confirmDisabled={count <= 0}
+        busy={generating}
+      >
+        <Alert tone="warning">
+          Thao tác này sử dụng quota AI. Không đóng trang hoặc gửi lại trong khi hệ thống đang xử lý.
+        </Alert>
+      </ConfirmDialog>
+    </>
   );
-};
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    minHeight: '100svh',
-    backgroundColor: 'var(--bg)',
-    width: '100%',
-  },
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexGrow: 1,
-    backgroundColor: 'var(--bg)',
-  },
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid var(--border)',
-    borderTop: '4px solid var(--accent)',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px 40px',
-    borderBottom: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    flexWrap: 'wrap' as const,
-    gap: '16px',
-    textAlign: 'left' as const,
-  },
-  logoGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  logoBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: '1px solid var(--accent-border)',
-  },
-  headerTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    margin: 0,
-    color: 'var(--text-h)',
-    lineHeight: '1.2',
-  },
-  headerSubtitle: {
-    fontSize: '13px',
-    color: 'var(--text)',
-    margin: 0,
-  },
-  userSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'flex-end',
-  },
-  userName: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-  },
-  userEmail: {
-    fontSize: '12px',
-    color: 'var(--text)',
-  },
-  logoutButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  mainContent: {
-    flexGrow: 1,
-    padding: '40px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-    textAlign: 'left' as const,
-  },
-  navigation: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '24px',
-  },
-  backButton: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  errorAlert: {
-    padding: '12px 16px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#ef4444',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '7fr 5fr',
-    gap: '30px',
-    alignItems: 'start',
-  },
-  formColumn: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-  },
-  historyColumn: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-  },
-  card: {
-    padding: '24px',
-    borderRadius: '12px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    boxShadow: 'var(--shadow)',
-  },
-  cardTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-    margin: '0 0 10px 0',
-  },
-  cardSubtitle: {
-    fontSize: '14px',
-    color: 'var(--text)',
-    margin: '0 0 20px 0',
-    lineHeight: '1.4',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '20px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'var(--text-h)',
-  },
-  select: {
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text-h)',
-    outline: 'none',
-    fontSize: '14px',
-  },
-  generateButton: {
-    padding: '14px',
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: 'var(--accent)',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    marginTop: '10px',
-  },
-  emptyHistory: {
-    padding: '20px',
-    textAlign: 'center' as const,
-    color: 'var(--text)',
-    fontSize: '13px',
-    fontStyle: 'italic',
-    backgroundColor: 'var(--code-bg)',
-    borderRadius: '8px',
-  },
-  historyList: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-  },
-  historyItem: {
-    padding: '14px',
-    borderRadius: '8px',
-    border: '1px solid var(--border)',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    backgroundColor: 'var(--bg)',
-    ':hover': {
-      borderColor: 'var(--accent)',
-      backgroundColor: 'var(--code-bg)',
-    },
-  },
-  historyItemHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '14px',
-    color: 'var(--text-h)',
-    marginBottom: '6px',
-  },
-  historyDate: {
-    fontSize: '12px',
-    color: 'var(--text)',
-  },
-  historyItemMeta: {
-    fontSize: '12px',
-    color: 'var(--text)',
-  },
-};
-
-export default QuestionGeneratePage;
+}

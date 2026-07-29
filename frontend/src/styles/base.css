@@ -1,0 +1,290 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   EzEdu AI — BASE LAYER
+   Reset tối giản + mặc định semantic + accessibility.
+   Nạp SAU tokens.css và TRƯỚC index.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Không đặt scroll-behavior: smooth ở đây — sẽ bật có điều kiện ở dưới
+     để tôn trọng prefers-reduced-motion */
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--ez-font-sans);
+  font-size: var(--ez-text-body);
+  line-height: var(--ez-leading-body);
+  font-weight: var(--ez-weight-regular);
+  color: var(--ez-text);
+  background-color: var(--ez-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Chặn cuộn ngang toàn trang. Nội dung rộng phải tự cuộn trong khối riêng
+     bằng .ez-scroll-x, không được đẩy body rộng ra. */
+  overflow-x: hidden;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Typography semantic — dùng đúng thẻ heading, không giả tiêu đề bằng div
+   ─────────────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  color: var(--ez-text);
+  font-weight: var(--ez-weight-bold);
+  line-height: var(--ez-leading-heading);
+  letter-spacing: var(--ez-tracking-snug);
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--ez-text-h1); letter-spacing: var(--ez-tracking-tight); }
+h2 { font-size: var(--ez-text-h2); letter-spacing: var(--ez-tracking-tight); }
+h3 { font-size: var(--ez-text-h3); }
+h4 { font-size: var(--ez-text-h4); font-weight: var(--ez-weight-semibold); }
+h5 { font-size: var(--ez-text-h5); font-weight: var(--ez-weight-semibold); }
+h6 { font-size: var(--ez-text-h6); font-weight: var(--ez-weight-semibold); }
+
+p {
+  margin: 0;
+  line-height: var(--ez-leading-body);
+}
+
+/* Đoạn văn dài giới hạn độ rộng để mắt không phải quét quá xa */
+.ez-prose {
+  max-width: 68ch;
+}
+
+small {
+  font-size: var(--ez-text-caption);
+}
+
+strong, b {
+  font-weight: var(--ez-weight-semibold);
+}
+
+code, kbd, pre, samp {
+  font-family: var(--ez-font-mono);
+  font-size: 0.9em;
+}
+
+ul, ol {
+  margin: 0;
+  padding: 0;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Liên kết
+   ─────────────────────────────────────────────────────────────────────── */
+a {
+  color: var(--ez-text-link);
+  text-decoration: none;
+  transition: var(--ez-transition-colors);
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Link trong khối văn bản luôn có gạch chân để không chỉ dựa vào màu */
+.ez-prose a,
+p > a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Media
+   ─────────────────────────────────────────────────────────────────────── */
+img, svg, video, canvas, picture {
+  display: block;
+  max-width: 100%;
+}
+
+img, video {
+  height: auto;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Form — kế thừa font thay vì dùng font mặc định của trình duyệt
+   ─────────────────────────────────────────────────────────────────────── */
+button, input, select, textarea, optgroup {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+textarea {
+  resize: vertical;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+legend {
+  padding: 0;
+}
+
+/* Nhãn form luôn bấm được để focus vào trường tương ứng */
+label {
+  cursor: pointer;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Bảng
+   ─────────────────────────────────────────────────────────────────────── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th {
+  text-align: left;
+  font-weight: var(--ez-weight-semibold);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   FOCUS — bắt buộc thấy được. Không bao giờ outline: none mà không thay thế.
+   ─────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: var(--ez-ring-width) solid var(--ez-ring-color);
+  outline-offset: var(--ez-ring-offset);
+  border-radius: var(--ez-radius-xs);
+}
+
+/* Chỉ bỏ outline mặc định khi trình duyệt hỗ trợ :focus-visible, để bàn
+   phím vẫn luôn có vòng focus */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Accessibility helper
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Chỉ dành cho screen reader */
+.ez-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link — phần tử focus được đầu tiên trên trang */
+.ez-skip-link {
+  position: absolute;
+  top: var(--ez-space-2);
+  left: var(--ez-space-2);
+  z-index: var(--ez-z-skip-link);
+  padding: var(--ez-space-3) var(--ez-space-4);
+  background: var(--ez-surface);
+  color: var(--ez-text);
+  border: 1px solid var(--ez-border-strong);
+  border-radius: var(--ez-radius-md);
+  box-shadow: var(--ez-shadow-lg);
+  font-weight: var(--ez-weight-semibold);
+  transform: translateY(-200%);
+  transition: transform var(--ez-duration-fast) var(--ez-ease-out);
+}
+
+.ez-skip-link:focus {
+  transform: translateY(0);
+  text-decoration: none;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Layout helper
+   ─────────────────────────────────────────────────────────────────────── */
+.ez-container {
+  width: 100%;
+  max-width: var(--ez-container-lg);
+  margin-inline: auto;
+  padding-inline: var(--ez-container-pad);
+}
+
+.ez-container-sm { max-width: var(--ez-container-sm); }
+.ez-container-md { max-width: var(--ez-container-md); }
+.ez-container-xl { max-width: var(--ez-container-xl); }
+
+@media (max-width: 480px) {
+  .ez-container,
+  .ez-container-sm,
+  .ez-container-md,
+  .ez-container-xl {
+    padding-inline: var(--ez-container-pad-sm);
+  }
+}
+
+/* Khối cuộn ngang riêng — dùng cho bảng rộng, thanh tab dài, sơ đồ.
+   Bắt buộc dùng cái này thay vì để body cuộn ngang. */
+.ez-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   REDUCED MOTION — tôn trọng tuyệt đối
+   ─────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   In ấn — bỏ điều hướng khi in đề/bài
+   ─────────────────────────────────────────────────────────────────────── */
+@media print {
+  .ez-no-print,
+  nav,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

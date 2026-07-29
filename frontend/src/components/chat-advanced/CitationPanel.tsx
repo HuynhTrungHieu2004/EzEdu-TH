@@ -1,4 +1,5 @@
 import React from 'react';
+import { BookOpen, Flag, Globe, Library, Pin } from 'lucide-react';
 import type { SourceChunkResponse, WebCitation } from '../../types/chat';
 
 interface CitationPanelProps {
@@ -21,7 +22,7 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <span style={styles.title}>📌 Nguồn trích dẫn</span>
+        <span style={styles.title}><Pin size={16} aria-hidden="true" /><span>Nguồn trích dẫn</span></span>
         {onClose && (
           <button type="button" onClick={onClose} style={styles.closeBtn}>
             Đóng
@@ -32,14 +33,17 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
       <div style={styles.content}>
         {!hasCitations ? (
           <div style={styles.empty}>
-            <span style={styles.emptyIcon}>📖</span>
+            <span style={styles.emptyIcon} aria-hidden="true"><BookOpen size={36} /></span>
             <p>Chọn câu trả lời có nguồn trích dẫn để hiển thị chi tiết tại đây.</p>
           </div>
         ) : (
           <div style={styles.list}>
             {internalCitations.length > 0 && (
               <div>
-                <h5 style={styles.sectionTitle}>📚 Tài liệu học tập ({internalCitations.length})</h5>
+                <h5 style={styles.sectionTitle}>
+                  <Library size={14} aria-hidden="true" />
+                  <span>Tài liệu học tập ({internalCitations.length})</span>
+                </h5>
                 <div style={styles.sectionList}>
                   {internalCitations.map((chunk) => {
                     const isFocused = chunk.source_id === focusedCitationId;
@@ -65,7 +69,7 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
                               title="Báo lỗi trích dẫn"
                               aria-label={`Báo cáo trích dẫn ${chunk.source_id}`}
                             >
-                              🚩
+                              <Flag size={14} aria-hidden="true" />
                             </button>
                           )}
                         </div>
@@ -85,7 +89,10 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
 
             {webCitations.length > 0 && (
               <div>
-                <h5 style={styles.sectionTitle}>🌐 Tìm kiếm Internet ({webCitations.length})</h5>
+                <h5 style={styles.sectionTitle}>
+                  <Globe size={14} aria-hidden="true" />
+                  <span>Tìm kiếm Internet ({webCitations.length})</span>
+                </h5>
                 <div style={styles.sectionList}>
                   {webCitations.map((web) => {
                     const isFocused = web.source_id === focusedCitationId;
@@ -117,7 +124,7 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
                               title="Báo lỗi trích dẫn"
                               aria-label={`Báo cáo trích dẫn ${web.source_id}`}
                             >
-                              🚩
+                              <Flag size={14} aria-hidden="true" />
                             </button>
                           )}
                         </div>
@@ -162,6 +169,9 @@ const styles = {
     fontSize: '14px',
     fontWeight: '700',
     color: 'var(--text-h)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   closeBtn: {
     display: 'none',
@@ -187,7 +197,7 @@ const styles = {
     fontSize: '13px',
   },
   emptyIcon: {
-    fontSize: '36px',
+    display: 'inline-flex',
     marginBottom: '12px',
   },
   list: {
@@ -200,6 +210,9 @@ const styles = {
     fontSize: '13px',
     fontWeight: '700',
     color: 'var(--text-h)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   sectionList: {
     display: 'flex',

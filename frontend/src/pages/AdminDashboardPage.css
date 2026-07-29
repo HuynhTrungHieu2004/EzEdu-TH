@@ -98,7 +98,7 @@
 .preset-btn--active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--ez-text-on-brand);
 }
 
 /* ── Tab Navigation ─────────────────────────────────────────── */
@@ -197,7 +197,36 @@
 
 .btn-retry:hover {
   background: var(--danger);
-  color: #fff;
+  color: var(--ez-text-on-brand);
+}
+
+/* Link nhanh thay cho hai tab đã gộp (Quản lý người dùng, Nhật ký hệ thống) */
+.admin-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.admin-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.35rem;
+  padding: 0.42rem 1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.admin-quick-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .admin-action-btn {
@@ -228,11 +257,11 @@
 .admin-action-btn--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--ez-text-on-brand);
 }
 
 .admin-action-btn--primary:hover:not(:disabled) {
-  color: #fff;
+  color: var(--ez-text-on-brand);
 }
 
 .admin-action-btn--danger {
@@ -658,6 +687,19 @@
 .health-detail-list dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.health-detail-json {
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--surface-muted, var(--surface));
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .health-history-list {

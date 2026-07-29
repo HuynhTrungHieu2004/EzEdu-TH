@@ -48,7 +48,7 @@ export default function StudentStatisticsPage() {
         <div className="page-header">
           <div>
             <p className="eyebrow">Hồ sơ học tập</p>
-            <h2 className="section-title">Thống kê kết quả</h2>
+            <h1 className="section-title">Thống kê kết quả</h1>
             <p className="section-subtitle">Điểm số được cập nhật tự động sau mỗi lần bạn nộp bài.</p>
           </div>
           <button type="button" className="btn-primary" onClick={() => navigate('/published-questions')}>Bài thi của bạn</button>

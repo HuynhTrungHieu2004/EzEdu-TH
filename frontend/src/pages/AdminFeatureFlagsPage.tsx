@@ -2,8 +2,23 @@ import { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
 import { systemSettingsApi } from '../api/systemSettingsApi';
 import type { FeatureFlagItem } from '../types/systemSettings';
-import { EmptyState, fmtDateTime } from './AdminContentShared';
+import { fmtDateTime } from './AdminContentShared';
 import { apiErrorMessage } from '../utils/apiError';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  Chip,
+  ChipGroup,
+  ConfirmDialog,
+  EmptyState,
+  FormField,
+  Input,
+  PageHeader,
+  Select,
+  Textarea,
+} from '../components/ui';
 import './AdminContentPages.css';
 
 const DANGEROUS_FLAGS = new Set([
@@ -22,6 +37,7 @@ export default function AdminFeatureFlagsPage() {
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState('');
   const [error, setError] = useState('');
+  const [pendingFlag, setPendingFlag] = useState<FeatureFlagItem | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -40,13 +56,8 @@ export default function AdminFeatureFlagsPage() {
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   };
 
-  const save = async (item: FeatureFlagItem) => {
+  const performSave = async (item: FeatureFlagItem) => {
     const reason = (reasons[item.key] || '').trim();
-    if (!reason) {
-      setError('Cần nhập lý do trước khi lưu feature flag.');
-      return;
-    }
-    if (DANGEROUS_FLAGS.has(item.key) && !window.confirm(`Xác nhận thay đổi ${item.key}? Tác động có thể ảnh hưởng người dùng đang sử dụng.`)) return;
     setBusyKey(item.key);
     setError('');
     try {
@@ -59,6 +70,7 @@ export default function AdminFeatureFlagsPage() {
       });
       patchLocal(item.key, updated);
       setReasons((prev) => ({ ...prev, [item.key]: '' }));
+      setPendingFlag(null);
     } catch (err: unknown) {
       setError(apiErrorMessage(err, 'Không lưu được feature flag.'));
     } finally {
@@ -66,57 +78,121 @@ export default function AdminFeatureFlagsPage() {
     }
   };
 
+  const requestSave = (item: FeatureFlagItem) => {
+    if (!(reasons[item.key] || '').trim()) {
+      setError('Cần nhập lý do trước khi lưu cờ tính năng.');
+      return;
+    }
+    if (DANGEROUS_FLAGS.has(item.key)) {
+      setPendingFlag(item);
+      return;
+    }
+    void performSave(item);
+  };
+
   return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Feature Flags</h1>
-          <p>Bật/tắt tính năng runtime, có rollout và giới hạn role. Backend kiểm tra flag ở các luồng quan trọng.</p>
-        </div>
-      </header>
+    <div className="admin-content-page">
+      <PageHeader
+        title="Cờ tính năng"
+        description="Bật hoặc tắt một số tính năng, đặt tỷ lệ triển khai và giới hạn vai trò. Đây không phải toàn bộ cấu hình hệ thống."
+      />
 
-      {error && <EmptyState title="Có lỗi" text={String(error)} />}
-      {loading && <EmptyState title="Đang tải" text="Đang đọc feature_flags từ backend." />}
+      {error && <EmptyState title="Có lỗi" description={String(error)} />}
+      {loading && <EmptyState title="Đang tải" description="Đang tải danh sách tính năng…" />}
 
-      {!loading && (
-        <section className="admin-content-panel">
-          <div className="admin-settings-list">
-            {items.map((item) => (
-              <article className="admin-settings-row admin-settings-row--flag" key={item.key}>
-                <div>
-                  <strong>{item.key}</strong>
-                  <textarea rows={2} value={item.description} onChange={(event) => patchLocal(item.key, { description: event.target.value })} />
-                  <small className="admin-content-muted">Cập nhật {fmtDateTime(item.updated_at)}</small>
-                </div>
-                <label className="admin-content-field">
-                  <span>Trạng thái</span>
-                  <select value={item.enabled ? 'true' : 'false'} onChange={(event) => patchLocal(item.key, { enabled: event.target.value === 'true' })}>
-                    <option value="true">Bật</option>
-                    <option value="false">Tắt</option>
-                  </select>
-                </label>
-                <label className="admin-content-field">
-                  <span>Rollout %</span>
-                  <input type="number" min={0} max={100} value={item.rollout_percentage} onChange={(event) => patchLocal(item.key, { rollout_percentage: Number(event.target.value) })} />
-                </label>
-                <label className="admin-content-field">
-                  <span>Allowed roles</span>
-                  <select multiple value={item.allowed_roles} onChange={(event) => patchLocal(item.key, { allowed_roles: Array.from(event.target.selectedOptions).map((option) => option.value) })}>
-                    {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-                  </select>
-                </label>
-                <label className="admin-content-field">
-                  <span>Lý do</span>
-                  <input value={reasons[item.key] || ''} onChange={(event) => setReasons({ ...reasons, [item.key]: event.target.value })} placeholder="Bắt buộc khi lưu" />
-                </label>
-                <button type="button" className="admin-content-btn admin-content-btn--primary" disabled={busyKey === item.key} onClick={() => save(item)}>
-                  <Save size={15} aria-hidden="true" /> Lưu
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
+      {!loading && items.length === 0 && (
+        <EmptyState title="Chưa có feature flag nào" description="Chưa có tính năng runtime nào được đăng ký." />
       )}
-    </main>
+
+      {!loading && items.length > 0 && (
+        <div className="ez-stack">
+          {items.map((item) => {
+            const toggleRole = (role: string) => {
+              const next = item.allowed_roles.includes(role)
+                ? item.allowed_roles.filter((r) => r !== role)
+                : [...item.allowed_roles, role];
+              patchLocal(item.key, { allowed_roles: next });
+            };
+            return (
+              <Card key={item.key}>
+                <CardBody className="ez-stack">
+                  <div>
+                    <strong>{item.key}</strong>
+                    <p className="admin-content-muted" style={{ margin: 'var(--ez-space-1) 0 0' }}>
+                      Cập nhật {fmtDateTime(item.updated_at)}
+                    </p>
+                  </div>
+                  <FormField label="Mô tả">
+                    <Textarea
+                      rows={2}
+                      value={item.description}
+                      onChange={(event) => patchLocal(item.key, { description: event.target.value })}
+                    />
+                  </FormField>
+                  <div style={{ display: 'flex', gap: 'var(--ez-space-4)', flexWrap: 'wrap' }}>
+                    <FormField label="Trạng thái">
+                      <Select
+                        value={item.enabled ? 'true' : 'false'}
+                        onChange={(event) => patchLocal(item.key, { enabled: event.target.value === 'true' })}
+                        options={[
+                          { value: 'true', label: 'Bật' },
+                          { value: 'false', label: 'Tắt' },
+                        ]}
+                      />
+                    </FormField>
+                    <FormField label="Rollout %">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        style={{ width: '100px' }}
+                        value={item.rollout_percentage}
+                        onChange={(event) => patchLocal(item.key, { rollout_percentage: Number(event.target.value) })}
+                      />
+                    </FormField>
+                  </div>
+                  <FormField label="Vai trò được áp dụng">
+                    <ChipGroup>
+                      {ROLES.map((role) => (
+                        <Chip key={role} selected={item.allowed_roles.includes(role)} onClick={() => toggleRole(role)}>
+                          {role}
+                        </Chip>
+                      ))}
+                    </ChipGroup>
+                  </FormField>
+                  <FormField label="Lý do">
+                    <Input
+                      value={reasons[item.key] || ''}
+                      onChange={(event) => setReasons({ ...reasons, [item.key]: event.target.value })}
+                      placeholder="Bắt buộc khi lưu"
+                    />
+                  </FormField>
+                  <div>
+                    <Button
+                      loading={busyKey === item.key}
+                      leadingIcon={<Save size={15} aria-hidden="true" />}
+                      onClick={() => requestSave(item)}
+                    >
+                      Lưu
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+      <ConfirmDialog
+        open={pendingFlag !== null}
+        onClose={busyKey ? () => undefined : () => setPendingFlag(null)}
+        onConfirm={() => pendingFlag && void performSave(pendingFlag)}
+        title="Thay đổi cờ tính năng nhạy cảm?"
+        description={`${pendingFlag?.key ?? ''} sẽ ${pendingFlag?.enabled ? 'được bật' : 'bị tắt'} cho phạm vi đã cấu hình. Có thể hoàn tác bằng một lần cập nhật khác.`}
+        confirmLabel="Áp dụng thay đổi"
+        busy={Boolean(busyKey)}
+      >
+        <Alert tone="warning">Thay đổi có thể ngắt luồng đang dùng của người dùng và được ghi vào nhật ký quản trị.</Alert>
+      </ConfirmDialog>
+    </div>
   );
 }

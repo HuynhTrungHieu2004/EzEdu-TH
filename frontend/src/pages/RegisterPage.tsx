@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
+import { useAuth } from '../hooks/useAuth';
 
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -14,6 +15,7 @@ const RegisterPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const { refresh } = useAuth();
 
   useEffect(() => {
     // If already logged in, redirect to dashboard
@@ -48,6 +50,9 @@ const RegisterPage = () => {
       if (role === 'student') {
         const data = await authApi.login({ email, password });
         localStorage.setItem('access_token', data.access_token);
+        // Xem chú thích trong LoginPage.tsx: không refresh() thì AuthProvider
+        // vẫn coi là 'anonymous' và RoleRoute sẽ đưa người dùng quay lại /login.
+        await refresh();
         navigate('/student-onboarding', { replace: true });
         return;
       }
@@ -71,7 +76,7 @@ const RegisterPage = () => {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-mark" translate="no">Ez</div>
-          <h2 className="auth-title">Đăng ký EzEdu AI</h2>
+          <h1 className="auth-title">Đăng ký EzEdu AI</h1>
           <p className="auth-subtitle">Biến học liệu thành đề thi dễ dàng</p>
         </div>
 

@@ -6,7 +6,7 @@ import type { AdminQuestionDetail, AdminQuestionUpdatePayload } from '../types/a
 import { hasPermission } from '../utils/adminPermissions';
 import { Badge, EmptyState, fmtDateTime, renderObjectRows } from './AdminContentShared';
 import { apiErrorMessage } from '../utils/apiError';
-import './AdminContentPages.css';
+import { Button, Card, CardBody, FormField, PageHeader, Textarea } from '../components/ui';
 
 export default function AdminQuestionDetailPage() {
   const { questionId = '' } = useParams();
@@ -67,63 +67,81 @@ export default function AdminQuestionDetailPage() {
     }
   };
 
-  if (loading) return <main className="admin-content-page"><EmptyState title="Đang tải" text="Đang lấy chi tiết câu hỏi." /></main>;
-  if (error || !item) return <main className="admin-content-page"><EmptyState title="Có lỗi" text={error || 'Không tìm thấy câu hỏi.'} /></main>;
+  if (loading) return <div className="ez-admin-page"><EmptyState title="Đang tải" text="Đang lấy chi tiết câu hỏi." /></div>;
+  if (error || !item) return <div className="ez-admin-page"><EmptyState title="Có lỗi" text={error || 'Không tìm thấy câu hỏi.'} /></div>;
 
   return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Chi tiết câu hỏi</h1>
-          <p>{item.id}</p>
-        </div>
-        <div className="admin-content-actions">
-          {canUpdate && <button type="button" className="admin-content-btn" onClick={() => setEditing((value) => !value)}>{editing ? 'Hủy sửa' : 'Sửa câu hỏi'}</button>}
-          <button type="button" className="admin-content-btn" onClick={() => navigate('/admin/questions')}>Quay lại</button>
-        </div>
-      </header>
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Chi tiết câu hỏi"
+        description={item.id}
+        actions={
+          <>
+            {canUpdate && <Button variant="outline" onClick={() => setEditing((value) => !value)}>{editing ? 'Hủy sửa' : 'Sửa câu hỏi'}</Button>}
+            <Button variant="outline" onClick={() => navigate('/admin/questions')}>Quay lại</Button>
+          </>
+        }
+      />
 
-      <section className="admin-content-detail">
-        <div className="admin-content-detail-grid">
-          <div className="admin-content-kv"><span>Loại / độ khó</span><strong>{item.question_type || 'Không có dữ liệu'} / {item.difficulty || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Nguồn</span><strong>{item.source_document_name || item.source_document_id || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Chủ sở hữu</span><strong>{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Citation</span><strong>{item.citation_status || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Hallucination risk</span><strong>{item.hallucination_risk || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Kiểm duyệt</span><strong><Badge tone={item.deleted_at ? 'danger' : item.moderation_status === 'approved' ? 'ok' : 'info'}>{item.deleted_at ? 'deleted' : item.moderation_status}</Badge></strong></div>
-          <div className="admin-content-kv"><span>Ngày tạo</span><strong>{fmtDateTime(item.created_at)}</strong></div>
-          <div className="admin-content-kv"><span>Bloom</span><strong>{item.bloom_level || 'Không có dữ liệu'}</strong></div>
-          <div className="admin-content-kv"><span>Tags</span><strong>{item.tags.length ? item.tags.join(', ') : 'Không có dữ liệu'}</strong></div>
-        </div>
-      </section>
+      <Card>
+        <CardBody>
+          <dl className="ez-kv-grid">
+            <div><dt>Loại / độ khó</dt><dd>{item.question_type || 'Không có dữ liệu'} / {item.difficulty || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Nguồn</dt><dd>{item.source_document_name || item.source_document_id || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Chủ sở hữu</dt><dd>{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Citation</dt><dd>{item.citation_status || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Hallucination risk</dt><dd>{item.hallucination_risk || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Kiểm duyệt</dt><dd><Badge tone={item.deleted_at ? 'danger' : item.moderation_status === 'approved' ? 'ok' : 'info'}>{item.deleted_at ? 'deleted' : item.moderation_status}</Badge></dd></div>
+            <div><dt>Ngày tạo</dt><dd>{fmtDateTime(item.created_at)}</dd></div>
+            <div><dt>Bloom</dt><dd>{item.bloom_level || 'Không có dữ liệu'}</dd></div>
+            <div><dt>Tags</dt><dd>{item.tags.length ? item.tags.join(', ') : 'Không có dữ liệu'}</dd></div>
+          </dl>
+        </CardBody>
+      </Card>
 
       {editing ? (
-        <form className="admin-content-panel" onSubmit={submit}>
-          <label className="admin-content-field"><span>Câu hỏi</span><textarea rows={5} value={question} onChange={(event) => setQuestion(event.target.value)} /></label>
-          <label className="admin-content-field"><span>Đáp án đúng</span><textarea rows={2} value={correctAnswer} onChange={(event) => setCorrectAnswer(event.target.value)} /></label>
-          <label className="admin-content-field"><span>Giải thích</span><textarea rows={5} value={explanation} onChange={(event) => setExplanation(event.target.value)} /></label>
-          <label className="admin-content-field"><span>Lý do chỉnh sửa</span><textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-          <div className="admin-content-actions" style={{ justifyContent: 'flex-end' }}>
-            <button type="submit" className="admin-content-btn" disabled={busy || !question.trim() || !correctAnswer.trim()}>{busy ? 'Đang lưu...' : 'Lưu thay đổi'}</button>
-          </div>
-        </form>
+        <Card>
+          <CardBody>
+            <form onSubmit={submit}>
+              <FormField label="Câu hỏi">
+                <Textarea rows={5} value={question} onChange={(event) => setQuestion(event.target.value)} />
+              </FormField>
+              <FormField label="Đáp án đúng">
+                <Textarea rows={2} value={correctAnswer} onChange={(event) => setCorrectAnswer(event.target.value)} />
+              </FormField>
+              <FormField label="Giải thích">
+                <Textarea rows={5} value={explanation} onChange={(event) => setExplanation(event.target.value)} />
+              </FormField>
+              <FormField label="Lý do chỉnh sửa">
+                <Textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
+              </FormField>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button type="submit" disabled={busy || !question.trim() || !correctAnswer.trim()}>{busy ? 'Đang lưu...' : 'Lưu thay đổi'}</Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
       ) : (
-        <section className="admin-content-panel">
-          <h2>Nội dung</h2>
-          <p>{item.question}</p>
-          <h3>Đáp án</h3>
-          <p>{item.correct_answer}</p>
-          <h3>Giải thích</h3>
-          <p>{item.explanation || 'Không có dữ liệu'}</p>
-          <h3>Lựa chọn</h3>
-          {item.options ? renderObjectRows(item.options) : <p className="admin-content-muted">Không có dữ liệu</p>}
-        </section>
+        <Card>
+          <CardBody>
+            <h2>Nội dung</h2>
+            <p>{item.question}</p>
+            <h3>Đáp án</h3>
+            <p>{item.correct_answer}</p>
+            <h3>Giải thích</h3>
+            <p>{item.explanation || 'Không có dữ liệu'}</p>
+            <h3>Lựa chọn</h3>
+            {item.options ? renderObjectRows(item.options) : <p className="ez-muted">Không có dữ liệu</p>}
+          </CardBody>
+        </Card>
       )}
 
-      <section className="admin-content-panel">
-        <h2>Evidence / source chunk</h2>
-        {item.evidence.length ? renderObjectRows(item.evidence) : <p className="admin-content-muted">Backend không tìm thấy chunk nguồn cho câu hỏi này.</p>}
-      </section>
-    </main>
+      <Card>
+        <CardBody>
+          <h2>Evidence / source chunk</h2>
+          {item.evidence.length ? renderObjectRows(item.evidence) : <p className="ez-muted">Backend không tìm thấy chunk nguồn cho câu hỏi này.</p>}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

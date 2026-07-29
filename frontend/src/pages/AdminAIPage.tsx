@@ -3,7 +3,25 @@ import { adminAiApi } from '../api/adminAiApi';
 import type { AIQuotaHistoryResponse, AIQuotaView, AIUsageDashboardResponse, AIUsageFilters, AIUsageStatus } from '../types/adminAi';
 import { Badge, EmptyState, Pagination, dateEnd, dateStart, fmtDateTime, fmtNumber, renderObjectRows } from './AdminContentShared';
 import { apiErrorMessage, isCanceledError } from '../utils/apiError';
-import './AdminContentPages.css';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  ConfirmDialog,
+  DataTable,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Select,
+  StatGrid,
+  StatTile,
+  Textarea,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
 
 function money(value: number | null | undefined, currency = 'USD') {
   return `${(value ?? 0).toLocaleString('vi-VN', { maximumFractionDigits: 6 })} ${currency}`;
@@ -13,15 +31,7 @@ function ms(value: number | null | undefined) {
   return value == null ? 'Không có dữ liệu' : `${fmtNumber(Math.round(value))} ms`;
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="admin-content-kv">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {sub && <small className="admin-content-muted">{sub}</small>}
-    </div>
-  );
-}
+type UsageItem = AIUsageDashboardResponse['items'][number];
 
 export default function AdminAIPage() {
   const [data, setData] = useState<AIUsageDashboardResponse | null>(null);
@@ -47,6 +57,8 @@ export default function AdminAIPage() {
   const [editingRole, setEditingRole] = useState('');
   const [roleQuotaJson, setRoleQuotaJson] = useState('{}');
   const [roleQuotaReason, setRoleQuotaReason] = useState('');
+  const [pendingAction, setPendingAction] = useState<'role-default' | 'quota-save' | 'quota-reset' | null>(null);
+  const [resetConfirmation, setResetConfirmation] = useState('');
 
   const params = useMemo<AIUsageFilters>(() => ({
     page,
@@ -108,6 +120,7 @@ export default function AdminAIPage() {
       setRoleDefaults((prev) => ({ ...prev, [result.role]: result.quota }));
       setEditingRole('');
       setRoleQuotaReason('');
+      setPendingAction(null);
     } catch (err: unknown) {
       setRoleDefaultsError(apiErrorMessage(err, 'Không lưu được quota mặc định.'));
     } finally {
@@ -142,6 +155,7 @@ export default function AdminAIPage() {
       setQuotaJson(JSON.stringify(result.quota.override_quota || {}, null, 2));
       setQuotaReason('');
       setQuotaHistory(await adminAiApi.quotaHistory(quota.user_id));
+      setPendingAction(null);
     } catch (err: unknown) {
       setQuotaError(apiErrorMessage(err, 'Không lưu được quota.'));
     } finally {
@@ -159,6 +173,8 @@ export default function AdminAIPage() {
       setQuotaJson(JSON.stringify(result.quota.override_quota || {}, null, 2));
       setQuotaReason('');
       setQuotaHistory(await adminAiApi.quotaHistory(quota.user_id));
+      setPendingAction(null);
+      setResetConfirmation('');
     } catch (err: unknown) {
       setQuotaError(apiErrorMessage(err, 'Không reset được quota.'));
     } finally {
@@ -166,147 +182,287 @@ export default function AdminAIPage() {
     }
   };
 
-  return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Quản lý AI</h1>
-          <p>Theo dõi request, token, quota, lỗi, latency và chi phí ước tính. Không hiển thị API key.</p>
-        </div>
-      </header>
+  const usageColumns: DataTableColumn<UsageItem>[] = [
+    { key: 'created_at', label: 'Thời gian', render: (item) => fmtDateTime(item.created_at) },
+    { key: 'user', label: 'User', render: (item) => item.user_email || item.user_id },
+    { key: 'feature', label: 'Feature', render: (item) => item.feature },
+    {
+      key: 'provider_model',
+      label: 'Provider/model',
+      render: (item) => (
+        <>
+          {item.provider}
+          <br />
+          <span className="ez-muted">{item.model}</span>
+        </>
+      ),
+    },
+    {
+      key: 'tokens',
+      label: 'Token',
+      render: (item) => (
+        <>
+          {fmtNumber(item.total_tokens)}
+          <br />
+          <span className="ez-muted">In {fmtNumber(item.input_tokens)} · Out {fmtNumber(item.output_tokens)}</span>
+        </>
+      ),
+    },
+    { key: 'cost', label: 'Cost', render: (item) => money(item.estimated_cost, item.currency) },
+    { key: 'latency', label: 'Latency', render: (item) => ms(item.latency_ms) },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (item) => (
+        <Badge tone={item.status === 'success' ? 'ok' : 'danger'}>
+          {item.status}{item.error_code ? ` · ${item.error_code}` : ''}
+        </Badge>
+      ),
+    },
+    { key: 'request_id', label: 'Request', render: (item) => item.request_id || 'Không có dữ liệu' },
+  ];
 
-      <section className="admin-content-toolbar">
-        <label className="admin-content-field"><span>Từ ngày</span><input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Đến ngày</span><input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>User ID</span><input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Provider</span><input value={provider} onChange={(event) => { setProvider(event.target.value); setPage(1); }} placeholder="google, groq, mixed" /></label>
-        <label className="admin-content-field"><span>Model</span><input value={model} onChange={(event) => { setModel(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Feature</span><input value={feature} onChange={(event) => { setFeature(event.target.value); setPage(1); }} placeholder="advanced_chat..." /></label>
-        <label className="admin-content-field"><span>Status</span><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">Tất cả</option><option value="success">Success</option><option value="failure">Failure</option></select></label>
-      </section>
+  return (
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Quản lý AI"
+        description="Theo dõi lượt gọi, token, quota, lỗi, độ trễ và chi phí ước tính. Không hiển thị khóa API."
+      />
+
+      <Card>
+        <CardBody>
+          <FilterBar columns={4}>
+            <FormField label="Từ ngày">
+              <Input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Đến ngày">
+              <Input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="User ID">
+              <Input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Provider">
+              <Input value={provider} onChange={(event) => { setProvider(event.target.value); setPage(1); }} placeholder="google, groq, mixed" />
+            </FormField>
+            <FormField label="Model">
+              <Input value={model} onChange={(event) => { setModel(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Feature">
+              <Input value={feature} onChange={(event) => { setFeature(event.target.value); setPage(1); }} placeholder="advanced_chat..." />
+            </FormField>
+            <FormField label="Status">
+              <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+                <option value="">Tất cả</option>
+                <option value="success">Success</option>
+                <option value="failure">Failure</option>
+              </Select>
+            </FormField>
+          </FilterBar>
+        </CardBody>
+      </Card>
 
       {error && <EmptyState title="Có lỗi" text={error} />}
       {loading && <EmptyState title="Đang tải" text="Đang lấy dữ liệu AI usage từ backend." />}
 
       {!loading && data && (
         <>
-          <section className="admin-content-detail">
-            <div className="admin-content-detail-grid">
-              <Stat label="Tổng request" value={fmtNumber(data.summary.total_requests)} />
-              <Stat label="Thành công" value={fmtNumber(data.summary.success_requests)} />
-              <Stat label="Thất bại" value={fmtNumber(data.summary.failed_requests)} />
-              <Stat label="Tổng token" value={fmtNumber(data.summary.total_tokens)} sub={`Input ${fmtNumber(data.summary.input_tokens)} · Output ${fmtNumber(data.summary.output_tokens)}`} />
-              <Stat label="Chi phí ước tính" value={money(data.summary.estimated_cost, data.summary.currency)} sub="Không phải hóa đơn chính thức" />
-              <Stat label="Độ trễ TB" value={ms(data.summary.avg_latency_ms)} />
-              <Stat label="P50 / P95 / P99" value={`${ms(data.summary.p50_latency_ms)} / ${ms(data.summary.p95_latency_ms)} / ${ms(data.summary.p99_latency_ms)}`} />
-            </div>
-          </section>
+          <StatGrid aria-label="Thống kê AI usage">
+            <StatTile label="Tổng request" value={fmtNumber(data.summary.total_requests)} />
+            <StatTile label="Thành công" value={fmtNumber(data.summary.success_requests)} />
+            <StatTile label="Thất bại" value={fmtNumber(data.summary.failed_requests)} />
+            <StatTile
+              label="Tổng token"
+              value={fmtNumber(data.summary.total_tokens)}
+              hint={`Input ${fmtNumber(data.summary.input_tokens)} · Output ${fmtNumber(data.summary.output_tokens)}`}
+            />
+            <StatTile
+              label="Chi phí ước tính"
+              value={money(data.summary.estimated_cost, data.summary.currency)}
+              hint="Không phải hóa đơn chính thức"
+            />
+            <StatTile label="Độ trễ TB" value={ms(data.summary.avg_latency_ms)} />
+            <StatTile
+              label="P50 / P95 / P99"
+              value={`${ms(data.summary.p50_latency_ms)} / ${ms(data.summary.p95_latency_ms)} / ${ms(data.summary.p99_latency_ms)}`}
+            />
+          </StatGrid>
 
           {data.warnings.length > 0 && (
-            <section className="admin-content-panel">
-              <h2>Cảnh báo</h2>
-              <div className="admin-content-actions">
-                {data.warnings.map((item) => <Badge key={`${item.type}-${item.message}`} tone={item.severity === 'critical' ? 'danger' : item.severity === 'info' ? 'info' : 'danger'}>{item.message}</Badge>)}
-              </div>
-            </section>
+            <Card>
+              <CardHeader><CardTitle as="h2">Cảnh báo</CardTitle></CardHeader>
+              <CardBody>
+                <div className="ez-row ez-row-wrap">
+                  {data.warnings.map((item) => (
+                    <Badge key={`${item.type}-${item.message}`} tone={item.severity === 'critical' ? 'danger' : item.severity === 'info' ? 'info' : 'danger'}>
+                      {item.message}
+                    </Badge>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
           )}
 
-          <section className="admin-content-detail-grid">
-            <div className="admin-content-panel">
-              <h2>User dùng nhiều</h2>
-              {data.top_users.length ? renderObjectRows(Object.fromEntries(data.top_users.map((row) => [row.label || row.key, `${fmtNumber(row.request_count)} req · ${fmtNumber(row.total_tokens)} token`])) as Record<string, unknown>) : <p className="admin-content-muted">Không có dữ liệu</p>}
-            </div>
-            <div className="admin-content-panel">
-              <h2>Model dùng nhiều</h2>
-              {data.top_models.length ? renderObjectRows(Object.fromEntries(data.top_models.map((row) => [row.key, `${fmtNumber(row.request_count)} req · ${money(row.estimated_cost)}`])) as Record<string, unknown>) : <p className="admin-content-muted">Không có dữ liệu</p>}
-            </div>
-            <div className="admin-content-panel">
-              <h2>Feature tốn token</h2>
-              {data.top_features.length ? renderObjectRows(Object.fromEntries(data.top_features.map((row) => [row.key, `${fmtNumber(row.total_tokens)} token · ${fmtNumber(row.request_count)} req`])) as Record<string, unknown>) : <p className="admin-content-muted">Không có dữ liệu</p>}
-            </div>
-          </section>
+          <Card>
+            <CardBody>
+              <div className="ez-grid ez-grid-3">
+                <Card variant="muted">
+                  <CardHeader><CardTitle as="h3">User dùng nhiều</CardTitle></CardHeader>
+                  <CardBody>
+                    {data.top_users.length
+                      ? renderObjectRows(Object.fromEntries(data.top_users.map((row) => [row.label || row.key, `${fmtNumber(row.request_count)} req · ${fmtNumber(row.total_tokens)} token`])) as Record<string, unknown>)
+                      : <p className="ez-muted">Không có dữ liệu</p>}
+                  </CardBody>
+                </Card>
+                <Card variant="muted">
+                  <CardHeader><CardTitle as="h3">Model dùng nhiều</CardTitle></CardHeader>
+                  <CardBody>
+                    {data.top_models.length
+                      ? renderObjectRows(Object.fromEntries(data.top_models.map((row) => [row.key, `${fmtNumber(row.request_count)} req · ${money(row.estimated_cost)}`])) as Record<string, unknown>)
+                      : <p className="ez-muted">Không có dữ liệu</p>}
+                  </CardBody>
+                </Card>
+                <Card variant="muted">
+                  <CardHeader><CardTitle as="h3">Feature tốn token</CardTitle></CardHeader>
+                  <CardBody>
+                    {data.top_features.length
+                      ? renderObjectRows(Object.fromEntries(data.top_features.map((row) => [row.key, `${fmtNumber(row.total_tokens)} token · ${fmtNumber(row.request_count)} req`])) as Record<string, unknown>)
+                      : <p className="ez-muted">Không có dữ liệu</p>}
+                  </CardBody>
+                </Card>
+              </div>
+            </CardBody>
+          </Card>
 
-          <div className="admin-content-table-wrap">
-            <table className="admin-content-table">
-              <thead><tr><th>Thời gian</th><th>User</th><th>Feature</th><th>Provider/model</th><th>Token</th><th>Cost</th><th>Latency</th><th>Status</th><th>Request</th></tr></thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Thời gian">{fmtDateTime(item.created_at)}</td>
-                    <td data-label="User">{item.user_email || item.user_id}</td>
-                    <td data-label="Feature">{item.feature}</td>
-                    <td data-label="Provider/model">{item.provider}<br /><span className="admin-content-muted">{item.model}</span></td>
-                    <td data-label="Token">{fmtNumber(item.total_tokens)}<br /><span className="admin-content-muted">In {fmtNumber(item.input_tokens)} · Out {fmtNumber(item.output_tokens)}</span></td>
-                    <td data-label="Cost">{money(item.estimated_cost, item.currency)}</td>
-                    <td data-label="Latency">{ms(item.latency_ms)}</td>
-                    <td data-label="Status"><Badge tone={item.status === 'success' ? 'ok' : 'danger'}>{item.status}{item.error_code ? ` · ${item.error_code}` : ''}</Badge></td>
-                    <td data-label="Request">{item.request_id || 'Không có dữ liệu'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
+          <Card>
+            <CardBody>
+              <DataTable columns={usageColumns} data={data.items} rowKey={(item) => item.id} minWidth={1100} />
+              <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
+            </CardBody>
+          </Card>
         </>
       )}
 
-      <section className="admin-content-panel">
-        <h2>Quota mặc định theo role</h2>
-        <p className="admin-content-muted">Áp dụng ngay không cần khởi động lại server, ghi đè lên giá trị mặc định trong code.</p>
-        {roleDefaultsError && <p className="admin-content-muted">{roleDefaultsError}</p>}
-        <div className="admin-content-detail-grid">
-          {Object.keys(roleDefaults).sort().map((role) => (
-            <div key={role} className="admin-content-panel">
-              <h3>{role}</h3>
-              {editingRole === role ? (
-                <>
-                  <label className="admin-content-field"><span>Quota JSON</span><textarea rows={8} value={roleQuotaJson} onChange={(event) => setRoleQuotaJson(event.target.value)} /></label>
-                  <label className="admin-content-field"><span>Lý do</span><textarea rows={3} value={roleQuotaReason} onChange={(event) => setRoleQuotaReason(event.target.value)} /></label>
-                  <div className="admin-content-actions">
-                    <button type="button" className="admin-content-btn" disabled={busy || !roleQuotaReason.trim()} onClick={saveRoleDefault}>Lưu</button>
-                    <button type="button" className="admin-content-btn" disabled={busy} onClick={() => setEditingRole('')}>Huỷ</button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {renderObjectRows(roleDefaults[role])}
-                  <button type="button" className="admin-content-btn" onClick={() => startEditRoleDefault(role)}>Sửa</button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      <Card>
+        <CardHeader><CardTitle as="h2">Quota mặc định theo role</CardTitle></CardHeader>
+        <CardBody>
+          <p className="ez-muted">Áp dụng ngay không cần khởi động lại server, ghi đè lên giá trị mặc định trong code.</p>
+          {roleDefaultsError && <p className="ez-muted">{roleDefaultsError}</p>}
+          <div className="ez-grid ez-grid-3">
+            {Object.keys(roleDefaults).sort().map((role) => (
+              <Card key={role} variant="muted">
+                <CardHeader><CardTitle as="h3">{role}</CardTitle></CardHeader>
+                <CardBody>
+                  {editingRole === role ? (
+                    <>
+                      <FormField label="Quota JSON">
+                        <Textarea rows={8} value={roleQuotaJson} onChange={(event) => setRoleQuotaJson(event.target.value)} />
+                      </FormField>
+                      <FormField label="Lý do">
+                        <Textarea rows={3} value={roleQuotaReason} onChange={(event) => setRoleQuotaReason(event.target.value)} />
+                      </FormField>
+                      <div className="ez-row ez-row-wrap">
+                        <Button variant="primary" disabled={busy || !roleQuotaReason.trim()} onClick={() => setPendingAction('role-default')}>Lưu</Button>
+                        <Button variant="outline" disabled={busy} onClick={() => setEditingRole('')}>Huỷ</Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {renderObjectRows(roleDefaults[role])}
+                      <Button variant="outline" onClick={() => startEditRoleDefault(role)}>Sửa</Button>
+                    </>
+                  )}
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
 
-      <section className="admin-content-panel">
-        <h2>Quota theo user</h2>
-        <div className="admin-content-actions">
-          <label className="admin-content-field" style={{ minWidth: 280 }}><span>User ID</span><input value={quotaUserId} onChange={(event) => setQuotaUserId(event.target.value)} /></label>
-          <button type="button" className="admin-content-btn" disabled={busy || !quotaUserId.trim()} onClick={loadQuota}>Xem quota</button>
-        </div>
-        {quotaError && <p className="admin-content-muted">{quotaError}</p>}
-        {quota && (
-          <div className="admin-content-detail-grid" style={{ marginTop: 14 }}>
-            <div className="admin-content-panel"><h3>Usage hiện tại</h3>{renderObjectRows(quota.usage)}</div>
-            <div className="admin-content-panel"><h3>Quota hiệu lực</h3>{renderObjectRows(quota.effective_quota)}</div>
-            <div className="admin-content-panel">
-              <h3>Override</h3>
-              <label className="admin-content-field"><span>Quota JSON</span><textarea rows={8} value={quotaJson} onChange={(event) => setQuotaJson(event.target.value)} /></label>
-              <label className="admin-content-field"><span>Lý do</span><textarea rows={3} value={quotaReason} onChange={(event) => setQuotaReason(event.target.value)} /></label>
-              <div className="admin-content-actions">
-                <button type="button" className="admin-content-btn" disabled={busy || !quotaReason.trim()} onClick={saveQuota}>Lưu quota</button>
-                <button type="button" className="admin-content-btn admin-content-btn--danger" disabled={busy || !quotaReason.trim()} onClick={resetQuota}>Reset quota</button>
-              </div>
+      <Card>
+        <CardHeader><CardTitle as="h2">Quota theo user</CardTitle></CardHeader>
+        <CardBody>
+          <div className="ez-row ez-row-wrap">
+            <FormField label="User ID">
+              <Input value={quotaUserId} onChange={(event) => setQuotaUserId(event.target.value)} style={{ minWidth: 280 }} />
+            </FormField>
+            <Button variant="primary" disabled={busy || !quotaUserId.trim()} onClick={loadQuota}>Xem quota</Button>
+          </div>
+          {quotaError && <p className="ez-muted">{quotaError}</p>}
+          {quota && (
+            <div className="ez-grid ez-grid-3" style={{ marginTop: 14 }}>
+              <Card variant="muted">
+                <CardHeader><CardTitle as="h3">Usage hiện tại</CardTitle></CardHeader>
+                <CardBody>{renderObjectRows(quota.usage)}</CardBody>
+              </Card>
+              <Card variant="muted">
+                <CardHeader><CardTitle as="h3">Quota hiệu lực</CardTitle></CardHeader>
+                <CardBody>{renderObjectRows(quota.effective_quota)}</CardBody>
+              </Card>
+              <Card variant="muted">
+                <CardHeader><CardTitle as="h3">Override</CardTitle></CardHeader>
+                <CardBody>
+                  <FormField label="Quota JSON">
+                    <Textarea rows={8} value={quotaJson} onChange={(event) => setQuotaJson(event.target.value)} />
+                  </FormField>
+                  <FormField label="Lý do">
+                    <Textarea rows={3} value={quotaReason} onChange={(event) => setQuotaReason(event.target.value)} />
+                  </FormField>
+                  <div className="ez-row ez-row-wrap">
+                    <Button variant="primary" disabled={busy || !quotaReason.trim()} onClick={() => setPendingAction('quota-save')}>Lưu quota</Button>
+                    <Button variant="danger" disabled={busy || !quotaReason.trim()} onClick={() => setPendingAction('quota-reset')}>Reset quota</Button>
+                  </div>
+                </CardBody>
+              </Card>
             </div>
-          </div>
+          )}
+          {quotaHistory && quotaHistory.items.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <CardTitle as="h3">Lịch sử đổi quota</CardTitle>
+              {renderObjectRows(Object.fromEntries(quotaHistory.items.map((item) => [fmtDateTime(item.timestamp), `${item.admin_email_snapshot} · ${item.reason || 'Không có lý do'}`])) as Record<string, unknown>)}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        onClose={busy ? () => undefined : () => { setPendingAction(null); setResetConfirmation(''); }}
+        onConfirm={() => {
+          if (pendingAction === 'role-default') void saveRoleDefault();
+          else if (pendingAction === 'quota-save') void saveQuota();
+          else if (pendingAction === 'quota-reset') void resetQuota();
+        }}
+        title={pendingAction === 'role-default'
+          ? 'Thay quota mặc định theo vai trò?'
+          : pendingAction === 'quota-save'
+            ? 'Thay quota người dùng?'
+            : 'Reset quota người dùng?'}
+        description={pendingAction === 'role-default'
+          ? `Vai trò ${editingRole} sẽ nhận quota mặc định mới ngay lập tức. Có thể thay đổi lại bằng một lần lưu khác.`
+          : pendingAction === 'quota-save'
+            ? `Người dùng ${quota?.user_id ?? ''} sẽ nhận quota ghi đè mới ngay lập tức. Có thể thay đổi hoặc reset sau.`
+            : `Mọi quota ghi đè của người dùng ${quota?.user_id ?? ''} sẽ bị xóa và quota mặc định sẽ có hiệu lực ngay. Không thể khôi phục tự động giá trị cũ.`}
+        confirmLabel={pendingAction === 'quota-reset' ? 'Reset quota' : 'Áp dụng'}
+        confirmDisabled={pendingAction === 'quota-reset' && resetConfirmation !== 'RESET'}
+        busy={busy}
+      >
+        <Alert tone={pendingAction === 'quota-reset' ? 'error' : 'warning'}>
+          Thao tác ảnh hưởng giới hạn sử dụng AI và được ghi vào nhật ký quản trị.
+        </Alert>
+        {pendingAction === 'quota-reset' && (
+          <FormField
+            label="Nhập RESET để xác nhận"
+            error={resetConfirmation && resetConfirmation !== 'RESET' ? 'Nội dung xác nhận chưa đúng.' : undefined}
+          >
+            <Input
+              value={resetConfirmation}
+              onChange={(event) => setResetConfirmation(event.target.value)}
+              autoComplete="off"
+              invalid={Boolean(resetConfirmation && resetConfirmation !== 'RESET')}
+            />
+          </FormField>
         )}
-        {quotaHistory && quotaHistory.items.length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <h3>Lịch sử đổi quota</h3>
-            {renderObjectRows(Object.fromEntries(quotaHistory.items.map((item) => [fmtDateTime(item.timestamp), `${item.admin_email_snapshot} · ${item.reason || 'Không có lý do'}`])) as Record<string, unknown>)}
-          </div>
-        )}
-      </section>
-    </main>
+      </ConfirmDialog>
+    </div>
   );
 }

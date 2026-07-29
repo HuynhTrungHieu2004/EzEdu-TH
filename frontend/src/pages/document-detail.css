@@ -1,0 +1,180 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   EzEdu AI — CHI TIẾT HỌC LIỆU
+   Chỉ dùng token. Bổ sung cho các primitive trong components/ui/ui.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.dd-overview {
+  display: grid;
+  gap: var(--ez-space-6);
+  margin-bottom: var(--ez-space-8);
+}
+
+@media (min-width: 900px) {
+  .dd-overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+}
+
+.dd-video {
+  overflow: hidden;
+  border-radius: var(--ez-radius-lg);
+  background-color: #000;
+  margin-bottom: var(--ez-space-4);
+}
+
+.dd-video video {
+  width: 100%;
+  max-height: 320px;
+  display: block;
+}
+
+.dd-meta-grid {
+  display: grid;
+  gap: var(--ez-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+  .dd-meta-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.dd-meta-item {
+  padding: var(--ez-space-3);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+  font-size: var(--ez-text-body-sm);
+}
+
+.dd-meta-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-semibold);
+  color: var(--ez-text-muted);
+}
+
+/* Quy trình xử lý — luôn hiện, không nằm trong tab vì đây là trạng thái chính */
+.dd-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-5);
+}
+
+.dd-step {
+  display: flex;
+  gap: var(--ez-space-4);
+}
+
+.dd-step-marker {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ez-radius-full);
+  border: 1px solid var(--ez-border-strong);
+  color: var(--ez-text-muted);
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-bold);
+}
+
+.dd-step[data-status='done'] .dd-step-marker {
+  background-color: var(--ez-success);
+  border-color: var(--ez-success);
+  color: var(--ez-text-on-brand);
+}
+
+.dd-step[data-status='active'] .dd-step-marker {
+  background-color: var(--ez-warning);
+  border-color: var(--ez-warning);
+  color: var(--ez-text-on-brand);
+}
+
+.dd-step-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dd-step-title {
+  font-size: var(--ez-text-body-sm);
+  font-weight: var(--ez-weight-semibold);
+  color: var(--ez-text);
+}
+
+.dd-step-desc {
+  font-size: var(--ez-text-caption);
+  color: var(--ez-text-secondary);
+  line-height: var(--ez-leading-snug);
+}
+
+.dd-step-status {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  margin-top: var(--ez-space-2);
+  font-size: var(--ez-text-caption);
+  color: var(--ez-warning-text);
+}
+
+.dd-step-action {
+  margin-top: var(--ez-space-2);
+}
+
+/* Nội dung trích xuất */
+.dd-content-box {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: var(--ez-space-4);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+  white-space: pre-wrap;
+  font-size: var(--ez-text-body-sm);
+  line-height: var(--ez-leading-body);
+  color: var(--ez-text);
+}
+
+/* Tìm kiếm */
+.dd-search-form {
+  display: flex;
+  gap: var(--ez-space-3);
+  margin-bottom: var(--ez-space-5);
+}
+
+.dd-search-form .ez-input { flex: 1; }
+
+.dd-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+}
+
+.dd-search-result {
+  padding: var(--ez-space-3);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+}
+
+.dd-search-result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ez-space-3);
+  margin-bottom: var(--ez-space-2);
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-semibold);
+}
+
+.dd-search-result-score { color: var(--ez-success-text); }
+
+.dd-search-result-text {
+  margin: 0;
+  font-size: var(--ez-text-body-sm);
+  font-style: italic;
+  color: var(--ez-text-secondary);
+  line-height: var(--ez-leading-snug);
+}
+
+@media (max-width: 600px) {
+  .dd-search-form { flex-direction: column; }
+}

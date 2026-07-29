@@ -2,8 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import { systemSettingsApi } from '../api/systemSettingsApi';
 import type { SettingCategory, SystemSettingItem } from '../types/systemSettings';
-import { EmptyState, fmtDateTime } from './AdminContentShared';
+import { fmtDateTime } from './AdminContentShared';
 import { apiErrorMessage } from '../utils/apiError';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  ConfirmDialog,
+  EmptyState,
+  FormField,
+  Input,
+  PageHeader,
+  Select,
+  SectionHeader,
+} from '../components/ui';
 import './AdminContentPages.css';
 
 const CATEGORY_LABELS: Record<SettingCategory, string> = {
@@ -46,6 +59,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState('');
   const [error, setError] = useState('');
+  const [pendingSetting, setPendingSetting] = useState<SystemSettingItem | null>(null);
 
   const grouped = useMemo(() => {
     const map = new Map<SettingCategory, SystemSettingItem[]>();
@@ -73,13 +87,8 @@ export default function AdminSettingsPage() {
     queueMicrotask(() => load());
   }, []);
 
-  const save = async (item: SystemSettingItem) => {
+  const performSave = async (item: SystemSettingItem) => {
     const reason = (reasons[item.key] || '').trim();
-    if (!reason) {
-      setError('Cần nhập lý do trước khi lưu cấu hình.');
-      return;
-    }
-    if (DANGEROUS_SETTINGS.has(item.key) && !window.confirm(`Xác nhận thay đổi cấu hình ${item.key}?`)) return;
     setSavingKey(item.key);
     setError('');
     try {
@@ -87,6 +96,7 @@ export default function AdminSettingsPage() {
       setItems((prev) => prev.map((row) => (row.key === item.key ? updated : row)));
       setEdits((prev) => ({ ...prev, [item.key]: valueToInput(updated) }));
       setReasons((prev) => ({ ...prev, [item.key]: '' }));
+      setPendingSetting(null);
     } catch (err: unknown) {
       setError(apiErrorMessage(err, 'Không lưu được setting.'));
     } finally {
@@ -94,57 +104,96 @@ export default function AdminSettingsPage() {
     }
   };
 
-  return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>System Settings</h1>
-          <p>Thay đổi cấu hình runtime an toàn, không lưu secret và không cần sửa .env/source code.</p>
-        </div>
-      </header>
+  const requestSave = (item: SystemSettingItem) => {
+    if (!(reasons[item.key] || '').trim()) {
+      setError('Cần nhập lý do trước khi lưu cấu hình.');
+      return;
+    }
+    if (DANGEROUS_SETTINGS.has(item.key)) {
+      setPendingSetting(item);
+      return;
+    }
+    void performSave(item);
+  };
 
-      {error && <EmptyState title="Có lỗi" text={String(error)} />}
-      {loading && <EmptyState title="Đang tải" text="Đang đọc system_settings từ backend." />}
+  return (
+    <div className="admin-content-page">
+      <PageHeader
+        title="Cấu hình hệ thống"
+        description="Thay đổi cấu hình vận hành an toàn; không hiển thị hoặc lưu thông tin bí mật."
+      />
+
+      {error && <EmptyState title="Có lỗi" description={String(error)} />}
+      {loading && <EmptyState title="Đang tải" description="Đang tải cấu hình hệ thống…" />}
 
       {!loading && Array.from(grouped.entries()).map(([category, rows]) => (
-        <section className="admin-content-panel" key={category}>
-          <h2>{CATEGORY_LABELS[category]}</h2>
-          <div className="admin-settings-list">
+        <section key={category} style={{ marginBottom: 'var(--ez-space-6)' }}>
+          <SectionHeader title={CATEGORY_LABELS[category]} />
+          <div className="ez-stack">
             {rows.map((item) => {
               const dirty = edits[item.key] !== valueToInput(item);
               return (
-                <article className="admin-settings-row" key={item.key}>
-                  <div>
-                    <strong>{item.key}</strong>
-                    <p className="admin-content-muted">{item.description}</p>
-                    <small className="admin-content-muted">
-                      {item.value_type} · {item.is_public ? 'public' : 'private'} · cập nhật {fmtDateTime(item.updated_at)}
-                    </small>
-                  </div>
-                  <label className="admin-content-field">
-                    <span>Giá trị</span>
-                    {item.value_type === 'bool' ? (
-                      <select value={edits[item.key] ?? valueToInput(item)} onChange={(event) => setEdits({ ...edits, [item.key]: event.target.value })}>
-                        <option value="true">Bật</option>
-                        <option value="false">Tắt</option>
-                      </select>
-                    ) : (
-                      <input value={edits[item.key] ?? valueToInput(item)} onChange={(event) => setEdits({ ...edits, [item.key]: event.target.value })} />
-                    )}
-                  </label>
-                  <label className="admin-content-field">
-                    <span>Lý do</span>
-                    <input value={reasons[item.key] || ''} onChange={(event) => setReasons({ ...reasons, [item.key]: event.target.value })} placeholder="Bắt buộc khi lưu" />
-                  </label>
-                  <button type="button" className="admin-content-btn admin-content-btn--primary" disabled={!dirty || savingKey === item.key} onClick={() => save(item)}>
-                    <Save size={15} aria-hidden="true" /> Lưu
-                  </button>
-                </article>
+                <Card key={item.key}>
+                  <CardBody className="ez-stack">
+                    <div>
+                      <strong>{item.key}</strong>
+                      <p className="admin-content-muted">{item.description}</p>
+                      <small className="admin-content-muted">
+                        {item.value_type} · {item.is_public ? 'public' : 'private'} · cập nhật {fmtDateTime(item.updated_at)}
+                      </small>
+                    </div>
+                    <FormField label="Giá trị">
+                      {item.value_type === 'bool' ? (
+                        <Select
+                          value={edits[item.key] ?? valueToInput(item)}
+                          onChange={(event) => setEdits({ ...edits, [item.key]: event.target.value })}
+                          options={[
+                            { value: 'true', label: 'Bật' },
+                            { value: 'false', label: 'Tắt' },
+                          ]}
+                        />
+                      ) : (
+                        <Input
+                          value={edits[item.key] ?? valueToInput(item)}
+                          onChange={(event) => setEdits({ ...edits, [item.key]: event.target.value })}
+                        />
+                      )}
+                    </FormField>
+                    <FormField label="Lý do">
+                      <Input
+                        value={reasons[item.key] || ''}
+                        onChange={(event) => setReasons({ ...reasons, [item.key]: event.target.value })}
+                        placeholder="Bắt buộc khi lưu"
+                      />
+                    </FormField>
+                    <div>
+                      <Button
+                        disabled={!dirty}
+                        loading={savingKey === item.key}
+                        leadingIcon={<Save size={15} aria-hidden="true" />}
+                        onClick={() => requestSave(item)}
+                      >
+                        Lưu
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
               );
             })}
           </div>
         </section>
       ))}
-    </main>
+      <ConfirmDialog
+        open={pendingSetting !== null}
+        onClose={savingKey ? () => undefined : () => setPendingSetting(null)}
+        onConfirm={() => pendingSetting && void performSave(pendingSetting)}
+        title="Thay đổi cấu hình nhạy cảm?"
+        description={`Cấu hình ${pendingSetting?.key ?? ''} sẽ được áp dụng ngay cho hệ thống. Có thể hoàn tác bằng cách lưu lại giá trị cũ; hệ thống không tự hoàn tác.`}
+        confirmLabel="Áp dụng thay đổi"
+        busy={Boolean(savingKey)}
+      >
+        <Alert tone="warning">Thay đổi có thể ảnh hưởng người dùng đang hoạt động và được ghi vào nhật ký quản trị.</Alert>
+      </ConfirmDialog>
+    </div>
   );
 }

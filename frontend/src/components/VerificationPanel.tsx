@@ -1,4 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle2,
+  ClipboardList,
+  Hash,
+  HelpCircle,
+  Hourglass,
+  Lightbulb,
+  Loader,
+  RefreshCw,
+  Scissors,
+  Search,
+  Type,
+  XCircle,
+  Zap,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { verificationApi } from '../api/verificationApi';
 import type { VerificationIssue, VerificationSession, VerificationResolutionAction } from '../api/verificationApi';
 import IssueCard from './IssueCard';
@@ -12,17 +30,31 @@ interface VerificationPanelProps {
 }
 
 const ISSUE_TYPE_LABELS: Record<string, string> = {
-  ocr_error: '🔤 Lỗi OCR',
-  factual_error: '❌ Sai kiến thức',
-  suspicious_number: '🔢 Số liệu nghi vấn',
-  terminology_error: '📚 Sai thuật ngữ',
-  internal_contradiction: '⚡ Mâu thuẫn nội bộ',
-  incomplete_content: '✂️ Thiếu nội dung',
-  outdated_information: '⏳ Thông tin lỗi thời',
-  missing_context: '💡 Thiếu ngữ cảnh',
-  misleading_statement: '⚠️ Gây hiểu nhầm',
-  unsupported_claim: '❓ Thiếu bằng chứng',
-  needs_verification: '🔎 Cần kiểm chứng',
+  ocr_error: 'Lỗi OCR',
+  factual_error: 'Sai kiến thức',
+  suspicious_number: 'Số liệu nghi vấn',
+  terminology_error: 'Sai thuật ngữ',
+  internal_contradiction: 'Mâu thuẫn nội bộ',
+  incomplete_content: 'Thiếu nội dung',
+  outdated_information: 'Thông tin lỗi thời',
+  missing_context: 'Thiếu ngữ cảnh',
+  misleading_statement: 'Gây hiểu nhầm',
+  unsupported_claim: 'Thiếu bằng chứng',
+  needs_verification: 'Cần kiểm chứng',
+};
+
+const ISSUE_TYPE_ICONS: Record<string, LucideIcon> = {
+  ocr_error: Type,
+  factual_error: XCircle,
+  suspicious_number: Hash,
+  terminology_error: BookOpen,
+  internal_contradiction: Zap,
+  incomplete_content: Scissors,
+  outdated_information: Hourglass,
+  missing_context: Lightbulb,
+  misleading_statement: AlertTriangle,
+  unsupported_claim: HelpCircle,
+  needs_verification: Search,
 };
 
 const VerificationPanel: React.FC<VerificationPanelProps> = ({
@@ -223,14 +255,18 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
   return (
     <div style={styles.wrapper}>
-      <h4 style={styles.sectionTitle}>🔍 Kiểm tra chất lượng nội dung</h4>
+      <h4 style={{ ...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Search size={18} aria-hidden="true" />
+        <span>Kiểm tra chất lượng nội dung</span>
+      </h4>
       <p style={styles.subtitle}>
         Phát hiện lỗi OCR, sai sự thật, số liệu đáng nghi, thuật ngữ lệch và mâu thuẫn nội bộ bằng AI kép.
       </p>
 
       {/* Guidelines disclaimer */}
       <div style={styles.guidelinesBox}>
-        💡 <strong>Lưu ý:</strong> AI hỗ trợ phát hiện lỗi nhưng không thay thế hoàn toàn chuyên gia. Các kết quả có độ tin cậy thấp cần được xem lại thủ công. Trạng thái "Cần kiểm chứng thêm" không đồng nghĩa với việc nội dung đó chắc chắn sai.
+        <Lightbulb size={16} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} />
+        <strong>Lưu ý:</strong> AI hỗ trợ phát hiện lỗi nhưng không thay thế hoàn toàn chuyên gia. Các kết quả có độ tin cậy thấp cần được xem lại thủ công. Trạng thái "Cần kiểm chứng thêm" không đồng nghĩa với việc nội dung đó chắc chắn sai.
       </div>
 
       {error && <div style={styles.errorAlert}>{error}</div>}
@@ -239,14 +275,29 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       {/* Stale content warning */}
       {session && session.is_stale && (
         <div style={styles.staleAlert}>
-          ⚠️ <strong>Nội dung tài liệu đã thay đổi kể từ lần kiểm tra gần nhất.</strong> Kết quả hiển thị bên dưới thuộc về phiên bản cũ. Bạn nên bấm <strong>Kiểm tra lại nội dung mới</strong> để cập nhật.
+          <AlertTriangle size={16} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} />
+          <strong>Nội dung tài liệu đã thay đổi kể từ lần kiểm tra gần nhất.</strong> Kết quả hiển thị bên dưới thuộc về phiên bản cũ. Bạn nên bấm <strong>Kiểm tra lại nội dung mới</strong> để cập nhật.
         </div>
       )}
 
-      {/* ─── No session yet → Trigger button ─── */}
+      {/* ─── No session yet -> Trigger button ─── */}
       {!session && !loading && (
-        <button onClick={handleTrigger} disabled={disabled || triggerLoading} style={styles.triggerButton}>
-          {triggerLoading ? '⏳ Đang khởi tạo...' : '🔍 Bắt đầu kiểm tra chất lượng'}
+        <button
+          onClick={handleTrigger}
+          disabled={disabled || triggerLoading}
+          style={{ ...styles.triggerButton, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          {triggerLoading ? (
+            <>
+              <Loader size={16} aria-hidden="true" />
+              <span>Đang khởi tạo...</span>
+            </>
+          ) : (
+            <>
+              <Search size={16} aria-hidden="true" />
+              <span>Bắt đầu kiểm tra chất lượng</span>
+            </>
+          )}
         </button>
       )}
 
@@ -277,7 +328,8 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       {/* ─── Partially Completed state ─── */}
       {session?.status === 'partially_completed' && (
         <div style={styles.partiallyCompletedBox}>
-          ⚠️ <strong>Kiểm tra hoàn thành một phần:</strong> 
+          <AlertTriangle size={16} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} />
+          <strong>Kiểm tra hoàn thành một phần:</strong>
           <span style={{ marginLeft: '4px' }}>
             Đã phân tích thành công {session.successful_chunks || 0}/{session.total_chunks || 0} đoạn. Có {session.failed_chunks || 0} đoạn gặp lỗi khi phân tích.
           </span>
@@ -291,8 +343,13 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       {session?.status === 'failed' && (
         <div style={styles.failedBox}>
           <strong>Kiểm tra thất bại:</strong> {session.error_message || 'Lỗi không xác định.'}
-          <button onClick={handleTrigger} disabled={disabled || triggerLoading} style={{ ...styles.triggerButton, marginTop: '10px' }}>
-            🔄 Thử lại
+          <button
+            onClick={handleTrigger}
+            disabled={disabled || triggerLoading}
+            style={{ ...styles.triggerButton, marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            <span>Thử lại</span>
           </button>
         </div>
       )}
@@ -303,8 +360,9 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
           {/* Summary Bar */}
           <div style={styles.summaryBar}>
             <div style={styles.summaryLeft}>
-              <span style={styles.summaryTitle}>
-                📋 {session.summary || (issues.length === 0 ? 'Không phát hiện vấn đề nào' : `${issues.length} vấn đề phát hiện`)}
+              <span style={{ ...styles.summaryTitle, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <ClipboardList size={16} aria-hidden="true" />
+                <span>{session.summary || (issues.length === 0 ? 'Không phát hiện vấn đề nào' : `${issues.length} vấn đề phát hiện`)}</span>
               </span>
               {session.ai_model && (
                 <span style={styles.modelInfo}>
@@ -325,11 +383,15 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
               )}
 
               <div style={styles.typeBadges}>
-                {Object.entries(typeCounts).map(([type, count]) => (
-                  <span key={type} style={styles.typeBadge}>
-                    {ISSUE_TYPE_LABELS[type] || type}: {count}
-                  </span>
-                ))}
+                {Object.entries(typeCounts).map(([type, count]) => {
+                  const TypeIcon = ISSUE_TYPE_ICONS[type];
+                  return (
+                    <span key={type} style={{ ...styles.typeBadge, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {TypeIcon && <TypeIcon size={12} aria-hidden="true" />}
+                      <span>{ISSUE_TYPE_LABELS[type] || type}: {count}</span>
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
@@ -340,12 +402,45 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
                 </span>
               )}
               {acceptedCount > 0 && (
-                <button onClick={handleApply} disabled={disabled || applyLoading} style={styles.applyButton}>
-                  {applyLoading ? '⏳ Đang áp dụng...' : `🔄 Áp dụng ${acceptedCount} bản sửa`}
+                <button
+                  onClick={handleApply}
+                  disabled={disabled || applyLoading}
+                  style={{ ...styles.applyButton, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {applyLoading ? (
+                    <>
+                      <Loader size={16} aria-hidden="true" />
+                      <span>Đang áp dụng...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={16} aria-hidden="true" />
+                      <span>{`Áp dụng ${acceptedCount} bản sửa`}</span>
+                    </>
+                  )}
                 </button>
               )}
-              <button onClick={handleTrigger} disabled={disabled || triggerLoading} style={styles.retriggerButton}>
-                {triggerLoading ? '⏳...' : session.is_stale ? '🔍 Kiểm tra lại nội dung mới' : '🔄 Kiểm tra lại'}
+              <button
+                onClick={handleTrigger}
+                disabled={disabled || triggerLoading}
+                style={{ ...styles.retriggerButton, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                {triggerLoading ? (
+                  <>
+                    <Loader size={16} aria-hidden="true" />
+                    <span>...</span>
+                  </>
+                ) : session.is_stale ? (
+                  <>
+                    <Search size={16} aria-hidden="true" />
+                    <span>Kiểm tra lại nội dung mới</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} aria-hidden="true" />
+                    <span>Kiểm tra lại</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -407,8 +502,9 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
           )}
 
           {issues.length === 0 && (
-            <div style={styles.noIssues}>
-              ✅ Nội dung tài liệu không có vấn đề nào được phát hiện. Chất lượng tốt!
+            <div style={{ ...styles.noIssues, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <span>Nội dung tài liệu không có vấn đề nào được phát hiện. Chất lượng tốt!</span>
             </div>
           )}
         </>

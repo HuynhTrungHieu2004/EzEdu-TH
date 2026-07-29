@@ -257,6 +257,19 @@ export default function StudentOnboardingPage() {
           <button type="submit" className="btn-primary" disabled={saving}>
             {saving ? 'Đang lưu hồ sơ...' : 'Lưu và bắt đầu học'}
           </button>
+          {/*
+            Đường thoát cho người dùng mới. Trước đây trang này khoá cứng mọi
+            route khác, nên học sinh chưa muốn khai thông tin thì không vào được
+            đâu cả. Xem docs/ui-redesign/01-audit-report.md §6.2 (lỗi H3).
+          */}
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={saving}
+            onClick={() => navigate('/dashboard', { replace: true })}
+          >
+            Để sau
+          </button>
         </div>
       </form>
     </main>

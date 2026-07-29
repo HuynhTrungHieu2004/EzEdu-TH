@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 
 interface ConversationActionsMenuProps {
   isPinned: boolean;
@@ -47,7 +48,7 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
         title="Tác vụ hội thoại"
         aria-label="Mở menu tác vụ"
       >
-        ⋯
+        <Ellipsis size={16} aria-hidden="true" />
       </button>
       {isOpen && (
         <div style={styles.dropdown} onClick={(e) => e.stopPropagation()}>
@@ -56,14 +57,15 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
             onClick={() => handleAction(onPin)}
             style={styles.menuItem}
           >
-            {isPinned ? '📌 Bỏ ghim' : '📌 Ghim hội thoại'}
+            {isPinned ? <PinOff size={16} aria-hidden="true" /> : <Pin size={16} aria-hidden="true" />}
+            <span>{isPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}</span>
           </button>
           <button
             type="button"
             onClick={() => handleAction(onRename)}
             style={styles.menuItem}
           >
-            ✏️ Đổi tên
+            <Pencil size={16} aria-hidden="true" /><span>Đổi tên</span>
           </button>
           <div style={styles.divider} />
           <button
@@ -71,7 +73,7 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
             onClick={() => handleAction(onDelete)}
             style={{ ...styles.menuItem, ...styles.deleteItem }}
           >
-            🗑️ Xóa hội thoại
+            <Trash2 size={16} aria-hidden="true" /><span>Xóa hội thoại</span>
           </button>
         </div>
       )}
@@ -93,6 +95,9 @@ const styles = {
     borderRadius: '4px',
     fontSize: '16px',
     lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'background-color 0.2s',
     ':hover': {
       backgroundColor: 'rgba(0,0,0,0.05)',
@@ -123,6 +128,9 @@ const styles = {
     textAlign: 'left' as const,
     cursor: 'pointer',
     transition: 'background-color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   deleteItem: {
     color: 'var(--danger)',

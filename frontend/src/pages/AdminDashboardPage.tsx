@@ -1,14 +1,42 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  Circle,
+  CircleDot,
+  Clock,
+  Flame,
+  FlaskConical,
+  HeartPulse,
+  ReceiptText,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  Users,
+  XCircle,
+  Zap,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { analyticsApi } from '../api/analyticsApi';
 import type {
   BackendHealthResponse,
   OverviewResponse, UsageResponse, QualityResponse,
   ErrorsLatencyResponse, EvaluationResponse, DateRangeFilter,
-  AdminManagedRole, AdminUserItem, AdminUserStatusFilter,
-  AuditLogItem, AuditLogSeverity,
   ErrorLogItem, ErrorMonitoringSummary, ErrorSeverity,
 } from '../types/analytics';
 import { API_BASE_URL, isApiBaseUrlConfigured } from '../config/api';
+import {
+  Button,
+  Dialog,
+  ErrorState,
+  PageHeader,
+  SectionHeader,
+  SkeletonText,
+  StatTile,
+  Tabs,
+} from '../components/ui';
 import './AdminDashboardPage.css';
 
 // ─────── Helpers ────────────────────────────────────────────────────────────
@@ -92,7 +120,7 @@ function daysAgoRange(days: number): DateRangeFilter {
 
 // ─────── Tiny SVG Bar Chart ──────────────────────────────────────────────────
 
-function MiniBarChart({ data, color = '#6366f1' }: { data: number[]; color?: string }) {
+function MiniBarChart({ data, color = 'var(--ez-primary)' }: { data: number[]; color?: string }) {
   if (!data.length) return <p className="chart-empty">Không có dữ liệu</p>;
   const max = Math.max(...data, 1);
   const W = 300, H = 60, gap = 2;
@@ -109,7 +137,7 @@ function MiniBarChart({ data, color = '#6366f1' }: { data: number[]; color?: str
 
 // ─────── Donut Chart ─────────────────────────────────────────────────────────
 
-function DonutChart({ value, total, color = '#6366f1' }: { value: number; total: number; color?: string }) {
+function DonutChart({ value, total, color = 'var(--ez-primary)' }: { value: number; total: number; color?: string }) {
   const r = 28, cx = 36, cy = 36, C = 2 * Math.PI * r;
   const pct = total > 0 ? value / total : 0;
   return (
@@ -138,17 +166,9 @@ function Panel({
 }: { title: string; state: PanelState; onRetry?: () => void; actions?: ReactNode; children: ReactNode }) {
   return (
     <section className="admin-panel" aria-label={title}>
-      <div className="panel-heading">
-        <h3 className="panel-title">{title}</h3>
-        {actions && <div className="panel-actions">{actions}</div>}
-      </div>
-      {state === 'loading' && <p className="panel-loading" role="status">Đang tải...</p>}
-      {state === 'error' && (
-        <div className="panel-error" role="alert">
-          <span>Lỗi tải dữ liệu.</span>
-          {onRetry && <button type="button" onClick={onRetry} className="btn-retry">Thử lại</button>}
-        </div>
-      )}
+      <SectionHeader title={title} titleAs="h3" actions={actions} />
+      {state === 'loading' && <SkeletonText lines={5} />}
+      {state === 'error' && <ErrorState title="Lỗi tải dữ liệu" onRetry={onRetry} compact />}
       {state === 'ok' && children}
     </section>
   );
@@ -156,14 +176,8 @@ function Panel({
 
 // ─────── Stat Card ────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="stat-card">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {sub && <span className="stat-sub">{sub}</span>}
-    </div>
-  );
+function StatCard({ label, value, sub }: { label: ReactNode; value: ReactNode; sub?: string }) {
+  return <StatTile className="stat-card" label={label} value={value} hint={sub} />;
 }
 
 // ─────── Backend Connection Panel ────────────────────────────────────────────
@@ -255,7 +269,7 @@ function BackendConnectionPanel() {
             <div className="health-alert-list">
               {data.alerts.slice(0, 4).map((alert) => (
                 <div className={`health-alert health-alert--${alert.severity}`} key={`${alert.component}-${alert.message}`}>
-                  <strong>{alert.severity}</strong>
+                  <strong>{ERROR_SEVERITY_LABELS[alert.severity]}</strong>
                   <span>{alert.message}</span>
                 </div>
               ))}
@@ -321,7 +335,11 @@ function OverviewTab({ filter }: { filter: DateRangeFilter }) {
               <StatCard label="Tin nhắn AI" value={fmt(data.total_messages.assistant)} />
               <StatCard label="Học liệu đã index" value={fmt(data.documents.indexed)} sub={`/ ${fmt(data.documents.total)} tổng`} />
               <StatCard label="Kiểm tra CL thành công" value={fmt(data.verification.success)} />
-              <StatCard label="Tỷ lệ 👍 hữu ích" value={fmtPct(data.feedback.helpful_ratio)} sub={`${fmt(data.feedback.total)} phản hồi`} />
+              <StatCard
+                label={<><span>Tỷ lệ</span> <ThumbsUp size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> <span>hữu ích</span></>}
+                value={fmtPct(data.feedback.helpful_ratio)}
+                sub={`${fmt(data.feedback.total)} phản hồi`}
+              />
             </div>
             {/* Accessible table summary */}
             <details className="accessible-table-toggle">
@@ -345,6 +363,24 @@ function OverviewTab({ filter }: { filter: DateRangeFilter }) {
           </>
         )}
       </Panel>
+
+      {/*
+        Trước đây trang này có thêm hai tab riêng "Quản lý người dùng" và "Nhật
+        ký hệ thống", trùng với AdminUsersPage/AdminAuditLogsPage nhưng ít năng
+        lực hơn (chỉ đổi role + bật/tắt; chỉ xem danh sách chung). Thay bằng
+        link thẳng tới hai trang chuyên biệt đó.
+        Xem docs/ui-redesign/01-audit-report.md §7.1.
+      */}
+      <div className="admin-quick-links">
+        <Link to="/admin/users" className="admin-quick-link">
+          <Users size={16} aria-hidden="true" />
+          Quản lý người dùng chi tiết
+        </Link>
+        <Link to="/admin/audit-logs" className="admin-quick-link">
+          <ReceiptText size={16} aria-hidden="true" />
+          Nhật ký quản trị đầy đủ
+        </Link>
+      </div>
     </>
   );
 }
@@ -409,7 +445,7 @@ function UsageTab({ filter }: { filter: DateRangeFilter }) {
 
           <div className="chart-section">
             <h4>Logical Requests vs Attempts theo thời gian</h4>
-            <MiniBarChart data={data.buckets.map((b) => b.logical_requests)} color="#6366f1" />
+            <MiniBarChart data={data.buckets.map((b) => b.logical_requests)} color="var(--ez-primary)" />
             <p className="chart-caption">▪ Tím: Logical requests (final) &nbsp; ▫ Attempts bao gồm retry</p>
           </div>
 
@@ -483,12 +519,18 @@ function QualityTab({ filter }: { filter: DateRangeFilter }) {
           <>
             <div className="feedback-donut-row">
               <div className="donut-item">
-                <DonutChart value={helpfulCount} total={data.total_feedback} color="#22c55e" />
-                <span>👍 Hữu ích: {fmtPct(data.helpful_ratio)}</span>
+                <DonutChart value={helpfulCount} total={data.total_feedback} color="var(--ez-success)" />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <ThumbsUp size={14} aria-hidden="true" />
+                  <span>Hữu ích: {fmtPct(data.helpful_ratio)}</span>
+                </span>
               </div>
               <div className="donut-item">
-                <DonutChart value={notHelpfulCount} total={data.total_feedback} color="#ef4444" />
-                <span>👎 Không hữu ích: {fmtPct(data.not_helpful_ratio)}</span>
+                <DonutChart value={notHelpfulCount} total={data.total_feedback} color="var(--ez-danger)" />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <ThumbsDown size={14} aria-hidden="true" />
+                  <span>Không hữu ích: {fmtPct(data.not_helpful_ratio)}</span>
+                </span>
               </div>
             </div>
 
@@ -583,7 +625,7 @@ function ErrorsLatencyTab({ filter }: { filter: DateRangeFilter }) {
             <h4>Tỷ lệ thành công theo thời gian</h4>
             <MiniBarChart
               data={data.buckets.map((b) => b.success_rate ?? 0)}
-              color="#22c55e"
+              color="var(--ez-success)"
             />
           </div>
 
@@ -625,11 +667,14 @@ function EvaluationTab() {
   useEffect(() => { load(); return () => abortRef.current?.abort(); }, [load]); // eslint-disable-line react-hooks/set-state-in-effect
 
   const statusBadge = (d: EvaluationResponse) => {
-    const badges: Record<string, string> = {
-      ok: '✅ OK', stale: '⚠️ Stale', missing: '❌ Missing',
-      malformed: '❌ Malformed', oversized: '❌ Oversized',
+    const badges: Record<string, ReactNode> = {
+      ok: <><CheckCircle2 size={14} aria-hidden="true" /><span>OK</span></>,
+      stale: <><AlertTriangle size={14} aria-hidden="true" /><span>Stale</span></>,
+      missing: <><XCircle size={14} aria-hidden="true" /><span>Missing</span></>,
+      malformed: <><XCircle size={14} aria-hidden="true" /><span>Malformed</span></>,
+      oversized: <><XCircle size={14} aria-hidden="true" /><span>Oversized</span></>,
     };
-    return <span className="eval-badge">{badges[d.status] ?? d.status}</span>;
+    return <span className="eval-badge" style={{ gap: '5px' }}>{badges[d.status] ?? d.status}</span>;
   };
 
   return (
@@ -640,10 +685,25 @@ function EvaluationTab() {
             {statusBadge(data)}
             {data.meta && (
               <>
-                <span className={`eval-badge eval-badge--${data.meta.source_mode}`}>
-                  {data.meta.source_mode === 'live' ? '🟢 Live' : '🔵 Mock'}
+                <span className={`eval-badge eval-badge--${data.meta.source_mode}`} style={{ gap: '5px' }}>
+                  {data.meta.source_mode === 'live' ? (
+                    <>
+                      <CircleDot size={14} aria-hidden="true" />
+                      <span>Live</span>
+                    </>
+                  ) : (
+                    <>
+                      <Circle size={14} aria-hidden="true" />
+                      <span>Mock</span>
+                    </>
+                  )}
                 </span>
-                {data.meta.is_stale && <span className="eval-badge eval-badge--stale">⏰ Stale</span>}
+                {data.meta.is_stale && (
+                  <span className="eval-badge eval-badge--stale" style={{ gap: '5px' }}>
+                    <Clock size={14} aria-hidden="true" />
+                    <span>Stale</span>
+                  </span>
+                )}
               </>
             )}
             <small className="eval-note">Dữ liệu TÁCH BIỆT với production usage</small>
@@ -654,14 +714,31 @@ function EvaluationTab() {
           {data.summary && (
             <>
               <div className="stat-grid">
-                <StatCard label="Kết quả" value={data.summary.passed ? '✅ PASS' : '❌ FAIL'} />
+                <StatCard
+                  label="Kết quả"
+                  value={
+                    data.summary.passed ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle2 size={20} aria-hidden="true" />
+                        <span>PASS</span>
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <XCircle size={20} aria-hidden="true" />
+                        <span>FAIL</span>
+                      </span>
+                    )
+                  }
+                />
                 <StatCard label="Test cases" value={`${data.summary.passed_cases}/${data.summary.total_cases}`} />
                 <StatCard label="LLM Model" value={data.summary.llm_model} />
                 <StatCard label="Embedding" value={data.summary.embedding_model} />
               </div>
 
               <table className="accessible-table" aria-label="Kết quả benchmark offline">
-                <caption>Kết quả RAG Benchmark theo thành phần — Offline / {data.meta?.source_mode ?? 'N/A'}</caption>
+                <caption>
+                  Kết quả RAG Benchmark theo thành phần — Offline / {data.meta?.source_mode === 'live' ? 'Live' : data.meta?.source_mode === 'mock' ? 'Mock' : 'N/A'}
+                </caption>
                 <thead>
                   <tr><th>Thành phần</th><th>Tổng</th><th>Đạt</th><th>Thất bại</th><th>Tỷ lệ</th><th>Ngưỡng</th></tr>
                 </thead>
@@ -686,324 +763,6 @@ function EvaluationTab() {
   );
 }
 
-// ─────── User Management Tab ─────────────────────────────────────────────────
-
-const ROLE_LABELS: Record<AdminManagedRole | 'user', string> = {
-  student: 'Học sinh',
-  lecturer: 'Giảng viên',
-  admin: 'Admin',
-  user: 'Người dùng',
-};
-
-function UserManagementTab() {
-  const [state, setState] = useState<PanelState>('loading');
-  const [users, setUsers] = useState<AdminUserItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState<AdminManagedRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<AdminUserStatusFilter | 'all'>('all');
-  const [page, setPage] = useState(0);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const pageSize = 50;
-
-  const load = useCallback(() => {
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    setState('loading');
-    setNotice(null);
-    analyticsApi.listUsers({
-      search: search || undefined,
-      role: role === 'all' ? undefined : role,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      limit: pageSize,
-      skip: page * pageSize,
-    }, ctrl.signal)
-      .then((d) => {
-        setUsers(d.items);
-        setTotal(d.total);
-        setState('ok');
-      })
-      .catch((e) => { if (e?.name !== 'CanceledError') setState('error'); });
-  }, [page, role, search, statusFilter]);
-
-  useEffect(() => { load(); return () => abortRef.current?.abort(); }, [load]); // eslint-disable-line react-hooks/set-state-in-effect
-
-  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setPage(0);
-    setSearch(searchInput.trim());
-  };
-
-  const handleRoleChange = async (user: AdminUserItem, nextRole: AdminManagedRole) => {
-    if (user.role === nextRole) return;
-    setBusyUserId(user.id);
-    setNotice(null);
-    try {
-      await analyticsApi.updateUserRole(user.id, nextRole);
-      setNotice(`Đã đổi quyền của ${user.email} sang ${ROLE_LABELS[nextRole]}.`);
-      load();
-    } catch {
-      setNotice('Không thể đổi quyền tài khoản này.');
-    } finally {
-      setBusyUserId(null);
-    }
-  };
-
-  const handleStatusChange = async (user: AdminUserItem) => {
-    setBusyUserId(user.id);
-    setNotice(null);
-    try {
-      await analyticsApi.updateUserStatus(user.id, !user.is_active);
-      setNotice(`${user.is_active ? 'Đã khóa' : 'Đã kích hoạt'} tài khoản ${user.email}.`);
-      load();
-    } catch {
-      setNotice('Không thể cập nhật trạng thái tài khoản này.');
-    } finally {
-      setBusyUserId(null);
-    }
-  };
-
-  return (
-    <Panel title="Quản lý người dùng" state={state} onRetry={load}>
-      <form className="admin-filter-grid" onSubmit={handleSearch} aria-label="Bộ lọc người dùng">
-        <label>
-          <span>Tìm kiếm</span>
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Tên hoặc email"
-          />
-        </label>
-        <label>
-          <span>Vai trò</span>
-          <select value={role} onChange={(event) => { setPage(0); setRole(event.target.value as AdminManagedRole | 'all'); }}>
-            <option value="all">Tất cả</option>
-            <option value="student">Học sinh</option>
-            <option value="lecturer">Giảng viên</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
-        <label>
-          <span>Trạng thái</span>
-          <select value={statusFilter} onChange={(event) => { setPage(0); setStatusFilter(event.target.value as AdminUserStatusFilter | 'all'); }}>
-            <option value="all">Tất cả</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="locked">Đã khóa</option>
-          </select>
-        </label>
-        <button type="submit" className="admin-action-btn admin-action-btn--primary">Tìm kiếm</button>
-      </form>
-
-      {notice && <p className="admin-inline-notice" role="status">{notice}</p>}
-      <div className="admin-table-toolbar">
-        <p className="admin-table-note">
-          Hiển thị {users.length ? page * pageSize + 1 : 0}-{Math.min((page + 1) * pageSize, total)}/{total} tài khoản.
-        </p>
-        <div className="admin-pagination" aria-label="Phân trang người dùng">
-          <button type="button" className="admin-action-btn" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            Trang trước
-          </button>
-          <button
-            type="button"
-            className="admin-action-btn"
-            disabled={(page + 1) * pageSize >= total}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Trang sau
-          </button>
-        </div>
-      </div>
-
-      <div className="admin-table-wrap">
-        <table className="accessible-table admin-data-table" aria-label="Danh sách tài khoản">
-          <thead>
-            <tr>
-              <th>Người dùng</th>
-              <th>Vai trò</th>
-              <th>Trạng thái</th>
-              <th>Ngày tạo</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>
-                  <strong>{user.full_name || 'Chưa có tên'}</strong>
-                  <span className="admin-cell-sub">{user.email}</span>
-                </td>
-                <td>
-                  <select
-                    className="admin-role-select"
-                    value={user.role === 'user' ? 'student' : user.role}
-                    disabled={busyUserId === user.id}
-                    onChange={(event) => handleRoleChange(user, event.target.value as AdminManagedRole)}
-                    aria-label={`Đổi quyền ${user.email}`}
-                  >
-                    <option value="student">Học sinh</option>
-                    <option value="lecturer">Giảng viên</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </td>
-                <td>
-                  <span className={`admin-status-badge ${user.is_active ? 'admin-status-badge--active' : 'admin-status-badge--locked'}`}>
-                    {user.is_active ? 'Hoạt động' : 'Đã khóa'}
-                  </span>
-                </td>
-                <td>{formatDateTime(user.created_at)}</td>
-                <td>
-                  <button
-                    type="button"
-                    className={`admin-action-btn ${user.is_active ? 'admin-action-btn--danger' : 'admin-action-btn--success'}`}
-                    disabled={busyUserId === user.id}
-                    onClick={() => handleStatusChange(user)}
-                  >
-                    {user.is_active ? 'Khóa' : 'Kích hoạt'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={5}>Không tìm thấy tài khoản phù hợp.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
-// ─────── Audit Logs Tab ──────────────────────────────────────────────────────
-
-const AUDIT_SEVERITY_LABELS: Record<AuditLogSeverity, string> = {
-  info: 'Thông tin',
-  warning: 'Cảnh báo',
-  error: 'Lỗi',
-};
-
-const AUDIT_EVENT_LABELS: Record<string, string> = {
-  user_role_updated: 'Đổi quyền người dùng',
-  user_status_updated: 'Khóa / kích hoạt tài khoản',
-  ai_usage_failure: 'Lỗi AI',
-  document_processing_failure: 'Lỗi xử lý học liệu',
-};
-
-function AuditLogsTab({ filter }: { filter: DateRangeFilter }) {
-  const [state, setState] = useState<PanelState>('loading');
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [eventType, setEventType] = useState('all');
-  const [severity, setSeverity] = useState<AuditLogSeverity | 'all'>('all');
-  const abortRef = useRef<AbortController | null>(null);
-
-  const load = useCallback(() => {
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    setState('loading');
-    analyticsApi.listAuditLogs({
-      ...filter,
-      search: search || undefined,
-      event_type: eventType === 'all' ? undefined : eventType,
-      severity: severity === 'all' ? undefined : severity,
-      limit: 120,
-    }, ctrl.signal)
-      .then((d) => {
-        setLogs(d.items);
-        setTotal(d.total);
-        setState('ok');
-      })
-      .catch((e) => { if (e?.name !== 'CanceledError') setState('error'); });
-  }, [eventType, filter, search, severity]);
-
-  useEffect(() => { load(); return () => abortRef.current?.abort(); }, [load]); // eslint-disable-line react-hooks/set-state-in-effect
-
-  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSearch(searchInput.trim());
-  };
-
-  const exportCsv = () => {
-    downloadCsv('ezedu-audit-logs.csv', logs.map((log) => ({
-      thoi_gian: log.created_at,
-      muc_do: log.severity,
-      loai_su_kien: log.event_type,
-      noi_dung: log.message,
-      user_id: log.user_id ?? '',
-      actor_user_id: log.actor_user_id ?? '',
-      target_user_id: log.target_user_id ?? '',
-      metadata: JSON.stringify(log.metadata ?? {}),
-    })));
-  };
-
-  return (
-    <Panel
-      title="Nhật ký thao tác hệ thống"
-      state={state}
-      onRetry={load}
-      actions={<button type="button" className="admin-action-btn" onClick={exportCsv} disabled={!logs.length}>Xuất CSV</button>}
-    >
-      <form className="admin-filter-grid" onSubmit={handleSearch} aria-label="Bộ lọc nhật ký">
-        <label>
-          <span>Tìm kiếm</span>
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Nội dung, model, mã lỗi..."
-          />
-        </label>
-        <label>
-          <span>Loại sự kiện</span>
-          <select value={eventType} onChange={(event) => setEventType(event.target.value)}>
-            <option value="all">Tất cả</option>
-            <option value="user_role_updated">Đổi quyền người dùng</option>
-            <option value="user_status_updated">Khóa / kích hoạt tài khoản</option>
-            <option value="ai_usage_failure">Lỗi AI</option>
-            <option value="document_processing_failure">Lỗi xử lý học liệu</option>
-          </select>
-        </label>
-        <label>
-          <span>Mức độ</span>
-          <select value={severity} onChange={(event) => setSeverity(event.target.value as AuditLogSeverity | 'all')}>
-            <option value="all">Tất cả</option>
-            <option value="info">Thông tin</option>
-            <option value="warning">Cảnh báo</option>
-            <option value="error">Lỗi</option>
-          </select>
-        </label>
-        <button type="submit" className="admin-action-btn admin-action-btn--primary">Lọc nhật ký</button>
-      </form>
-
-      <p className="admin-table-note">Hiển thị {logs.length}/{total} dòng nhật ký trong khoảng thời gian đã chọn.</p>
-      <div className="admin-log-list" aria-label="Nhật ký hệ thống">
-        {logs.map((log) => (
-          <article className={`admin-log-item admin-log-item--${log.severity}`} key={`${log.event_type}-${log.id}`}>
-            <div>
-              <span className={`admin-status-badge admin-status-badge--${log.severity}`}>
-                {AUDIT_SEVERITY_LABELS[log.severity] ?? log.severity}
-              </span>
-              <strong>{AUDIT_EVENT_LABELS[log.event_type] ?? log.event_type}</strong>
-            </div>
-            <p>{log.message}</p>
-            <small>{formatDateTime(log.created_at)}{log.user_id ? ` · user ${log.user_id}` : ''}</small>
-          </article>
-        ))}
-        {logs.length === 0 && <p className="chart-empty">Chưa có nhật ký trong khoảng thời gian này.</p>}
-      </div>
-    </Panel>
-  );
-}
-
 // ─────── System Health Tab ──────────────────────────────────────────────────
 
 const ERROR_SEVERITY_LABELS: Record<ErrorSeverity, string> = {
@@ -1020,7 +779,7 @@ function SafeDetails({ details }: { details: Record<string, unknown> }) {
       {rows.map(([key, value]) => (
         <div key={key}>
           <dt>{key}</dt>
-          <dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd>
+          <dd>{typeof value === 'object' ? <pre className="health-detail-json">{JSON.stringify(value, null, 2)}</pre> : String(value)}</dd>
         </div>
       ))}
     </dl>
@@ -1029,9 +788,13 @@ function SafeDetails({ details }: { details: Record<string, unknown> }) {
 
 function ErrorDetailModal({ item, onClose }: { item: ErrorLogItem; onClose: () => void }) {
   return (
-    <div className="admin-error-modal-backdrop" role="presentation">
-      <section className="admin-error-modal" role="dialog" aria-modal="true" aria-labelledby="error-detail-title">
-        <h3 id="error-detail-title">Chi tiết lỗi an toàn</h3>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Chi tiết lỗi an toàn"
+      size="lg"
+      footer={<Button variant="primary" onClick={onClose}>Đóng</Button>}
+    >
         <dl className="health-detail-list">
           <div><dt>Error ID</dt><dd>{item.error_id}</dd></div>
           <div><dt>Endpoint</dt><dd>{item.method} {item.endpoint}</dd></div>
@@ -1043,11 +806,7 @@ function ErrorDetailModal({ item, onClose }: { item: ErrorLogItem; onClose: () =
           <div><dt>Occurrences</dt><dd>{item.occurrence_count}</dd></div>
         </dl>
         <p>{item.message_safe}</p>
-        <div className="panel-actions">
-          <button type="button" className="admin-action-btn admin-action-btn--primary" onClick={onClose}>Đóng</button>
-        </div>
-      </section>
-    </div>
+    </Dialog>
   );
 }
 
@@ -1110,7 +869,7 @@ function SystemHealthTab({ filter }: { filter: DateRangeFilter }) {
             <section className="health-alert-list">
               {[...health.alerts, ...summary.warnings].map((alert) => (
                 <div className={`health-alert health-alert--${alert.severity}`} key={`${alert.component}-${alert.message}`}>
-                  <strong>{alert.severity}</strong>
+                  <strong>{ERROR_SEVERITY_LABELS[alert.severity]}</strong>
                   <span>{alert.message}</span>
                 </div>
               ))}
@@ -1204,18 +963,16 @@ function SystemHealthTab({ filter }: { filter: DateRangeFilter }) {
 
 // ─────── Main Dashboard Page ──────────────────────────────────────────────────
 
-type Tab = 'overview' | 'usage' | 'quality' | 'errors' | 'health' | 'users' | 'audit' | 'evaluation';
+type Tab = 'overview' | 'usage' | 'quality' | 'errors' | 'health' | 'evaluation';
 type Preset = 'today' | '7d' | '30d' | 'custom';
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview', label: '📊 Tổng quan' },
-  { id: 'usage', label: '⚡ Mức sử dụng' },
-  { id: 'quality', label: '⭐ Chất lượng AI' },
-  { id: 'errors', label: '🔥 Lỗi & Độ trễ' },
-  { id: 'health', label: '🫀 System Health' },
-  { id: 'users', label: '👥 Quản lý người dùng' },
-  { id: 'audit', label: '🧾 Nhật ký hệ thống' },
-  { id: 'evaluation', label: '🔬 RAG Benchmark' },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Tổng quan', icon: BarChart3 },
+  { id: 'usage', label: 'Mức sử dụng', icon: Zap },
+  { id: 'quality', label: 'Chất lượng AI', icon: Star },
+  { id: 'errors', label: 'Lỗi & Độ trễ', icon: Flame },
+  { id: 'health', label: 'System Health', icon: HeartPulse },
+  { id: 'evaluation', label: 'RAG Benchmark', icon: FlaskConical },
 ];
 
 export default function AdminDashboardPage() {
@@ -1255,10 +1012,10 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="admin-dashboard">
-      <header className="admin-header">
-        <h1>Dashboard Quản trị</h1>
-        <p className="admin-subtitle">Thống kê hoạt động và chất lượng AI — chỉ dành cho quản trị viên</p>
-      </header>
+      <PageHeader
+        title="Tổng quan quản trị"
+        description="Thống kê hoạt động, chất lượng AI và tình trạng hệ thống."
+      />
 
       <BackendConnectionPanel />
 
@@ -1292,32 +1049,23 @@ export default function AdminDashboardPage() {
       </form>
 
       {/* Tab Navigation */}
-      <nav className="admin-tabs" role="tablist" aria-label="Tab thống kê quản trị">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            aria-selected={activeTab === t.id}
-            className={`admin-tab${activeTab === t.id ? ' admin-tab--active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* Tab Content */}
-      <main className="admin-content" role="tabpanel" aria-live="polite">
+      <Tabs
+        items={TABS.map((tab) => {
+          const Icon = tab.icon;
+          return { id: tab.id, label: tab.label, icon: <Icon size={16} /> };
+        })}
+        value={activeTab}
+        onChange={(id) => setActiveTab(id as Tab)}
+        ariaLabel="Thống kê quản trị"
+        className="admin-content"
+      >
         {activeTab === 'overview' && <OverviewTab filter={filter} />}
         {activeTab === 'usage' && <UsageTab filter={filter} />}
         {activeTab === 'quality' && <QualityTab filter={filter} />}
         {activeTab === 'errors' && <ErrorsLatencyTab filter={filter} />}
         {activeTab === 'health' && <SystemHealthTab filter={filter} />}
-        {activeTab === 'users' && <UserManagementTab />}
-        {activeTab === 'audit' && <AuditLogsTab filter={filter} />}
         {activeTab === 'evaluation' && <EvaluationTab />}
-      </main>
+      </Tabs>
     </div>
   );
 }

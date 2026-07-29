@@ -3,10 +3,12 @@ import type { FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
+import { useAuth } from '../hooks/useAuth';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { refresh } = useAuth();
   const locationMessage = (location.state as { message?: string } | null)?.message ?? null;
 
   const [email, setEmail] = useState('');
@@ -35,6 +37,12 @@ const LoginPage = () => {
       const data = await authApi.login({ email, password });
       localStorage.setItem('access_token', data.access_token);
       const user = await authApi.getMe();
+      // AuthProvider tự tải /auth/me ở lần mount đầu, khi chưa có token nên
+      // status dừng ở 'anonymous'. Không gọi refresh() ở đây thì status không
+      // bao giờ cập nhật, khiến RoleRoute coi người vừa đăng nhập là chưa đăng
+      // nhập và đưa họ quay lại /login — trong khi trang này thấy token vẫn
+      // còn nên lại điều hướng đi, tạo vòng lặp chuyển hướng vô tận.
+      await refresh();
       if (user.role === 'student' && !user.student_profile_completed) navigate('/student-onboarding');
       else if (user.role === 'student') navigate('/published-questions');
       else if (user.role === 'admin') navigate('/admin/dashboard');
@@ -54,7 +62,7 @@ const LoginPage = () => {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-mark" translate="no">Ez</div>
-          <h2 className="auth-title">Đăng nhập EzEdu AI</h2>
+          <h1 className="auth-title">Đăng nhập EzEdu AI</h1>
           <p className="auth-subtitle">Biến học liệu thành đề thi dễ dàng</p>
         </div>
 

@@ -62,8 +62,25 @@ export function splitPreferenceInput(value: string) {
     .slice(0, 20);
 }
 
+/**
+ * Nhận diện trường hợp tính năng cá nhân hoá bị quản trị viên tắt.
+ *
+ * Backend dùng dependency `require_feature_enabled` và trả **403** kèm thông
+ * điệp tiếng Việt "Tính năng hiện đang bị tắt bởi quản trị viên." Bản trước chỉ
+ * kiểm tra 404 và chuỗi tiếng Anh "disabled", nên không bao giờ khớp — nhánh xử
+ * lý tính năng-bị-tắt trở thành code chết và người dùng nhận thông báo lỗi
+ * chung chung trên một trang gần như trắng.
+ *
+ * Vẫn giữ nhánh 404 để tương thích nếu backend đổi mã trạng thái về sau.
+ */
 export function isPersonalizationFeatureDisabled(error: unknown) {
   const maybeError = error as PersonalizationFeatureError;
-  const detail = maybeError.response?.data?.detail;
-  return maybeError.response?.status === 404 && typeof detail === 'string' && detail.toLowerCase().includes('disabled');
+  const status = maybeError?.response?.status;
+  if (status !== 403 && status !== 404) return false;
+
+  const detail = maybeError?.response?.data?.detail;
+  if (typeof detail !== 'string') return false;
+
+  const normalized = detail.toLowerCase();
+  return normalized.includes('disabled') || normalized.includes('bị tắt');
 }

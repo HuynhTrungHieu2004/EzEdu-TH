@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 
 interface ConversationSearchProps {
   value: string;
@@ -30,7 +31,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
           title="Xóa tìm kiếm"
           aria-label="Xóa từ khóa tìm kiếm"
         >
-          ✕
+          <X size={14} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -66,5 +67,8 @@ const styles = {
     fontSize: '12px',
     padding: '4px',
     lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 };

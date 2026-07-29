@@ -1,8 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  ClipboardList,
+  Download,
+  File,
+  FileText,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { questionApi } from '../api/questionApi';
 import type { QuestionSetSummary, HistoryParams } from '../api/questionApi';
 import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
+import { Alert, ConfirmDialog, FormField, Input } from '../components/ui';
 
 /* ─── Constants ─────────────────────────────────────────────────────────── */
 const PAGE_SIZE = 20;
@@ -63,6 +75,7 @@ const QuestionHistoryPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   // Request identity to prevent stale responses
   const requestIdRef = useRef(0);
@@ -160,7 +173,7 @@ const QuestionHistoryPage: React.FC = () => {
 
   // ── Delete ─────────────────────────────────────────────────
   const handleDeleteConfirm = async () => {
-    if (!confirmDeleteId || deletingId) return;
+    if (!confirmDeleteId || deletingId || deleteConfirmation !== 'XÓA') return;
     const id = confirmDeleteId;
     setDeletingId(id);
     setDeleteError(null);
@@ -169,6 +182,7 @@ const QuestionHistoryPage: React.FC = () => {
       await questionApi.deleteQuestionSet(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
       setConfirmDeleteId(null);
+      setDeleteConfirmation('');
     } catch (err: unknown) {
       if (isUnauthorizedError(err)) {
         localStorage.removeItem('access_token');
@@ -202,64 +216,59 @@ const QuestionHistoryPage: React.FC = () => {
   /* ═══════════════════════════════════════════════════════════ */
   return (
     <div style={S.container}>
-      {/* ── Confirm Delete Dialog ── */}
-      {confirmDeleteId && (
-        <div style={S.overlay} onClick={() => !deletingId && setConfirmDeleteId(null)}>
-          <div style={S.dialog} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-labelledby="delete-dialog-title">
-            <h3 id="delete-dialog-title" style={S.dialogTitle}>🗑️ Xác nhận xóa bộ đề</h3>
-            <p style={S.dialogBody}>
-              Bạn có chắc muốn xóa bộ đề{' '}
-              <strong>{deleteTarget?.question_count ?? '?'} câu</strong> từ tài liệu{' '}
-              <strong>"{deleteTarget?.document_name ?? '…'}"</strong>?
-            </p>
-            <p style={S.dialogNote}>Hành động này không thể hoàn tác.</p>
-            {deleteError && <p style={S.dialogError}>{deleteError}</p>}
-            <div style={S.dialogActions}>
-              <button
-                type="button"
-                onClick={() => { setConfirmDeleteId(null); setDeleteError(null); }}
-                disabled={!!deletingId}
-                style={S.btnCancel}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={!!deletingId}
-                style={S.btnDanger}
-              >
-                {deletingId ? 'Đang xóa…' : 'Xóa bộ đề'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={deletingId ? () => undefined : () => { setConfirmDeleteId(null); setDeleteError(null); setDeleteConfirmation(''); }}
+        onConfirm={() => void handleDeleteConfirm()}
+        title="Xóa vĩnh viễn bộ đề?"
+        description={`Bộ đề ${deleteTarget?.question_count ?? 0} câu từ học liệu “${deleteTarget?.document_name ?? ''}” sẽ bị xóa. Thao tác không thể hoàn tác.`}
+        confirmLabel="Xóa bộ đề"
+        confirmDisabled={deleteConfirmation !== 'XÓA'}
+        busy={Boolean(deletingId)}
+      >
+        {deleteError && <Alert tone="error">{deleteError}</Alert>}
+        <FormField
+          label="Nhập XÓA để xác nhận"
+          error={deleteConfirmation && deleteConfirmation !== 'XÓA' ? 'Nội dung xác nhận chưa đúng.' : undefined}
+        >
+          <Input
+            value={deleteConfirmation}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            autoComplete="off"
+            invalid={Boolean(deleteConfirmation && deleteConfirmation !== 'XÓA')}
+          />
+        </FormField>
+      </ConfirmDialog>
 
       {/* ── Page Header ── */}
       <header style={S.header}>
         <div>
-          <h1 style={S.title}>📋 Ngân hàng câu hỏi</h1>
+          <h1 style={S.title}>
+            <ClipboardList size={18} aria-hidden="true" /><span>Ngân hàng câu hỏi</span>
+          </h1>
           <p style={S.subtitle}>
             Quản lý bộ câu hỏi AI đã soạn, duyệt nội dung và ban hành đề thi cho học sinh.
           </p>
         </div>
         <button type="button" onClick={() => navigate('/generate')} className="btn-primary">
-          ＋ Upload học liệu &amp; sinh đề AI
+          <Plus size={16} aria-hidden="true" /><span>Upload học liệu &amp; sinh đề AI</span>
         </button>
       </header>
 
       {/* ── Filters ── */}
       <div style={S.filterBar}>
-        <input
-          id="history-search"
-          type="text"
-          placeholder="🔍 Tìm theo tên tài liệu…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          style={S.searchInput}
-          aria-label="Tìm kiếm tài liệu"
-        />
+        <div style={S.searchWrap}>
+          <Search size={16} style={S.searchIcon} aria-hidden="true" />
+          <input
+            id="history-search"
+            type="text"
+            placeholder="Tìm theo tên tài liệu…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            style={S.searchInput}
+            aria-label="Tìm kiếm tài liệu"
+          />
+        </div>
         <select
           id="history-filter-type"
           value={filterType}
@@ -284,7 +293,7 @@ const QuestionHistoryPage: React.FC = () => {
         </select>
         {hasFilters && (
           <button type="button" onClick={clearFilters} style={S.clearBtn} aria-label="Xóa bộ lọc">
-            ✕ Xóa lọc
+            <X size={16} aria-hidden="true" /><span>Xóa lọc</span>
           </button>
         )}
       </div>
@@ -299,12 +308,12 @@ const QuestionHistoryPage: React.FC = () => {
         <div style={S.center}>
           <div style={S.errorBox}>{error}</div>
           <button type="button" onClick={() => fetchHistory(null, false)} style={S.retryBtn}>
-            🔄 Thử lại
+            <RefreshCw size={16} aria-hidden="true" /><span>Thử lại</span>
           </button>
         </div>
       ) : items.length === 0 ? (
         <div style={S.emptyState}>
-          <div style={S.emptyIcon}>📝</div>
+          <div style={S.emptyIcon} aria-hidden="true"><FileText size={56} /></div>
           <h3 style={S.emptyTitle}>
             {hasFilters ? 'Không tìm thấy kết quả' : 'Chưa có bộ đề nào'}
           </h3>
@@ -343,13 +352,14 @@ const QuestionHistoryPage: React.FC = () => {
                     aria-label={`Xóa bộ đề ${item.document_name}`}
                     title="Xóa bộ đề"
                   >
-                    🗑️
+                    <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
 
                 {/* Document name */}
                 <h3 style={S.cardDocName} title={item.document_name}>
-                  📄 {item.document_name}
+                  <File size={16} style={S.docNameIcon} aria-hidden="true" />
+                  {item.document_name}
                 </h3>
 
                 {/* Meta badges */}
@@ -407,7 +417,7 @@ const QuestionHistoryPage: React.FC = () => {
                   onClick={() => navigate(`/question-sets/${item.id}`)}
                   style={S.viewBtn}
                 >
-                  📝 Duyệt &amp; ban hành đề
+                  <FileText size={16} aria-hidden="true" /><span>Duyệt &amp; ban hành đề</span>
                 </button>
               </article>
             ))}
@@ -422,7 +432,13 @@ const QuestionHistoryPage: React.FC = () => {
                 disabled={loadingMore}
                 style={S.loadMoreBtn}
               >
-                {loadingMore ? 'Đang tải…' : '📥 Xem thêm'}
+                {loadingMore ? (
+                  <span>Đang tải…</span>
+                ) : (
+                  <>
+                    <Download size={16} aria-hidden="true" /><span>Xem thêm</span>
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -453,6 +469,9 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: 'var(--text-h)',
     margin: '0 0 6px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   subtitle: {
     fontSize: '14px',
@@ -468,10 +487,22 @@ const S: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     alignItems: 'center',
   },
-  searchInput: {
+  searchWrap: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
     flex: '1 1 220px',
     minWidth: '180px',
-    padding: '10px 14px',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '14px',
+    color: 'var(--muted)',
+    pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%',
+    padding: '10px 14px 10px 38px',
     fontSize: '14px',
     borderRadius: '10px',
     border: '1px solid var(--border)',
@@ -500,6 +531,9 @@ const S: Record<string, React.CSSProperties> = {
     backgroundColor: 'var(--surface)',
     color: 'var(--danger)',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
   },
 
   // ── Center states ──
@@ -538,6 +572,9 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--accent-border)',
     borderRadius: '10px',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
   },
 
   // ── Empty state ──
@@ -549,7 +586,8 @@ const S: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   emptyIcon: {
-    fontSize: '56px',
+    display: 'flex',
+    color: 'var(--muted)',
     marginBottom: '16px',
   },
   emptyTitle: {
@@ -604,6 +642,14 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     opacity: 0.5,
     transition: 'opacity 0.2s',
+    display: 'inline-flex',
+    alignItems: 'center',
+    color: 'var(--danger)',
+  },
+  docNameIcon: {
+    verticalAlign: '-3px',
+    marginRight: '6px',
+    color: 'var(--muted)',
   },
   cardDocName: {
     fontSize: '15px',
@@ -667,6 +713,10 @@ const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     textAlign: 'center',
     transition: 'opacity 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
   },
 
   // ── Load more ──
@@ -684,6 +734,9 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--accent-border)',
     borderRadius: '12px',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
   },
 
   // ── Confirm Dialog ──
@@ -712,6 +765,9 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: 'var(--text-h)',
     margin: '0 0 12px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   dialogBody: {
     fontSize: '14px',

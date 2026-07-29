@@ -1,4 +1,5 @@
 import React from 'react';
+import { ThumbsDown, ThumbsUp } from 'lucide-react';
 import type { FeedbackRating, FeedbackData } from '../../../types/feedback';
 
 interface AnswerFeedbackControlsProps {
@@ -27,7 +28,7 @@ export const AnswerFeedbackControls: React.FC<AnswerFeedbackControlsProps> = ({
         aria-pressed={currentRating === 'helpful'}
         disabled={loading}
       >
-        <span style={styles.icon}>👍</span>
+        <span style={styles.icon} aria-hidden="true"><ThumbsUp size={14} /></span>
         <span style={styles.text}>Hữu ích</span>
       </button>
 
@@ -42,7 +43,7 @@ export const AnswerFeedbackControls: React.FC<AnswerFeedbackControlsProps> = ({
         aria-pressed={currentRating === 'not_helpful'}
         disabled={loading}
       >
-        <span style={styles.icon}>👎</span>
+        <span style={styles.icon} aria-hidden="true"><ThumbsDown size={14} /></span>
         <span style={styles.text}>Chưa tốt</span>
       </button>
 
@@ -84,7 +85,8 @@ const styles = {
     color: 'var(--danger)',
   },
   icon: {
-    fontSize: '13px',
+    display: 'inline-flex',
+    alignItems: 'center',
   },
   text: {
     lineHeight: 1,

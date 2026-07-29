@@ -17,6 +17,10 @@ export function isUnauthorizedError(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 401;
 }
 
+export function getApiErrorStatus(error: unknown) {
+  return axios.isAxiosError(error) ? error.response?.status : undefined;
+}
+
 export async function getBlobErrorDetail(error: unknown) {
   if (!axios.isAxiosError(error)) {
     return undefined;

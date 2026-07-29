@@ -28,6 +28,9 @@ export interface DocumentUploadResponse {
   media_kind?: 'document' | 'video';
   status: string;
   error_message?: string | null;
+  checksum?: string | null;
+  reuse_count?: number;
+  reused?: boolean;
   created_at: string;
   updated_at: string;
 }

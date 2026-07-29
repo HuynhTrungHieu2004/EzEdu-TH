@@ -1,0 +1,553 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   EzEdu AI — DESIGN TOKENS
+   Nguồn duy nhất cho màu, chữ, khoảng cách, bo góc, bóng, z-index, motion.
+   Không viết mã màu trực tiếp trong file component — luôn dùng token ở đây.
+
+   Ba tầng:
+     1. PRIMITIVE  --ez-<họ>-<bậc>     giá trị thô, không mang ngữ nghĩa
+     2. SEMANTIC   --ez-<vai trò>      dùng trong component
+     3. ALIAS      tên biến cũ         giữ tương thích với CSS đã có
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────────────────
+   1. PRIMITIVE — bảng màu nhận diện EzEdu AI
+   Cập nhật theo bảng màu MagicSchool-inspired đề xuất ở `04-design-system.md`
+   (trước đó chỉ mượn cấu trúc/component, không đổi màu — nay đổi màu theo
+   yêu cầu). Violet (tên biến vẫn giữ `indigo` để không phải sửa hàng trăm
+   chỗ tham chiếu) làm màu chính — neo đúng `#6D5DFB`/`#5546E8` đặc tả. Sky
+   blue làm màu phụ — neo đúng `#3B82F6`. Amber làm màu nhấn — neo đúng
+   `#F59E0B`. Success/danger neo đúng `#16A34A`/`#DC2626`. Toàn bộ bậc còn
+   lại trong mỗi thang được suy ra bằng nội suy HSL cùng tông, đã kiểm tra
+   tương phản WCAG AA cho từng cặp chữ/nền thực tế đang dùng trong component
+   (xem ghi chú tương phản ở tầng SEMANTIC bên dưới).
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Indigo/Violet — primary (MagicSchool #6D5DFB) */
+  --ez-indigo-50:  #f1f0ff;
+  --ez-indigo-100: #dfdcfe;
+  --ez-indigo-200: #c5befd;
+  --ez-indigo-300: #a59cfc;
+  --ez-indigo-400: #8679fc;
+  --ez-indigo-500: #796bfa;
+  --ez-indigo-600: #6d5dfb;
+  --ez-indigo-700: #5546e8;
+  --ez-indigo-800: #3625d0;
+  --ez-indigo-900: #32279b;
+  --ez-indigo-950: #251e67;
+
+  /* Teal — không còn dùng làm secondary (xem Sky bên dưới), giữ lại cho
+     alias --mint-* tương thích ngược với CSS legacy chưa di trú. */
+  --ez-teal-50:  #e6f7f5;
+  --ez-teal-100: #c8efe9;
+  --ez-teal-200: #93ded4;
+  --ez-teal-300: #57c8bb;
+  --ez-teal-400: #24aea0;
+  --ez-teal-500: #0e9f8e;
+  --ez-teal-600: #0a7f72;
+  --ez-teal-700: #09665c;
+  --ez-teal-800: #0a5049;
+  --ez-teal-900: #08403b;
+
+  /* Sky blue — secondary (MagicSchool #3B82F6). Bậc 500 giữ đúng mã đặc tả;
+     bậc 600 (dùng làm nền nút đặc + chữ trắng) đậm hơn một chút vì #3B82F6
+     nguyên bản chỉ đạt 3.68:1 với chữ trắng — không đủ AA 4.5:1. */
+  --ez-sky-50:  #ebf3fe;
+  --ez-sky-100: #d3e3fd;
+  --ez-sky-200: #accafc;
+  --ez-sky-300: #7bacf9;
+  --ez-sky-400: #5996f7;
+  --ez-sky-500: #3b82f6;
+  --ez-sky-600: #216fed;
+  --ez-sky-700: #1659c5;
+  --ez-sky-800: #164a9c;
+  --ez-sky-900: #183a72;
+
+  /* Amber — accent (MagicSchool #F59E0B) */
+  --ez-amber-50:  #fff6e5;
+  --ez-amber-100: #ffe8c2;
+  --ez-amber-200: #fdd591;
+  --ez-amber-300: #fabb52;
+  --ez-amber-400: #f7ac2b;
+  --ez-amber-500: #f59e0b;
+  --ez-amber-600: #ce860d;
+  --ez-amber-700: #a56d0d;
+  --ez-amber-800: #81560e;
+
+  /* Neutral — hơi lệch xanh để hoà với indigo, không phải xám chết */
+  --ez-neutral-0:   #ffffff;
+  --ez-neutral-25:  #fbfcfe;
+  --ez-neutral-50:  #f6f7fb;
+  --ez-neutral-100: #eef0f6;
+  --ez-neutral-200: #e2e5ef;
+  --ez-neutral-300: #cbd0de;
+  --ez-neutral-400: #9ba3b8;
+  --ez-neutral-500: #667085;
+  --ez-neutral-600: #545b73;
+  --ez-neutral-700: #40465c;
+  --ez-neutral-800: #2a2f42;
+  --ez-neutral-900: #1a1e2e;
+  --ez-neutral-950: #10131f;
+
+  /* Trạng thái — success/danger neo đúng #16A34A/#DC2626 theo MagicSchool */
+  --ez-green-50:  #e5faed;
+  --ez-green-100: #c8f3d8;
+  --ez-green-500: #19cc5b;
+  --ez-green-600: #16a34a;
+  --ez-green-700: #10843b;
+
+  --ez-red-50:  #fdecec;
+  --ez-red-100: #fad1d1;
+  --ez-red-500: #ea3e3e;
+  --ez-red-600: #dc2626;
+  --ez-red-700: #b41d1d;
+
+  --ez-blue-50:  #e9f2fe;
+  --ez-blue-100: #d0e4fd;
+  --ez-blue-500: #1f72d4;
+  --ez-blue-600: #185cad;
+  --ez-blue-700: #144a8b;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   2. TYPOGRAPHY
+   Font đã được nạp trong index.css (Inter). Giữ nguyên để không thêm
+   request mạng mới.
+   Thang chữ nhảy bậc dứt khoát: 64 / 40 / 32 / 24 / 20 / 16 / 14 / 13.
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                  Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ez-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+                  'Liberation Mono', monospace;
+
+  /* Cỡ chữ */
+  --ez-text-display: 4rem;    /* 64px — chỉ dùng cho hero trang chủ */
+  --ez-text-h1:      2.5rem;  /* 40px */
+  --ez-text-h2:      2rem;    /* 32px */
+  --ez-text-h3:      1.5rem;  /* 24px */
+  --ez-text-h4:      1.25rem; /* 20px */
+  --ez-text-h5:      1.125rem;/* 18px */
+  --ez-text-h6:      1rem;    /* 16px */
+  --ez-text-body:    1rem;    /* 16px */
+  --ez-text-body-sm: 0.875rem;/* 14px */
+  --ez-text-caption: 0.8125rem; /* 13px */
+  --ez-text-button:  0.9375rem; /* 15px */
+
+  /* Line-height — tiêu đề chặt, thân chữ thoáng để đọc tiếng Việt có dấu */
+  --ez-leading-display: 1.05;
+  --ez-leading-heading: 1.2;
+  --ez-leading-snug:    1.4;
+  --ez-leading-body:    1.65;
+  --ez-leading-relaxed: 1.75;
+
+  /* Font-weight */
+  --ez-weight-regular:  400;
+  --ez-weight-medium:   500;
+  --ez-weight-semibold: 600;
+  --ez-weight-bold:     700;
+  --ez-weight-extrabold:800;
+
+  /* Letter-spacing — chữ lớn cần siết lại, chữ nhỏ cần nới ra */
+  --ez-tracking-tight:  -0.02em;
+  --ez-tracking-snug:   -0.01em;
+  --ez-tracking-normal: 0;
+  --ez-tracking-wide:   0.02em;
+  --ez-tracking-caps:   0.06em;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   3. SPACING — thang 4px
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-space-0:  0;
+  --ez-space-1:  0.25rem;  /*  4px */
+  --ez-space-2:  0.5rem;   /*  8px */
+  --ez-space-3:  0.75rem;  /* 12px */
+  --ez-space-4:  1rem;     /* 16px */
+  --ez-space-5:  1.25rem;  /* 20px */
+  --ez-space-6:  1.5rem;   /* 24px */
+  --ez-space-8:  2rem;     /* 32px */
+  --ez-space-10: 2.5rem;   /* 40px */
+  --ez-space-12: 3rem;     /* 48px */
+  --ez-space-16: 4rem;     /* 64px */
+  --ez-space-20: 5rem;     /* 80px */
+  --ez-space-24: 6rem;     /* 96px */
+  --ez-space-32: 8rem;     /* 128px */
+
+  /* Khoảng cách dọc giữa các section trang public */
+  --ez-section-y:    var(--ez-space-24);
+  --ez-section-y-sm: var(--ez-space-16);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   4. BORDER RADIUS
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-radius-none: 0;
+  --ez-radius-xs:   4px;
+  --ez-radius-sm:   6px;
+  --ez-radius-md:   10px;   /* input, button */
+  --ez-radius-lg:   14px;   /* card */
+  --ez-radius-xl:   20px;   /* card lớn, khối hero */
+  --ez-radius-2xl:  28px;   /* section nổi */
+  --ez-radius-full: 9999px; /* chip, badge, avatar */
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   5. SHADOW — dùng rất tiết chế. Thẻ phân tách bằng nền + viền, không
+   bằng bóng. Bóng chỉ dành cho lớp thực sự nổi lên trên (dropdown, dialog).
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-shadow-none: none;
+  --ez-shadow-xs: 0 1px 2px rgba(26, 30, 46, 0.05);
+  --ez-shadow-sm: 0 1px 3px rgba(26, 30, 46, 0.06),
+                  0 1px 2px rgba(26, 30, 46, 0.04);
+  --ez-shadow-md: 0 4px 12px rgba(26, 30, 46, 0.07),
+                  0 1px 3px rgba(26, 30, 46, 0.04);
+  --ez-shadow-lg: 0 12px 28px rgba(26, 30, 46, 0.10),
+                  0 2px 6px rgba(26, 30, 46, 0.05);
+  --ez-shadow-xl: 0 24px 48px rgba(26, 30, 46, 0.14),
+                  0 4px 12px rgba(26, 30, 46, 0.06);
+
+  /* Vòng focus — dùng chung toàn hệ thống */
+  --ez-ring-width: 2px;
+  --ez-ring-offset: 2px;
+  --ez-ring-color: var(--ez-indigo-500);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   6. Z-INDEX — thang cố định, không dùng số tuỳ ý trong component
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-z-base:       0;
+  --ez-z-raised:     10;  /* thẻ được nâng khi hover */
+  --ez-z-sticky:     100; /* header/thanh công cụ dính */
+  --ez-z-sidebar:    200;
+  --ez-z-overlay:    300; /* lớp phủ mờ sau dialog/drawer */
+  --ez-z-drawer:     400;
+  --ez-z-dialog:     500;
+  --ez-z-dropdown:   600;
+  --ez-z-tooltip:    700;
+  --ez-z-toast:      800;
+  --ez-z-skip-link:  900; /* luôn trên cùng khi được focus */
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   7. BREAKPOINT & CONTAINER
+   Biến chỉ để tra cứu — media query CSS không đọc được var(), nên giá trị
+   thực được viết trực tiếp trong @media. Giữ đồng bộ với bảng dưới.
+     xs  < 480px   điện thoại nhỏ (360px là mức hẹp nhất phải hỗ trợ)
+     sm  ≥ 480px   điện thoại
+     md  ≥ 768px   tablet dọc
+     lg  ≥ 1024px  tablet ngang / laptop nhỏ  → mốc đổi sidebar ↔ bottom nav
+     xl  ≥ 1280px  desktop
+     2xl ≥ 1536px  desktop rộng
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-bp-sm:  480px;
+  --ez-bp-md:  768px;
+  --ez-bp-lg:  1024px;
+  --ez-bp-xl:  1280px;
+  --ez-bp-2xl: 1536px;
+
+  --ez-container-sm:   640px;  /* form, trang xác thực */
+  --ez-container-md:   840px;  /* nội dung đọc dài */
+  --ez-container-lg:   1120px; /* trang app tiêu chuẩn */
+  --ez-container-xl:   1280px; /* trang public rộng */
+  --ez-container-pad:  var(--ez-space-6);
+  --ez-container-pad-sm: var(--ez-space-4);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   8. MOTION — 150–300ms cho tương tác cơ bản. Không animation trang trí.
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-duration-instant: 100ms;
+  --ez-duration-fast:    150ms; /* hover, màu, viền */
+  --ez-duration-base:    200ms; /* mặc định */
+  --ez-duration-slow:    300ms; /* dialog, drawer trượt */
+
+  --ez-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ez-ease-out:      cubic-bezier(0, 0, 0.2, 1);
+  --ez-ease-in:       cubic-bezier(0.4, 0, 1, 1);
+
+  --ez-transition-colors: color var(--ez-duration-fast) var(--ez-ease-standard),
+                          background-color var(--ez-duration-fast) var(--ez-ease-standard),
+                          border-color var(--ez-duration-fast) var(--ez-ease-standard);
+  --ez-transition-transform: transform var(--ez-duration-base) var(--ez-ease-standard);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   9. TOUCH TARGET
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-touch-min: 44px;  /* mọi phần tử bấm được trên mobile */
+  --ez-control-sm: 32px;
+  --ez-control-md: 40px;
+  --ez-control-lg: 48px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   10. SEMANTIC — SÁNG
+   Đây là tầng component được phép dùng. Không dùng trực tiếp primitive.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Nền: nền app hơi xám để surface trắng nổi lên mà không cần bóng */
+  --ez-bg:            var(--ez-neutral-50);
+  --ez-bg-subtle:     var(--ez-neutral-100);
+  --ez-bg-inverse:    var(--ez-neutral-900);
+
+  /* Surface */
+  --ez-surface:          var(--ez-neutral-0);
+  --ez-surface-subtle:   var(--ez-neutral-25);
+  --ez-surface-muted:    var(--ez-neutral-100);
+  --ez-surface-hover:    var(--ez-neutral-100);
+  --ez-surface-active:   var(--ez-neutral-200);
+  --ez-surface-inverse:  var(--ez-neutral-900);
+
+  /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên --ez-surface */
+  --ez-text:           var(--ez-neutral-900);
+  --ez-text-secondary: var(--ez-neutral-600);
+  --ez-text-muted:     var(--ez-neutral-500);
+  --ez-text-inverse:   var(--ez-neutral-0);
+  --ez-text-on-brand:  var(--ez-neutral-0);
+  --ez-text-link:      var(--ez-indigo-600);
+
+  /* Viền */
+  --ez-border:        var(--ez-neutral-200);
+  --ez-border-subtle: var(--ez-neutral-100);
+  --ez-border-strong: var(--ez-neutral-300);
+  --ez-border-focus:  var(--ez-indigo-500);
+
+  /* Primary */
+  --ez-primary:         var(--ez-indigo-600);
+  --ez-primary-hover:   var(--ez-indigo-700);
+  --ez-primary-active:  var(--ez-indigo-800);
+  --ez-primary-subtle:  var(--ez-indigo-50);
+  --ez-primary-border:  var(--ez-indigo-200);
+  --ez-primary-text:    var(--ez-indigo-700);
+
+  /* Secondary */
+  --ez-secondary:        var(--ez-sky-500);
+  --ez-secondary-hover:  var(--ez-sky-600);
+  --ez-secondary-active: var(--ez-sky-700);
+  --ez-secondary-subtle: var(--ez-sky-50);
+  --ez-secondary-border: var(--ez-sky-200);
+  --ez-secondary-text:   var(--ez-sky-700);
+
+  /* Accent */
+  --ez-accent:        var(--ez-amber-500);
+  --ez-accent-hover:  var(--ez-amber-600);
+  --ez-accent-subtle: var(--ez-amber-50);
+  --ez-accent-border: var(--ez-amber-200);
+  --ez-accent-text:   var(--ez-amber-800);
+
+  /* Success / Warning / Error / Info */
+  --ez-success:        var(--ez-green-600);
+  --ez-success-subtle: var(--ez-green-50);
+  --ez-success-border: var(--ez-green-100);
+  --ez-success-text:   var(--ez-green-700);
+
+  --ez-warning:        var(--ez-amber-600);
+  --ez-warning-subtle: var(--ez-amber-50);
+  --ez-warning-border: var(--ez-amber-200);
+  --ez-warning-text:   var(--ez-amber-800);
+
+  --ez-error:          var(--ez-red-600);
+  --ez-error-hover:    var(--ez-red-700);
+  --ez-error-subtle:   var(--ez-red-50);
+  --ez-error-border:   var(--ez-red-100);
+  --ez-error-text:     var(--ez-red-700);
+
+  --ez-info:           var(--ez-blue-600);
+  --ez-info-subtle:    var(--ez-blue-50);
+  --ez-info-border:    var(--ez-blue-100);
+  --ez-info-text:      var(--ez-blue-700);
+
+  /* Lớp phủ */
+  --ez-overlay: rgba(16, 19, 31, 0.48);
+
+  /* Skeleton */
+  --ez-skeleton-base:  var(--ez-neutral-100);
+  --ez-skeleton-sheen: var(--ez-neutral-200);
+
+  /* Tên semantic chuẩn dùng trong tài liệu và kiểm thử thiết kế. */
+  --ez-background:   var(--ez-bg);
+  --ez-text-primary: var(--ez-text);
+  --ez-danger:       var(--ez-error);
+  --ez-focus-ring:   var(--ez-ring-color);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   11. SEMANTIC — TỐI
+   Kích hoạt bằng [data-theme="dark"] trên <html> (giữ đúng cơ chế đã có).
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-theme='dark'] {
+  --ez-bg:            var(--ez-neutral-950);
+  --ez-bg-subtle:     var(--ez-neutral-900);
+  --ez-bg-inverse:    var(--ez-neutral-50);
+
+  --ez-surface:         #1a1e2e;
+  --ez-surface-subtle:  #1f2436;
+  --ez-surface-muted:   #262c40;
+  --ez-surface-hover:   #262c40;
+  --ez-surface-active:  #2f3648;
+  --ez-surface-inverse: var(--ez-neutral-50);
+
+  --ez-text:           #eaecf4;
+  --ez-text-secondary: #b0b6c8;
+  --ez-text-muted:     #8b92a8;
+  --ez-text-inverse:   var(--ez-neutral-900);
+  /* Ở chế độ tối, các màu thương hiệu được nâng sáng lên để nổi trên nền tối.
+     Hệ quả: chữ TRẮNG trên nút primary không đủ mức AA 4.5:1 cho chữ thường.
+     Vì vậy nhãn trên nền thương hiệu dùng màu gần đen:
+       trên primary (#8679fc)   → 5.42:1
+       trên secondary (#7bacf9) → 8.03:1
+       trên error (#f2726f)     → 6.57:1
+     Đây cũng là quy ước quen thuộc của giao diện tối: nền nhấn sáng, nhãn tối. */
+  --ez-text-on-brand:  var(--ez-neutral-950);
+  --ez-text-link:      var(--ez-indigo-300);
+
+  --ez-border:        #313850;
+  --ez-border-subtle: #262c40;
+  --ez-border-strong: #414a66;
+  --ez-border-focus:  var(--ez-indigo-300);
+
+  /* Trên nền tối cần bậc màu sáng hơn để giữ tương phản */
+  --ez-primary:         var(--ez-indigo-400);
+  --ez-primary-hover:   var(--ez-indigo-300);
+  --ez-primary-active:  var(--ez-indigo-200);
+  --ez-primary-subtle:  rgba(134, 121, 252, 0.14);
+  --ez-primary-border:  rgba(134, 121, 252, 0.34);
+  --ez-primary-text:    var(--ez-indigo-200);
+
+  --ez-secondary:        var(--ez-sky-300);
+  --ez-secondary-hover:  var(--ez-sky-200);
+  --ez-secondary-active: var(--ez-sky-100);
+  --ez-secondary-subtle: rgba(123, 172, 249, 0.14);
+  --ez-secondary-border: rgba(123, 172, 249, 0.32);
+  --ez-secondary-text:   var(--ez-sky-200);
+
+  --ez-accent:        var(--ez-amber-300);
+  --ez-accent-hover:  var(--ez-amber-200);
+  --ez-accent-subtle: rgba(250, 191, 87, 0.14);
+  --ez-accent-border: rgba(250, 191, 87, 0.32);
+  --ez-accent-text:   var(--ez-amber-200);
+
+  --ez-success:        #4ec98a;
+  --ez-success-subtle: rgba(78, 201, 138, 0.14);
+  --ez-success-border: rgba(78, 201, 138, 0.30);
+  --ez-success-text:   #8fe0b3;
+
+  --ez-warning:        var(--ez-amber-300);
+  --ez-warning-subtle: rgba(250, 191, 87, 0.14);
+  --ez-warning-border: rgba(250, 191, 87, 0.30);
+  --ez-warning-text:   var(--ez-amber-200);
+
+  --ez-error:          #f2726f;
+  --ez-error-hover:    #f79694;
+  --ez-error-subtle:   rgba(242, 114, 111, 0.14);
+  --ez-error-border:   rgba(242, 114, 111, 0.30);
+  --ez-error-text:     #f7a8a6;
+
+  --ez-info:           #62a6ec;
+  --ez-info-subtle:    rgba(98, 166, 236, 0.14);
+  --ez-info-border:    rgba(98, 166, 236, 0.30);
+  --ez-info-text:      #9cc7f3;
+
+  --ez-overlay: rgba(6, 8, 14, 0.66);
+
+  --ez-skeleton-base:  #262c40;
+  --ez-skeleton-sheen: #313850;
+
+  /* Bóng trên nền tối phải đậm hơn mới thấy được */
+  --ez-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --ez-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.36), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --ez-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.42), 0 1px 3px rgba(0, 0, 0, 0.26);
+  --ez-shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.30);
+  --ez-shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.58), 0 4px 12px rgba(0, 0, 0, 0.34);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   12. ALIAS — tương thích ngược
+   CSS hiện có (index.css, landing.css, Admin*.css…) dùng bộ tên biến cũ.
+   Ánh xạ chúng sang token mới để giao diện cũ đổi màu theo hệ thống mới
+   mà không phải sửa hàng nghìn dòng. Alias sẽ được rút dần khi từng trang
+   được thiết kế lại.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root,
+[data-theme='dark'] {
+  --app-bg:         var(--ez-bg);
+  --bg:             var(--ez-bg);
+  --ink:            var(--ez-text);
+  --text-h:         var(--ez-text);
+  --text:           var(--ez-text-secondary);
+  --muted:          var(--ez-text-muted);
+
+  --surface:        var(--ez-surface);
+  --surface-strong: var(--ez-surface);
+  --surface-muted:  var(--ez-surface-muted);
+  --card:           var(--ez-surface);
+  --code-bg:        var(--ez-surface-muted);
+
+  /* Bỏ hiệu ứng kính: surface đục hoàn toàn, tránh cảm giác "template AI" */
+  --glass-bg:       var(--ez-surface);
+  --glass-border:   var(--ez-border);
+
+  --border:         var(--ez-border);
+  --border-strong:  var(--ez-border-strong);
+
+  --accent:         var(--ez-primary);
+  --accent-hover:   var(--ez-primary-hover);
+  --accent-bg:      var(--ez-primary-subtle);
+  --accent-border:  var(--ez-primary-border);
+  --accent-2:       var(--ez-secondary);
+  --accent-2-bg:    var(--ez-secondary-subtle);
+  --accent-3:       var(--ez-accent);
+  --accent-3-bg:    var(--ez-accent-subtle);
+  --accent-4:       var(--ez-accent);
+
+  --success:        var(--ez-success);
+  --success-bg:     var(--ez-success-subtle);
+  --warning:        var(--ez-warning);
+  --warning-bg:     var(--ez-warning-subtle);
+  --danger:         var(--ez-error);
+  --danger-bg:      var(--ez-error-subtle);
+
+  --shadow:         var(--ez-shadow-lg);
+  --shadow-soft:    var(--ez-shadow-md);
+  --shadow-card:    var(--ez-shadow-sm);
+  --shadow-glow:    var(--ez-shadow-md);
+  --ring:           0 0 0 3px var(--ez-primary-subtle);
+
+  /* Bảng màu cũ: trỏ về bậc indigo tương ứng để chữ/nền cũ không bị lệch */
+  --crystal-50:  var(--ez-indigo-50);
+  --crystal-100: var(--ez-indigo-100);
+  --crystal-200: var(--ez-indigo-200);
+  --crystal-300: var(--ez-indigo-300);
+  --crystal-400: var(--ez-indigo-400);
+  --crystal-500: var(--ez-indigo-500);
+  --crystal-600: var(--ez-indigo-600);
+  --crystal-700: var(--ez-indigo-700);
+
+  --ice-50:  var(--ez-blue-50);
+  --ice-100: var(--ez-blue-100);
+  --ice-200: var(--ez-blue-100);
+  --ice-400: var(--ez-blue-500);
+  --ice-500: var(--ez-blue-600);
+
+  --mint-50:  var(--ez-teal-50);
+  --mint-100: var(--ez-teal-100);
+  --mint-400: var(--ez-teal-400);
+  --mint-500: var(--ez-teal-500);
+
+  --rose-50:  var(--ez-red-50);
+  --rose-100: var(--ez-red-100);
+  --rose-200: var(--ez-red-100);
+  --rose-400: var(--ez-red-500);
+  --rose-500: var(--ez-red-600);
+
+  --amber-50:  var(--ez-amber-50);
+  --amber-400: var(--ez-amber-400);
+  --amber-500: var(--ez-amber-500);
+}

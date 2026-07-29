@@ -13,19 +13,36 @@ import {
   adminAuditResultLabel,
   formatAuditValue,
 } from '../utils/adminAuditLogsUi';
-import './AdminAuditLogsPage.css';
+import {
+  Badge,
+  Button,
+  Card, CardBody,
+  DataTable,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SkeletonText,
+  StatGrid,
+  StatTile,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
+import { fmtDateTime } from '../utils/adminUtils';
 
 type LoadState = 'loading' | 'error' | 'ok';
 
+const RESULT_BADGE_MAP: Record<AdminAuditResult, 'success' | 'error'> = {
+  success: 'success',
+  failure: 'error',
+};
+
 function fmtNumber(value: number | undefined) {
   return (value ?? 0).toLocaleString('vi-VN');
-}
-
-function fmtDateTime(value: string | null | undefined) {
-  if (!value) return 'Không có dữ liệu';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'medium', hour12: false });
 }
 
 function toIsoDateStart(value: string) {
@@ -34,15 +51,6 @@ function toIsoDateStart(value: string) {
 
 function toIsoDateEnd(value: string) {
   return value ? new Date(`${value}T23:59:59.999+07:00`).toISOString() : undefined;
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="audit-stat">
-      <span>{label}</span>
-      <strong>{fmtNumber(value)}</strong>
-    </div>
-  );
 }
 
 function AuditDiffModal({ item, onClose }: { item: AdminAuditLogItem; onClose: () => void }) {
@@ -59,51 +67,37 @@ function AuditDiffModal({ item, onClose }: { item: AdminAuditLogItem; onClose: (
     }));
   }, [item]);
 
+  const diffColumns: DataTableColumn<(typeof rows)[number]>[] = [
+    { key: 'field', label: 'Field', render: (row) => row.field },
+    { key: 'before', label: 'Before', render: (row) => row.before },
+    { key: 'after', label: 'After', render: (row) => row.after },
+  ];
+
   return (
-    <div className="audit-modal-backdrop" role="presentation">
-      <section className="audit-modal" role="dialog" aria-modal="true" aria-labelledby="audit-detail-title">
-        <h3 id="audit-detail-title">Before / After</h3>
-        <dl className="audit-detail-kv">
-          <div><dt>Admin</dt><dd>{item.admin_email_snapshot}</dd></div>
-          <div><dt>Action</dt><dd>{adminAuditActionLabel(item.action)}</dd></div>
-          <div><dt>Target</dt><dd>{item.target_type} · {item.target_id}</dd></div>
-          <div><dt>Result</dt><dd>{adminAuditResultLabel(item.result)}</dd></div>
-          <div><dt>Reason</dt><dd>{item.reason || '-'}</dd></div>
-          <div><dt>Request ID</dt><dd>{item.request_id || '-'}</dd></div>
-          <div><dt>IP hash</dt><dd>{item.ip_hash || '-'}</dd></div>
-          <div><dt>User agent</dt><dd>{item.user_agent_summary || '-'}</dd></div>
-        </dl>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Trước và sau thay đổi"
+      size="xl"
+      footer={<Button variant="primary" onClick={onClose}>Đóng</Button>}
+    >
+      <dl className="ez-kv-grid">
+        <div><dt>Admin</dt><dd>{item.admin_email_snapshot}</dd></div>
+        <div><dt>Action</dt><dd>{adminAuditActionLabel(item.action)}</dd></div>
+        <div><dt>Target</dt><dd>{item.target_type} · {item.target_id}</dd></div>
+        <div><dt>Result</dt><dd>{adminAuditResultLabel(item.result)}</dd></div>
+        <div><dt>Reason</dt><dd>{item.reason || '-'}</dd></div>
+        <div><dt>Mã yêu cầu</dt><dd>{item.request_id || '-'}</dd></div>
+        <div><dt>IP (đã ẩn danh)</dt><dd>{item.ip_hash || '-'}</dd></div>
+        <div><dt>Trình duyệt/thiết bị</dt><dd>{item.user_agent_summary || '-'}</dd></div>
+      </dl>
 
-        {rows.length > 0 ? (
-          <div className="audit-diff-wrap">
-            <table className="audit-diff-table">
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Before</th>
-                  <th>After</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.field}>
-                    <td>{row.field}</td>
-                    <td>{row.before}</td>
-                    <td>{row.after}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="audit-empty-small">Không có thay đổi before/after được ghi nhận.</p>
-        )}
-
-        <div className="audit-modal-actions">
-          <button type="button" className="admin-action-btn admin-action-btn--primary" onClick={onClose}>Đóng</button>
-        </div>
-      </section>
-    </div>
+      {rows.length > 0 ? (
+        <DataTable columns={diffColumns} data={rows} rowKey={(row) => row.field} minWidth={0} />
+      ) : (
+        <p className="ez-muted">Không có thay đổi before/after được ghi nhận.</p>
+      )}
+    </Dialog>
   );
 }
 
@@ -170,118 +164,109 @@ export default function AdminAuditLogsPage() {
     setAppliedFilters(filters);
   };
 
+  const columns: DataTableColumn<AdminAuditLogItem>[] = [
+    { key: 'timestamp', label: 'Thời gian', render: (item) => fmtDateTime(item.timestamp) },
+    {
+      key: 'admin',
+      label: 'Admin',
+      render: (item) => (
+        <div className="ez-datatable-cell-title">
+          <strong>{item.admin_email_snapshot}</strong>
+          <span className="ez-muted">{item.admin_user_id}</span>
+        </div>
+      ),
+    },
+    { key: 'action', label: 'Hành động', render: (item) => adminAuditActionLabel(item.action) },
+    {
+      key: 'target',
+      label: 'Đối tượng',
+      render: (item) => (
+        <div className="ez-datatable-cell-title">
+          <strong>{item.target_type}</strong>
+          <span className="ez-muted">{item.target_id}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'result',
+      label: 'Kết quả',
+      render: (item) => <Badge variant={RESULT_BADGE_MAP[item.result as AdminAuditResult]}>{adminAuditResultLabel(item.result)}</Badge>,
+    },
+    { key: 'reason', label: 'Lý do', render: (item) => item.reason || '-' },
+    {
+      key: 'diff',
+      label: 'Before/After',
+      render: (item) => <Button variant="outline" size="sm" onClick={() => setSelected(item)}>Xem</Button>,
+    },
+  ];
+
   return (
-    <div className="audit-page">
-      <header className="admin-header">
-        <h1>Nhật ký quản trị</h1>
-        <p className="admin-subtitle">Theo dõi thao tác quản trị có ảnh hưởng dữ liệu hoặc cấu hình.</p>
-      </header>
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Nhật ký quản trị"
+        description="Theo dõi thao tác quản trị có ảnh hưởng dữ liệu hoặc cấu hình."
+      />
 
       {stats && (
-        <section className="audit-stat-grid" aria-label="Thống kê admin audit logs">
-          <StatCard label="Tổng audit" value={stats.total} />
-          <StatCard label="Thành công" value={stats.success_count} />
-          <StatCard label="Thất bại" value={stats.failure_count} />
-          <StatCard label="Loại hành động" value={Object.keys(stats.by_action).length} />
-          <StatCard label="Loại đối tượng" value={Object.keys(stats.by_target_type).length} />
-        </section>
+        <StatGrid aria-label="Thống kê nhật ký quản trị">
+          <StatTile label="Tổng bản ghi" value={fmtNumber(stats.total)} />
+          <StatTile label="Thành công" value={fmtNumber(stats.success_count)} />
+          <StatTile label="Thất bại" value={fmtNumber(stats.failure_count)} />
+          <StatTile label="Loại hành động" value={fmtNumber(Object.keys(stats.by_action).length)} />
+          <StatTile label="Loại đối tượng" value={fmtNumber(Object.keys(stats.by_target_type).length)} />
+        </StatGrid>
       )}
 
-      <section className="audit-panel">
-        <form className="audit-filters" onSubmit={submitFilters}>
-          <label>
-            <span>Tìm kiếm</span>
-            <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Admin, action, target, reason" />
-          </label>
-          <label>
-            <span>Admin ID</span>
-            <input value={filters.admin_user_id} onChange={(event) => setFilters({ ...filters, admin_user_id: event.target.value })} />
-          </label>
-          <label>
-            <span>Action</span>
-            <select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
-              <option value="all">Tất cả</option>
-              {ADMIN_AUDIT_ACTIONS.map((action) => <option key={action} value={action}>{adminAuditActionLabel(action)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Target type</span>
-            <input value={filters.target_type} onChange={(event) => setFilters({ ...filters, target_type: event.target.value })} placeholder="user, document..." />
-          </label>
-          <label>
-            <span>Target ID</span>
-            <input value={filters.target_id} onChange={(event) => setFilters({ ...filters, target_id: event.target.value })} />
-          </label>
-          <label>
-            <span>Kết quả</span>
-            <select value={filters.result} onChange={(event) => setFilters({ ...filters, result: event.target.value })}>
-              <option value="all">Tất cả</option>
-              {(['success', 'failure'] as AdminAuditResult[]).map((item) => <option key={item} value={item}>{adminAuditResultLabel(item)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Từ ngày</span>
-            <input type="date" value={filters.date_from} onChange={(event) => setFilters({ ...filters, date_from: event.target.value })} />
-          </label>
-          <label>
-            <span>Đến ngày</span>
-            <input type="date" value={filters.date_to} onChange={(event) => setFilters({ ...filters, date_to: event.target.value })} />
-          </label>
-          <button type="submit" className="admin-action-btn admin-action-btn--primary">Lọc</button>
-        </form>
+      <Card>
+        <CardBody>
+          <FilterBar columns={4} onSubmit={submitFilters}>
+            <FormField label="Tìm kiếm">
+              <Input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Admin, action, target, reason" />
+            </FormField>
+            <FormField label="Admin ID">
+              <Input value={filters.admin_user_id} onChange={(event) => setFilters({ ...filters, admin_user_id: event.target.value })} />
+            </FormField>
+            <FormField label="Action">
+              <Select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
+                <option value="all">Tất cả</option>
+                {ADMIN_AUDIT_ACTIONS.map((action) => <option key={action} value={action}>{adminAuditActionLabel(action)}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Target type">
+              <Input value={filters.target_type} onChange={(event) => setFilters({ ...filters, target_type: event.target.value })} placeholder="user, document..." />
+            </FormField>
+            <FormField label="Target ID">
+              <Input value={filters.target_id} onChange={(event) => setFilters({ ...filters, target_id: event.target.value })} />
+            </FormField>
+            <FormField label="Kết quả">
+              <Select value={filters.result} onChange={(event) => setFilters({ ...filters, result: event.target.value })}>
+                <option value="all">Tất cả</option>
+                {(['success', 'failure'] as AdminAuditResult[]).map((item) => <option key={item} value={item}>{adminAuditResultLabel(item)}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Từ ngày">
+              <Input type="date" value={filters.date_from} onChange={(event) => setFilters({ ...filters, date_from: event.target.value })} />
+            </FormField>
+            <FormField label="Đến ngày">
+              <Input type="date" value={filters.date_to} onChange={(event) => setFilters({ ...filters, date_to: event.target.value })} />
+            </FormField>
+            <Button type="submit" variant="primary">Lọc</Button>
+          </FilterBar>
 
-        {error && <div className="panel-error" role="alert">{error}</div>}
-        {state === 'loading' && <p className="panel-loading">Đang tải nhật ký quản trị...</p>}
-        {state === 'error' && <div className="audit-empty"><strong>Không tải được dữ liệu</strong><p>Vui lòng kiểm tra quyền hoặc thử lại.</p></div>}
-        {state === 'ok' && list && list.items.length === 0 && (
-          <div className="audit-empty"><strong>Chưa có audit phù hợp</strong><p>Thử thay đổi bộ lọc hoặc khoảng thời gian.</p></div>
-        )}
+          {error && <ErrorState title="Không tải được dữ liệu" description={error} onRetry={load} compact />}
+          {state === 'loading' && <SkeletonText lines={6} />}
+          {state === 'ok' && list && list.items.length === 0 && (
+            <EmptyState title="Chưa có bản ghi phù hợp" description="Thử thay đổi bộ lọc hoặc khoảng thời gian." compact />
+          )}
 
-        {state === 'ok' && list && list.items.length > 0 && (
-          <>
-            <div className="audit-table-wrap">
-              <table className="audit-table">
-                <thead>
-                  <tr>
-                    <th>Thời gian</th>
-                    <th>Admin</th>
-                    <th>Hành động</th>
-                    <th>Đối tượng</th>
-                    <th>Kết quả</th>
-                    <th>Lý do</th>
-                    <th>Before/After</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    <tr key={item.id}>
-                      <td data-label="Thời gian">{fmtDateTime(item.timestamp)}</td>
-                      <td data-label="Admin">{item.admin_email_snapshot}<small>{item.admin_user_id}</small></td>
-                      <td data-label="Hành động">{adminAuditActionLabel(item.action)}</td>
-                      <td data-label="Đối tượng">{item.target_type}<small>{item.target_id}</small></td>
-                      <td data-label="Kết quả">
-                        <span className={`audit-result audit-result--${item.result}`}>{adminAuditResultLabel(item.result)}</span>
-                      </td>
-                      <td data-label="Lý do">{item.reason || '-'}</td>
-                      <td data-label="Before/After">
-                        <button type="button" className="admin-action-btn" onClick={() => setSelected(item)}>Xem</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="audit-pagination">
-              <span>Trang {list.page}/{Math.max(list.total_pages, 1)} · {fmtNumber(list.total)} audit</span>
-              <div>
-                <button type="button" className="admin-action-btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Trước</button>
-                <button type="button" className="admin-action-btn" disabled={page >= list.total_pages} onClick={() => setPage((value) => value + 1)}>Sau</button>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
+          {state === 'ok' && list && list.items.length > 0 && (
+            <>
+              <DataTable columns={columns} data={list.items} rowKey={(item) => item.id} minWidth={1040} />
+              <Pagination page={page} totalPages={list.total_pages} total={list.total} label="bản ghi" onPageChange={setPage} />
+            </>
+          )}
+        </CardBody>
+      </Card>
 
       {selected && <AuditDiffModal item={selected} onClose={() => setSelected(null)} />}
     </div>

@@ -1,4 +1,22 @@
 import React, { useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Check,
+  Hash,
+  HelpCircle,
+  Hourglass,
+  Lightbulb,
+  Pencil,
+  Scissors,
+  Search,
+  Type,
+  X,
+  XCircle,
+  Zap,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type {
   VerificationIssue,
   VerificationIssueType,
@@ -17,18 +35,18 @@ interface IssueCardProps {
   ) => Promise<boolean>;
 }
 
-const ISSUE_TYPE_LABELS: Record<VerificationIssueType, { label: string; icon: string }> = {
-  ocr_error: { label: 'Lỗi OCR', icon: '🔤' },
-  factual_error: { label: 'Sai kiến thức', icon: '❌' },
-  suspicious_number: { label: 'Số liệu đáng nghi', icon: '🔢' },
-  terminology_error: { label: 'Sai thuật ngữ', icon: '📚' },
-  internal_contradiction: { label: 'Mâu thuẫn nội bộ', icon: '⚡' },
-  incomplete_content: { label: 'Nội dung thiếu', icon: '✂️' },
-  outdated_information: { label: 'Thông tin lỗi thời', icon: '⏳' },
-  missing_context: { label: 'Thiếu ngữ cảnh', icon: '💡' },
-  misleading_statement: { label: 'Gây hiểu nhầm', icon: '⚠️' },
-  unsupported_claim: { label: 'Thiếu bằng chứng', icon: '❓' },
-  needs_verification: { label: 'Cần kiểm chứng thêm', icon: '🔎' },
+const ISSUE_TYPE_LABELS: Record<VerificationIssueType, { label: string; icon: LucideIcon }> = {
+  ocr_error: { label: 'Lỗi OCR', icon: Type },
+  factual_error: { label: 'Sai kiến thức', icon: XCircle },
+  suspicious_number: { label: 'Số liệu đáng nghi', icon: Hash },
+  terminology_error: { label: 'Sai thuật ngữ', icon: BookOpen },
+  internal_contradiction: { label: 'Mâu thuẫn nội bộ', icon: Zap },
+  incomplete_content: { label: 'Nội dung thiếu', icon: Scissors },
+  outdated_information: { label: 'Thông tin lỗi thời', icon: Hourglass },
+  missing_context: { label: 'Thiếu ngữ cảnh', icon: Lightbulb },
+  misleading_statement: { label: 'Gây hiểu nhầm', icon: AlertTriangle },
+  unsupported_claim: { label: 'Thiếu bằng chứng', icon: HelpCircle },
+  needs_verification: { label: 'Cần kiểm chứng thêm', icon: Search },
 };
 
 const SEVERITY_LABELS: Record<VerificationSeverity, string> = {
@@ -60,8 +78,9 @@ const IssueCard: React.FC<IssueCardProps> = ({
 
   const issueMeta = ISSUE_TYPE_LABELS[issue.issue_type] ?? {
     label: issue.issue_type,
-    icon: '❓',
+    icon: HelpCircle,
   };
+  const IssueTypeIcon = issueMeta.icon;
   const confidence = Number.isFinite(issue.confidence)
     ? Math.min(1, Math.max(0, issue.confidence))
     : 0;
@@ -129,8 +148,9 @@ const IssueCard: React.FC<IssueCardProps> = ({
     >
       <div className="verification-issue__header">
         <div className="verification-issue__badges">
-          <span className="verification-badge verification-badge--type">
-            {issueMeta.icon} {issueMeta.label}
+          <span className="verification-badge verification-badge--type" style={{ gap: '4px' }}>
+            <IssueTypeIcon size={12} aria-hidden="true" />
+            <span>{issueMeta.label}</span>
           </span>
           <span
             className={`verification-badge verification-badge--severity verification-badge--${issue.severity}`}
@@ -175,7 +195,7 @@ const IssueCard: React.FC<IssueCardProps> = ({
             {issue.original_text}
           </div>
         </div>
-        <span className="verification-diff__arrow" aria-hidden="true">→</span>
+        <span className="verification-diff__arrow" aria-hidden="true"><ArrowRight size={18} /></span>
         <div className="verification-diff__column">
           <span className="verification-diff__label">
             {issue.resolution === 'edited' ? 'Bản tự sửa' : 'Đề xuất sửa'}
@@ -226,13 +246,15 @@ const IssueCard: React.FC<IssueCardProps> = ({
 
       <div className="verification-issue__evidence">
         {issue.ai_provider === 'both' && (
-          <span className="verification-evidence-badge">
-            ✓ Đã kiểm tra chéo bởi hai mô hình AI
+          <span className="verification-evidence-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={12} aria-hidden="true" />
+            <span>Đã kiểm tra chéo bởi hai mô hình AI</span>
           </span>
         )}
         {issue.applied_at && (
-          <span className="verification-evidence-badge verification-evidence-badge--applied">
-            ✓ Đã áp dụng vào nội dung
+          <span className="verification-evidence-badge verification-evidence-badge--applied" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={12} aria-hidden="true" />
+            <span>Đã áp dụng vào nội dung</span>
           </span>
         )}
       </div>
@@ -286,7 +308,14 @@ const IssueCard: React.FC<IssueCardProps> = ({
                 onClick={() => void submitResolution('accepted')}
                 disabled={resolving || disabled}
               >
-                {resolving ? 'Đang cập nhật...' : '✓ Chấp nhận'}
+                {resolving ? (
+                  'Đang cập nhật...'
+                ) : (
+                  <>
+                    <Check size={16} aria-hidden="true" />
+                    <span>Chấp nhận</span>
+                  </>
+                )}
               </button>
               <button
                 type="button"
@@ -294,7 +323,8 @@ const IssueCard: React.FC<IssueCardProps> = ({
                 onClick={() => void submitResolution('rejected')}
                 disabled={resolving || disabled}
               >
-                ✕ Từ chối
+                <X size={16} aria-hidden="true" />
+                <span>Từ chối</span>
               </button>
               <button
                 type="button"
@@ -302,7 +332,8 @@ const IssueCard: React.FC<IssueCardProps> = ({
                 onClick={openEditor}
                 disabled={resolving || disabled}
               >
-                ✎ Tự sửa
+                <Pencil size={16} aria-hidden="true" />
+                <span>Tự sửa</span>
               </button>
               {resolved && (
                 <button

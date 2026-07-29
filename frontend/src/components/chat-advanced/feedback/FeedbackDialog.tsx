@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, ThumbsDown, X } from 'lucide-react';
 import type { LocalChatMessage } from '../../../types/chat';
 import type { FeedbackReasonCode, FeedbackData } from '../../../types/feedback';
 import { FeedbackReasonSelector } from './FeedbackReasonSelector';
@@ -105,23 +106,25 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
       >
         <div style={styles.header}>
           <h3 id="feedback-dialog-title" style={styles.title}>
-            👎 Đóng góp ý kiến cho câu trả lời
+            <ThumbsDown size={16} aria-hidden="true" /><span>Đóng góp ý kiến cho câu trả lời</span>
           </h3>
           <button
             type="button"
             onClick={onClose}
             style={styles.closeBtn}
+            title="Đóng hộp thoại"
             aria-label="Đóng hộp thoại"
             disabled={submitting}
           >
-            ✕
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
         <form onSubmit={handleFormSubmit} style={styles.body}>
           {errorMsg && (
             <div style={styles.errorAlert} role="alert">
-              ⚠️ {errorMsg}
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
@@ -233,6 +236,9 @@ const styles = {
     fontSize: '15px',
     fontWeight: '700',
     color: 'var(--text-h)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   closeBtn: {
     border: 'none',
@@ -259,6 +265,9 @@ const styles = {
     color: 'var(--danger)',
     fontSize: '13px',
     marginBottom: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   commentContainer: {
     display: 'flex',

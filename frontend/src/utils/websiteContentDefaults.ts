@@ -22,9 +22,9 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContentBundle = {
   hero: {
     title: 'Xử lý học liệu điện tử',
     highlight: 'thành đề thi miễn phí',
-    description: 'Tải lên PDF, Word, PowerPoint hoặc video từ máy tính. EzEdu AI tự động trích xuất nội dung, phân tích chủ đề, kiểm tra kiến thức và tạo câu hỏi kèm đáp án, lời giải thích và mức độ khó.',
-    primary_cta_label: 'Bắt đầu tạo đề',
-    secondary_cta_label: 'Xem cách hoạt động',
+    description: 'Tải tài liệu lên, tạo câu hỏi, luyện tập và nhận hỗ trợ từ AI trong cùng một nền tảng.',
+    primary_cta_label: 'Bắt đầu miễn phí',
+    secondary_cta_label: 'Khám phá công cụ',
     sticker_image_url: '',
     upload_enabled: true,
     chips: ['PDF · DOCX · PPTX · Video', 'Tìm đúng nội dung', 'Tạo câu hỏi nhanh', 'Có đáp án và lời giải'],

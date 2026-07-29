@@ -14,19 +14,40 @@ import {
   activityStatusLabel,
   hasPrivateMetadataKey,
 } from '../utils/activityLogsUi';
-import './AdminActivityLogsPage.css';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card, CardBody,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SkeletonText,
+  StatGrid,
+  StatTile,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
+import { fmtDateTime } from '../utils/adminUtils';
 
 type LoadState = 'loading' | 'error' | 'ok';
 
+const STATUS_BADGE_MAP: Record<ActivityStatus, 'success' | 'warning' | 'error'> = {
+  success: 'success',
+  failure: 'error',
+  started: 'warning',
+  denied: 'error',
+};
+
 function fmtNumber(value: number | undefined) {
   return (value ?? 0).toLocaleString('vi-VN');
-}
-
-function fmtDateTime(value: string | null | undefined) {
-  if (!value) return 'Không có dữ liệu';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'medium', hour12: false });
 }
 
 function toIsoDateStart(value: string) {
@@ -37,42 +58,33 @@ function toIsoDateEnd(value: string) {
   return value ? new Date(`${value}T23:59:59.999+07:00`).toISOString() : undefined;
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="activity-stat">
-      <span>{label}</span>
-      <strong>{fmtNumber(value)}</strong>
-    </div>
-  );
-}
-
 function ActivityDetailModal({ item, onClose }: { item: UserActivityLogItem; onClose: () => void }) {
   const metadataText = JSON.stringify(item.metadata || {}, null, 2);
   return (
-    <div className="activity-modal-backdrop" role="presentation">
-      <section className="activity-modal" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title">
-        <h3 id="activity-detail-title">Chi tiết hoạt động</h3>
-        <dl className="activity-detail-kv">
-          <div><dt>Action</dt><dd>{activityActionLabel(item.action)}</dd></div>
-          <div><dt>Category</dt><dd>{activityCategoryLabel(item.category)}</dd></div>
-          <div><dt>Status</dt><dd>{activityStatusLabel(item.status)}</dd></div>
-          <div><dt>User ID</dt><dd>{item.user_id || 'Không có'}</dd></div>
-          <div><dt>Resource</dt><dd>{item.resource_type || '-'} · {item.resource_id || '-'}</dd></div>
-          <div><dt>Request ID</dt><dd>{item.request_id || '-'}</dd></div>
-          <div><dt>IP hash</dt><dd>{item.ip_hash || '-'}</dd></div>
-          <div><dt>User agent</dt><dd>{item.user_agent_summary || '-'}</dd></div>
-          <div><dt>Duration</dt><dd>{item.duration_ms == null ? '-' : `${item.duration_ms} ms`}</dd></div>
-          <div><dt>Error</dt><dd>{item.error_code || '-'}</dd></div>
-        </dl>
-        {hasPrivateMetadataKey(item.metadata || {}) && (
-          <p className="activity-warning">Metadata có key nhạy cảm. Cần kiểm tra backend sanitizer.</p>
-        )}
-        <pre className="activity-json">{metadataText}</pre>
-        <div className="activity-modal-actions">
-          <button type="button" className="admin-action-btn admin-action-btn--primary" onClick={onClose}>Đóng</button>
-        </div>
-      </section>
-    </div>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Chi tiết hoạt động"
+      size="lg"
+      footer={<Button variant="primary" onClick={onClose}>Đóng</Button>}
+    >
+      <dl className="ez-kv-grid">
+        <div><dt>Action</dt><dd>{activityActionLabel(item.action)}</dd></div>
+        <div><dt>Category</dt><dd>{activityCategoryLabel(item.category)}</dd></div>
+        <div><dt>Status</dt><dd>{activityStatusLabel(item.status)}</dd></div>
+        <div><dt>User ID</dt><dd>{item.user_id || 'Không có'}</dd></div>
+        <div><dt>Resource</dt><dd>{item.resource_type || '-'} · {item.resource_id || '-'}</dd></div>
+        <div><dt>Mã yêu cầu</dt><dd>{item.request_id || '-'}</dd></div>
+        <div><dt>IP (đã ẩn danh)</dt><dd>{item.ip_hash || '-'}</dd></div>
+        <div><dt>Trình duyệt/thiết bị</dt><dd>{item.user_agent_summary || '-'}</dd></div>
+        <div><dt>Duration</dt><dd>{item.duration_ms == null ? '-' : `${item.duration_ms} ms`}</dd></div>
+        <div><dt>Error</dt><dd>{item.error_code || '-'}</dd></div>
+      </dl>
+      {hasPrivateMetadataKey(item.metadata || {}) && (
+        <Alert tone="warning">Dữ liệu này có thể chứa thông tin nhạy cảm — rà soát trước khi chia sẻ.</Alert>
+      )}
+      <pre className="ez-pre">{metadataText}</pre>
+    </Dialog>
   );
 }
 
@@ -144,135 +156,119 @@ export default function AdminActivityLogsPage() {
     setAppliedFilters(filters);
   };
 
+  const columns: DataTableColumn<UserActivityLogItem>[] = [
+    { key: 'timestamp', label: 'Thời gian', render: (item) => fmtDateTime(item.timestamp) },
+    {
+      key: 'user',
+      label: 'User',
+      render: (item) => <span style={{ fontFamily: 'var(--ez-font-mono)' }}>{item.user_id || '-'}</span>,
+    },
+    { key: 'action', label: 'Action', render: (item) => activityActionLabel(item.action) },
+    { key: 'category', label: 'Category', render: (item) => activityCategoryLabel(item.category) },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (item) => <Badge variant={STATUS_BADGE_MAP[item.status as ActivityStatus]}>{activityStatusLabel(item.status)}</Badge>,
+    },
+    {
+      key: 'resource',
+      label: 'Resource',
+      render: (item) => (
+        <div className="ez-datatable-cell-title">
+          <strong>{item.resource_type || '-'}</strong>
+          <span className="ez-muted">{item.resource_id || ''}</span>
+        </div>
+      ),
+    },
+    { key: 'duration', label: 'Duration', render: (item) => (item.duration_ms == null ? '-' : `${item.duration_ms} ms`) },
+    { key: 'error', label: 'Error', render: (item) => item.error_code || '-' },
+    {
+      key: 'detail',
+      label: 'Chi tiết',
+      render: (item) => <Button variant="outline" size="sm" onClick={() => setSelected(item)}>Xem</Button>,
+    },
+  ];
+
   return (
-    <div className="activity-page">
-      <header className="admin-header">
-        <h1>Nhật ký hoạt động</h1>
-        <p className="admin-subtitle">Theo dõi hoạt động quan trọng mà không lưu nội dung riêng tư.</p>
-      </header>
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Nhật ký hoạt động"
+        description="Theo dõi hoạt động quan trọng mà không lưu nội dung riêng tư."
+      />
 
       {stats && (
-        <section className="activity-stat-grid" aria-label="Thống kê activity logs">
-          <StatCard label="Tổng hoạt động hôm nay" value={stats.total_today} />
-          <StatCard label="Thành công" value={stats.success_count} />
-          <StatCard label="Thất bại" value={stats.failure_count} />
-          <StatCard label="Permission denied" value={stats.permission_denied_count} />
-          <StatCard label="Quota exceeded" value={stats.quota_exceeded_count} />
-        </section>
+        <StatGrid aria-label="Thống kê nhật ký hoạt động">
+          <StatTile label="Tổng hôm nay" value={fmtNumber(stats.total_today)} />
+          <StatTile label="Thành công" value={fmtNumber(stats.success_count)} />
+          <StatTile label="Thất bại" value={fmtNumber(stats.failure_count)} />
+          <StatTile label="Bị từ chối quyền" value={fmtNumber(stats.permission_denied_count)} />
+          <StatTile label="Vượt quota" value={fmtNumber(stats.quota_exceeded_count)} />
+        </StatGrid>
       )}
 
-      <section className="activity-panel">
-        <form className="activity-filters" onSubmit={submitFilters}>
-          <label>
-            <span>Tìm kiếm</span>
-            <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Action, resource, request ID" />
-          </label>
-          <label>
-            <span>User ID</span>
-            <input value={filters.user_id} onChange={(event) => setFilters({ ...filters, user_id: event.target.value })} placeholder="ObjectId hoặc user id" />
-          </label>
-          <label>
-            <span>Category</span>
-            <select value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}>
-              <option value="all">Tất cả</option>
-              {ACTIVITY_CATEGORIES.map((item) => <option key={item} value={item}>{activityCategoryLabel(item)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Action</span>
-            <select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
-              <option value="all">Tất cả</option>
-              {ACTIVITY_ACTIONS.map((item) => <option key={item} value={item}>{activityActionLabel(item)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Status</span>
-            <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
-              <option value="all">Tất cả</option>
-              {(['success', 'failure', 'started', 'denied'] as ActivityStatus[]).map((item) => (
-                <option key={item} value={item}>{activityStatusLabel(item)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Từ ngày</span>
-            <input type="date" value={filters.date_from} onChange={(event) => setFilters({ ...filters, date_from: event.target.value })} />
-          </label>
-          <label>
-            <span>Đến ngày</span>
-            <input type="date" value={filters.date_to} onChange={(event) => setFilters({ ...filters, date_to: event.target.value })} />
-          </label>
-          <label>
-            <span>Resource type</span>
-            <input value={filters.resource_type} onChange={(event) => setFilters({ ...filters, resource_type: event.target.value })} placeholder="document, question_set..." />
-          </label>
-          <label>
-            <span>Resource ID</span>
-            <input value={filters.resource_id} onChange={(event) => setFilters({ ...filters, resource_id: event.target.value })} />
-          </label>
-          <label className="activity-check">
-            <input type="checkbox" checked={filters.error_only} onChange={(event) => setFilters({ ...filters, error_only: event.target.checked })} />
-            <span>Chỉ lỗi</span>
-          </label>
-          <button type="submit" className="admin-action-btn admin-action-btn--primary">Lọc</button>
-        </form>
+      <Card>
+        <CardBody>
+          <FilterBar columns={5} onSubmit={submitFilters}>
+            <FormField label="Tìm kiếm">
+              <Input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Action, resource, request ID" />
+            </FormField>
+            <FormField label="User ID">
+              <Input value={filters.user_id} onChange={(event) => setFilters({ ...filters, user_id: event.target.value })} placeholder="ObjectId hoặc user id" />
+            </FormField>
+            <FormField label="Category">
+              <Select value={filters.category} onChange={(event) => setFilters({ ...filters, category: event.target.value })}>
+                <option value="all">Tất cả</option>
+                {ACTIVITY_CATEGORIES.map((item) => <option key={item} value={item}>{activityCategoryLabel(item)}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Action">
+              <Select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}>
+                <option value="all">Tất cả</option>
+                {ACTIVITY_ACTIONS.map((item) => <option key={item} value={item}>{activityActionLabel(item)}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Status">
+              <Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
+                <option value="all">Tất cả</option>
+                {(['success', 'failure', 'started', 'denied'] as ActivityStatus[]).map((item) => (
+                  <option key={item} value={item}>{activityStatusLabel(item)}</option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Từ ngày">
+              <Input type="date" value={filters.date_from} onChange={(event) => setFilters({ ...filters, date_from: event.target.value })} />
+            </FormField>
+            <FormField label="Đến ngày">
+              <Input type="date" value={filters.date_to} onChange={(event) => setFilters({ ...filters, date_to: event.target.value })} />
+            </FormField>
+            <FormField label="Resource type">
+              <Input value={filters.resource_type} onChange={(event) => setFilters({ ...filters, resource_type: event.target.value })} placeholder="document, question_set..." />
+            </FormField>
+            <FormField label="Resource ID">
+              <Input value={filters.resource_id} onChange={(event) => setFilters({ ...filters, resource_id: event.target.value })} />
+            </FormField>
+            <Checkbox
+              checked={filters.error_only}
+              onChange={(event) => setFilters({ ...filters, error_only: event.target.checked })}
+              label="Chỉ lỗi"
+            />
+            <Button type="submit" variant="primary">Lọc</Button>
+          </FilterBar>
 
-        {error && <div className="panel-error" role="alert">{error}</div>}
-        {state === 'loading' && <p className="panel-loading">Đang tải nhật ký...</p>}
-        {state === 'error' && <div className="activity-empty"><strong>Không tải được dữ liệu</strong><p>Vui lòng kiểm tra quyền hoặc thử lại.</p></div>}
-        {state === 'ok' && list && list.items.length === 0 && (
-          <div className="activity-empty"><strong>Chưa có hoạt động phù hợp</strong><p>Thử thay đổi bộ lọc hoặc khoảng thời gian.</p></div>
-        )}
+          {error && <ErrorState title="Không tải được dữ liệu" description={error} onRetry={load} compact />}
+          {state === 'loading' && <SkeletonText lines={6} />}
+          {state === 'ok' && list && list.items.length === 0 && (
+            <EmptyState title="Chưa có hoạt động phù hợp" description="Thử thay đổi bộ lọc hoặc khoảng thời gian." compact />
+          )}
 
-        {state === 'ok' && list && list.items.length > 0 && (
-          <>
-            <div className="activity-table-wrap">
-              <table className="activity-table">
-                <thead>
-                  <tr>
-                    <th>Thời gian</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Resource</th>
-                    <th>Duration</th>
-                    <th>Error</th>
-                    <th>Chi tiết</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    <tr key={item.id}>
-                      <td data-label="Thời gian">{fmtDateTime(item.timestamp)}</td>
-                      <td data-label="User"><span className="activity-mono">{item.user_id || '-'}</span></td>
-                      <td data-label="Action">{activityActionLabel(item.action)}</td>
-                      <td data-label="Category">{activityCategoryLabel(item.category)}</td>
-                      <td data-label="Status">
-                        <span className={`activity-status activity-status--${item.status}`}>{activityStatusLabel(item.status)}</span>
-                      </td>
-                      <td data-label="Resource">{item.resource_type || '-'}<small>{item.resource_id || ''}</small></td>
-                      <td data-label="Duration">{item.duration_ms == null ? '-' : `${item.duration_ms} ms`}</td>
-                      <td data-label="Error">{item.error_code || '-'}</td>
-                      <td data-label="Chi tiết">
-                        <button type="button" className="admin-action-btn" onClick={() => setSelected(item)}>Xem</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="activity-pagination">
-              <span>Trang {list.page}/{Math.max(list.total_pages, 1)} · {fmtNumber(list.total)} hoạt động</span>
-              <div>
-                <button type="button" className="admin-action-btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Trước</button>
-                <button type="button" className="admin-action-btn" disabled={page >= list.total_pages} onClick={() => setPage((value) => value + 1)}>Sau</button>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
+          {state === 'ok' && list && list.items.length > 0 && (
+            <>
+              <DataTable columns={columns} data={list.items} rowKey={(item) => item.id} minWidth={1040} />
+              <Pagination page={page} totalPages={list.total_pages} total={list.total} label="hoạt động" onPageChange={setPage} />
+            </>
+          )}
+        </CardBody>
+      </Card>
 
       {selected && <ActivityDetailModal item={selected} onClose={() => setSelected(null)} />}
     </div>

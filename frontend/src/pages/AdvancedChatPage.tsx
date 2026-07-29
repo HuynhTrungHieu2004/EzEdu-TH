@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 
 import { chatApi } from '../api/chatApi';
 import { documentApi } from '../api/documentApi';
@@ -85,9 +86,8 @@ const AdvancedChatPage = () => {
         docsAbortRef.current = new AbortController();
         const docs = await documentApi.list();
         setDocuments(docs);
-      } catch (err: unknown) {
+      } catch {
         setDocsError('Không thể tải danh sách tài liệu.');
-        console.error(err);
       } finally {
         setLoadingDocs(false);
       }
@@ -99,9 +99,8 @@ const AdvancedChatPage = () => {
         setConversations(res.conversations);
         setConversationsCursor(res.next_cursor || null);
         setHasMoreConversations(!!res.has_more);
-      } catch (err: unknown) {
+      } catch {
         setConvsError('Không thể tải lịch sử cuộc trò chuyện.');
-        console.error(err);
       } finally {
         setLoadingConversations(false);
       }
@@ -203,7 +202,6 @@ const AdvancedChatPage = () => {
       const axiosErr = err as { name?: string; response?: { data?: { detail?: string } } };
       if (axiosErr.name !== 'CanceledError' && axiosErr.name !== 'AbortError') {
         setConvsError('Không thể tải lịch sử cuộc trò chuyện.');
-        console.error(err);
       }
     } finally {
       setLoadingConversations(false);
@@ -248,8 +246,8 @@ const AdvancedChatPage = () => {
       });
       setConversationsCursor(res.next_cursor || null);
       setHasMoreConversations(!!res.has_more);
-    } catch (err) {
-      console.error('Lỗi tải thêm hội thoại:', err);
+    } catch {
+      setConvsError('Không thể tải thêm lịch sử cuộc trò chuyện.');
     } finally {
       setLoadingMoreConversations(false);
     }
@@ -288,8 +286,8 @@ const AdvancedChatPage = () => {
       });
       setMessagesCursor(res.next_cursor || null);
       setHasMoreMessages(!!res.has_more);
-    } catch (err) {
-      console.error('Lỗi tải tin nhắn cũ:', err);
+    } catch {
+      setErrorMessage('Không thể tải thêm tin nhắn cũ. Vui lòng thử lại.');
     } finally {
       setLoadingMoreMessages(false);
     }
@@ -562,7 +560,7 @@ const AdvancedChatPage = () => {
   const [activeFeedbackMessage, setActiveFeedbackMessage] = useState<LocalChatMessage | null>(null);
   const [prefilledFeedbackData, setPrefilledFeedbackData] = useState<FeedbackData | null>(null);
 
-  // 7. Handle rating click (👍/👎) from AnswerFeedbackControls
+  // 7. Handle rating click (helpful / not_helpful) from AnswerFeedbackControls
   const handleRatingClick = async (msgIndex: number, rating: FeedbackRating) => {
     const msg = messages[msgIndex];
     if (!msg || !msg.message_id) return;
@@ -636,7 +634,7 @@ const AdvancedChatPage = () => {
     }
   };
 
-  // 9. Report citation from CitationPanel (🚩)
+  // 9. Report citation from CitationPanel (flag button)
   const handleReportCitation = (sourceId: string) => {
     if (activeMessageIndex === null) return;
     const activeMsg = messages[activeMessageIndex];
@@ -709,7 +707,8 @@ const AdvancedChatPage = () => {
 
           {errorMessage && (
             <div style={styles.errorAlert} role="alert">
-              ⚠️ {errorMessage}
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>{errorMessage}</span>
             </div>
           )}
 
@@ -830,6 +829,9 @@ const styles = {
     backgroundColor: 'var(--danger-bg)',
     color: 'var(--danger)',
     fontSize: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   responseStyleBar: {
     display: 'flex',

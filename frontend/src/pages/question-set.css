@@ -1,0 +1,140 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   EzEdu AI — SOẠN ĐỀ (giáo viên) & LÀM BÀI (học sinh)
+   Chỉ dùng token. Bổ sung cho các primitive trong components/ui/ui.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.qs-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-2);
+  margin-top: var(--ez-space-3);
+}
+
+.qs-meta-badge {
+  padding: var(--ez-space-2) var(--ez-space-3);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+  font-size: var(--ez-text-body-sm);
+}
+
+.qs-meta-badge strong {
+  font-weight: var(--ez-weight-semibold);
+  margin-right: var(--ez-space-1);
+}
+
+/* Từ khoá trọng tâm — chỉ giáo viên thấy, không lộ ra học sinh */
+.qs-keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-2);
+}
+
+.qs-keyword-chip {
+  padding: var(--ez-space-1) var(--ez-space-3);
+  border-radius: var(--ez-radius-full);
+  background-color: var(--ez-secondary-subtle);
+  color: var(--ez-secondary-text);
+  border: 1px solid var(--ez-secondary-border);
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-medium);
+}
+
+.qs-keyword-chip[data-strong='true'] {
+  font-weight: var(--ez-weight-bold);
+}
+
+/* Phân bố Bloom */
+.qs-bloom-bar {
+  display: flex;
+  height: 22px;
+  border-radius: var(--ez-radius-sm);
+  overflow: hidden;
+  margin-bottom: var(--ez-space-3);
+}
+
+.qs-bloom-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ez-text-on-brand);
+  font-size: 10px;
+  font-weight: var(--ez-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.qs-bloom-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-3);
+}
+
+.qs-bloom-legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  font-size: var(--ez-text-caption);
+  color: var(--ez-text-secondary);
+}
+
+.qs-bloom-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--ez-radius-full);
+  flex: none;
+}
+
+/* Form soạn câu hỏi */
+.qs-editor-grid {
+  display: grid;
+  gap: var(--ez-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.qs-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-2);
+  align-items: center;
+}
+
+/* Chế độ ôn tập (ẩn/hiện đáp án khi soạn) */
+.qs-study-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-3);
+  flex-wrap: wrap;
+}
+
+/* Ban hành — chọn đối tượng */
+.qs-audience-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+}
+
+.qs-class-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-1);
+  padding-left: var(--ez-space-4);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Kết quả làm bài (học sinh) */
+.qs-result-box {
+  padding: var(--ez-space-4);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-success-subtle);
+  border: 1px solid var(--ez-success-border);
+  color: var(--ez-text);
+  font-size: var(--ez-text-body-sm);
+}
+
+.qs-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-6);
+  margin-top: var(--ez-space-6);
+}

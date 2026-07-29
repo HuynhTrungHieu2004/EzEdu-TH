@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorDetail } from '../api/errors';
+import { Button, FeatureDisabledState } from '../components/ui';
 import {
   personalizationApi,
   type KnowledgeSignal,
@@ -319,18 +320,21 @@ export default function PersonalizationPage() {
   }
 
   if (featureDisabled) {
+    // Không nêu chi tiết kỹ thuật (mã trạng thái, tên cờ tính năng) cho người học;
+    // chỉ nói rõ tính năng đang tắt và đưa họ về việc còn làm được.
     return (
-      <div className="page">
-        <div className="page-wide">
-          <section className="welcome-panel">
-            <div>
-              <p className="eyebrow">Cá nhân hóa</p>
-              <h2>Hệ thống cá nhân hóa đang tắt</h2>
-              <p>Backend trả về trạng thái disabled, nên giao diện không hiển thị dữ liệu hồ sơ hoặc đề xuất.</p>
-            </div>
-          </section>
-        </div>
-      </div>
+      <FeatureDisabledState
+        title="Cá nhân hóa đang tạm tắt"
+        description="Quản trị viên đã tắt tính năng này, nên hiện chưa có gợi ý học tập hay phân tích điểm mạnh, điểm yếu. Bạn vẫn làm bài luyện tập và xem tiến độ như bình thường."
+        actions={
+          <>
+            <Button onClick={() => navigate('/published-questions')}>Tới bài luyện tập</Button>
+            <Button variant="outline" onClick={() => navigate('/learning-history')}>
+              Xem tiến độ
+            </Button>
+          </>
+        }
+      />
     );
   }
 

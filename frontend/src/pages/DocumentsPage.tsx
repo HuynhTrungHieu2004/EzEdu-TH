@@ -4,33 +4,27 @@ import { documentApi } from '../api/documentApi';
 import type { DocumentResponse } from '../api/documentApi';
 import FileUpload from '../components/FileUpload';
 import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
+import { Alert, ConfirmDialog, FormField, Input } from '../components/ui';
 
 const DocumentsPage = () => {
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [clusters, setClusters] = useState<Array<{
-    cluster_id: number;
-    label: string;
-    size: number;
-    documents: Array<{ id: string; name: string }>;
-  }>>([]);
-  const [clusterLoading, setClusterLoading] = useState(false);
-  const [clusterMessage, setClusterMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocumentResponse | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const navigate = useNavigate();
 
-  const handleDelete = async (doc: DocumentResponse) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xoá tài liệu "${doc.original_filename}"?\n\nHành động này sẽ xoá vĩnh viễn tài liệu, nội dung trích xuất, các bộ câu hỏi liên quan và không thể khôi phục.`
-    );
-    if (!confirmed) return;
-
+  const handleDelete = async () => {
+    const doc = deleteTarget;
+    if (!doc || deletingId || deleteConfirmation !== 'XÓA') return;
     setDeletingId(doc.id);
     setError(null);
     try {
       await documentApi.delete(doc.id);
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+      setDeleteTarget(null);
+      setDeleteConfirmation('');
     } catch (err: unknown) {
       const detail = getApiErrorDetail(err);
       setError(detail ?? 'Xoá tài liệu thất bại. Vui lòng thử lại.');
@@ -70,20 +64,6 @@ const DocumentsPage = () => {
 
     void Promise.resolve().then(fetchDocuments);
   }, [fetchDocuments, navigate]);
-
-  const fetchClusters = async () => {
-    setClusterLoading(true);
-    setClusterMessage(null);
-    try {
-      const result = await documentApi.getClusters();
-      setClusters(result.clusters || []);
-      setClusterMessage(result.message);
-    } catch {
-      setClusterMessage('Không thể phân cụm tài liệu.');
-    } finally {
-      setClusterLoading(false);
-    }
-  };
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -131,7 +111,7 @@ const DocumentsPage = () => {
         <div className="page-header">
           <div>
             <p className="eyebrow">Kho học liệu</p>
-            <h2 className="section-title">Quản lý học liệu điện tử</h2>
+            <h1 className="section-title">Quản lý học liệu điện tử</h1>
             <p className="section-subtitle">
               Tải lên và quản lý tài liệu PDF, DOCX, PPTX cùng video MP4, MOV, WEBM, MKV.
             </p>
@@ -211,7 +191,7 @@ const DocumentsPage = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDelete(doc)}
+                              onClick={() => setDeleteTarget(doc)}
                               disabled={deletingId === doc.id}
                               className="btn-danger"
                             >
@@ -227,76 +207,29 @@ const DocumentsPage = () => {
             </div>
           )}
         </section>
-
-        {/* K-Means Clustering Section */}
-        <section className="table-card" style={{ marginTop: '24px' }}>
-          <div className="table-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 className="table-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🔬</span> Phân cụm tài liệu (K-Means)
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0' }}>
-                Tự động nhóm tài liệu theo chủ đề dựa trên vector embeddings
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={fetchClusters}
-              disabled={clusterLoading}
-              className="btn-secondary"
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              {clusterLoading ? 'Đang phân cụm...' : '🔄 Phân cụm'}
-            </button>
-          </div>
-
-          {clusterMessage && (
-            <p style={{ padding: '0 20px', fontSize: '13px', color: 'var(--muted)', marginBottom: '8px' }}>
-              {clusterMessage}
-            </p>
-          )}
-
-          {clusters.length > 0 ? (
-            <div style={{ padding: '0 20px 20px', display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-              {clusters.map((cluster) => (
-                <div key={cluster.cluster_id} style={{
-                  padding: '16px',
-                  borderRadius: '12px',
-                  background: 'var(--surface-muted)',
-                  border: '1px solid var(--border)',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span style={{
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      color: 'var(--accent)',
-                    }}>
-                      📁 {cluster.label}
-                    </span>
-                    <span className="tag" style={{ fontSize: '11px' }}>{cluster.size} tài liệu</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {cluster.documents.map((doc) => (
-                      <button
-                        key={doc.id}
-                        type="button"
-                        onClick={() => navigate(`/documents/${doc.id}`)}
-                        className="document-link"
-                        style={{ fontSize: '12px', textAlign: 'left', padding: '4px 0' }}
-                      >
-                        📄 {doc.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : !clusterLoading && (
-            <div className="empty-state" style={{ padding: '20px' }}>
-              Nhấn "Phân cụm" để AI tự động nhóm tài liệu theo chủ đề. Cần ít nhất 2 tài liệu đã được lập chỉ mục.
-            </div>
-          )}
-        </section>
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          onClose={deletingId ? () => undefined : () => { setDeleteTarget(null); setDeleteConfirmation(''); }}
+          onConfirm={() => void handleDelete()}
+          title="Xóa vĩnh viễn học liệu?"
+          description={`“${deleteTarget?.original_filename ?? ''}” cùng nội dung trích xuất và các bộ câu hỏi liên quan sẽ bị xóa. Thao tác không thể hoàn tác.`}
+          confirmLabel="Xóa vĩnh viễn"
+          confirmDisabled={deleteConfirmation !== 'XÓA'}
+          busy={Boolean(deletingId)}
+        >
+          <Alert tone="error">Đây là thao tác xóa nghiêm trọng. Hãy kiểm tra đúng học liệu trước khi tiếp tục.</Alert>
+          <FormField
+            label="Nhập XÓA để xác nhận"
+            error={deleteConfirmation && deleteConfirmation !== 'XÓA' ? 'Nội dung xác nhận chưa đúng.' : undefined}
+          >
+            <Input
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              autoComplete="off"
+              invalid={Boolean(deleteConfirmation && deleteConfirmation !== 'XÓA')}
+            />
+          </FormField>
+        </ConfirmDialog>
       </div>
     </div>
   );

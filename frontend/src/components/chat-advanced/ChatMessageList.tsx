@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Sparkles } from 'lucide-react';
 import type { LocalChatMessage } from '../../types/chat';
 import type { FeedbackRating } from '../../types/feedback';
 import { AssistantMessage } from './AssistantMessage';
@@ -81,7 +82,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 
       {messages.length === 0 ? (
         <div style={styles.empty}>
-          <span style={styles.emptyIcon}>✨</span>
+          <span style={styles.emptyIcon} aria-hidden="true"><Sparkles size={48} /></span>
           <p style={styles.emptyText}>Bắt đầu đặt câu hỏi đầu tiên của bạn cho trợ lý AI.</p>
           <p style={styles.emptySub}>
             Bạn có thể hỏi đáp nâng cao, kết hợp tài liệu học liệu và tìm kiếm Internet có nguồn trích dẫn đầy đủ.
@@ -158,7 +159,8 @@ const styles = {
     padding: '40px 20px',
   },
   emptyIcon: {
-    fontSize: '48px',
+    display: 'inline-flex',
+    color: 'var(--accent)',
     marginBottom: '16px',
   },
   emptyText: {

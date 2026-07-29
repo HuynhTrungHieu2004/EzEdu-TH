@@ -1,5 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import {
+  Badge as UiBadge,
+  ConfirmDialog,
+  EmptyState as UiEmptyState,
+  FormField,
+  Input,
+  Pagination as UiPagination,
+  Textarea,
+} from '../components/ui';
 
 export function fmtDateTime(value: string | null | undefined) {
   if (!value) return 'Không có dữ liệu';
@@ -28,17 +37,12 @@ export function dateEnd(value: string) {
 }
 
 export function EmptyState({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="admin-content-state">
-      <strong>{title}</strong>
-      <p>{text}</p>
-    </div>
-  );
+  return <UiEmptyState title={title} description={text} compact />;
 }
 
 export function Badge({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'ok' | 'danger' }) {
-  const modifier = tone === 'ok' ? ' admin-content-badge--ok' : tone === 'danger' ? ' admin-content-badge--danger' : '';
-  return <span className={`admin-content-badge${modifier}`}>{children}</span>;
+  const variant = tone === 'ok' ? 'success' : tone === 'danger' ? 'error' : 'info';
+  return <UiBadge variant={variant}>{children}</UiBadge>;
 }
 
 export function Pagination({
@@ -52,14 +56,7 @@ export function Pagination({
   total: number;
   onPage: (page: number) => void;
 }) {
-  return (
-    <div className="admin-content-pagination">
-      <span className="admin-content-muted">Tổng {fmtNumber(total)} bản ghi</span>
-      <button type="button" className="admin-content-btn" disabled={page <= 1} onClick={() => onPage(page - 1)}>Trước</button>
-      <span className="admin-content-muted">Trang {page}/{totalPages || 1}</span>
-      <button type="button" className="admin-content-btn" disabled={!totalPages || page >= totalPages} onClick={() => onPage(page + 1)}>Sau</button>
-    </div>
-  );
+  return <UiPagination page={page} totalPages={totalPages} total={total} onPageChange={onPage} />;
 }
 
 export function ReasonModal({
@@ -70,6 +67,9 @@ export function ReasonModal({
   onReason,
   onCancel,
   onConfirm,
+  consequence,
+  reversible = true,
+  confirmationText,
 }: {
   title: string;
   target: string;
@@ -78,24 +78,49 @@ export function ReasonModal({
   onReason: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  consequence?: string;
+  reversible?: boolean;
+  confirmationText?: string;
 }) {
+  const [confirmation, setConfirmation] = useState('');
+  const confirmationMatches = !confirmationText || confirmation === confirmationText;
   return (
-    <div className="admin-content-modal-backdrop" role="presentation">
-      <section className="admin-content-modal" role="dialog" aria-modal="true">
-        <h3>{title}</h3>
-        <p className="admin-content-muted">Đối tượng bị ảnh hưởng: <strong>{target}</strong></p>
-        <label className="admin-content-field">
-          <span>Lý do</span>
-          <textarea rows={4} value={reason} onChange={(event) => onReason(event.target.value)} placeholder="Nhập lý do thao tác" />
-        </label>
-        <div className="admin-content-actions" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
-          <button type="button" className="admin-content-btn" disabled={busy} onClick={onCancel}>Hủy</button>
-          <button type="button" className="admin-content-btn admin-content-btn--danger" disabled={busy || !reason.trim()} onClick={onConfirm}>
-            {busy ? 'Đang xử lý...' : 'Xác nhận'}
-          </button>
-        </div>
-      </section>
-    </div>
+    <ConfirmDialog
+      open
+      onClose={busy ? () => undefined : onCancel}
+      onConfirm={onConfirm}
+      title={title}
+      description={`Đối tượng bị ảnh hưởng: ${target}. ${consequence ?? 'Thao tác sẽ được ghi vào nhật ký quản trị.'} ${reversible ? 'Có thể hoàn tác bằng thao tác khôi phục phù hợp.' : 'Không thể hoàn tác.'}`}
+      confirmLabel="Xác nhận"
+      confirmDisabled={!reason.trim() || !confirmationMatches}
+      busy={busy}
+    >
+      <FormField
+        label="Lý do"
+        error={!reason.trim() ? 'Cần nhập lý do trước khi xác nhận.' : undefined}
+      >
+        <Textarea
+          rows={4}
+          value={reason}
+          onChange={(event) => onReason(event.target.value)}
+          placeholder="Nhập lý do thao tác"
+          invalid={!reason.trim()}
+        />
+      </FormField>
+      {confirmationText && (
+        <FormField
+          label={`Nhập ${confirmationText} để xác nhận`}
+          error={confirmation && !confirmationMatches ? 'Nội dung xác nhận chưa đúng.' : undefined}
+        >
+          <Input
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            autoComplete="off"
+            invalid={Boolean(confirmation && !confirmationMatches)}
+          />
+        </FormField>
+      )}
+    </ConfirmDialog>
   );
 }
 

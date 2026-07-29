@@ -23,7 +23,7 @@ export default function LearningHistoryPage() {
         <div className="page-header">
           <div>
             <p className="eyebrow">Hồ sơ học sinh</p>
-            <h2 className="section-title">Lịch sử bài thi và ôn tập</h2>
+            <h1 className="section-title">Lịch sử bài thi và ôn tập</h1>
             <p className="section-subtitle">Theo dõi kết quả các lần làm bài và tiếp tục ôn tập.</p>
           </div>
           <button type="button" className="btn-primary" onClick={() => navigate('/published-questions')}>

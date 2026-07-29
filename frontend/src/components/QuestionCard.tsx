@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Check, Eye, EyeOff, GraduationCap, Lightbulb, X } from 'lucide-react';
 import type { QuestionItem } from '../api/questionApi';
 
 interface QuestionCardProps {
@@ -142,8 +143,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 color: bloom.color,
                 fontWeight: 600,
                 border: `1px solid ${bloom.color}30`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
               }}>
-                🎓 {bloom.label}
+                <GraduationCap size={12} aria-hidden="true" />
+                <span>{bloom.label}</span>
               </span>
             );
           })()}
@@ -177,9 +182,22 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 border: `1px solid ${manualReveal ? 'rgba(16, 185, 129, 0.3)' : 'var(--accent-border)'}`,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
               }}
             >
-              {manualReveal ? '👁️ Ẩn đáp án' : '👁️‍🗨️ Hiện đáp án'}
+              {manualReveal ? (
+                <>
+                  <EyeOff size={12} aria-hidden="true" />
+                  <span>Ẩn đáp án</span>
+                </>
+              ) : (
+                <>
+                  <Eye size={12} aria-hidden="true" />
+                  <span>Hiện đáp án</span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -218,14 +236,22 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 backgroundColor = 'rgba(34, 197, 94, 0.05)';
                 badgeBg = '#22c55e';
                 badgeColor = '#fff';
-                statusLabel = <span style={cardStyles.correctLabel}>✓ Đáp án đúng</span>;
+                statusLabel = (
+                  <span style={cardStyles.correctLabel}>
+                    <Check size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> Đáp án đúng
+                  </span>
+                );
               } else if (isSelected) {
                 // Wrong selected option highlighted in red
                 borderColor = '#ef4444';
                 backgroundColor = 'rgba(239, 68, 68, 0.05)';
                 badgeBg = '#ef4444';
                 badgeColor = '#fff';
-                statusLabel = <span style={cardStyles.wrongLabel}>✗ Bạn chọn sai</span>;
+                statusLabel = (
+                  <span style={cardStyles.wrongLabel}>
+                    <X size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> Bạn chọn sai
+                  </span>
+                );
               }
             } else if (examMode && isSelected) {
               borderColor = 'var(--accent)';
@@ -343,7 +369,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           fontSize: '14px',
           color: 'var(--text-h)',
         }}>
-          <strong style={{ color: '#22c55e' }}>✓ Đáp án đúng:</strong>{' '}
+          <strong style={{ color: '#22c55e' }}>
+            <Check size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> Đáp án đúng:
+          </strong>{' '}
           {question.correct_answer}
           {question.options && question.options[question.correct_answer]
             ? ` — ${question.options[question.correct_answer]}`
@@ -353,7 +381,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
 
       {showExplanation && (examMode || isRevealed) && (
         <div style={cardStyles.explanationSection}>
-          <div style={cardStyles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
+          <div style={cardStyles.explanationHeader}>
+            <Lightbulb size={16} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} />
+            Giải thích chi tiết từ học liệu:
+          </div>
           <p style={cardStyles.explanationText}>{question.explanation}</p>
         </div>
       )}
@@ -361,7 +392,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       {/* Study mode: show explanation on manual reveal even without interaction */}
       {studyMode && manualReveal && !showExplanation && (
         <div style={cardStyles.explanationSection}>
-          <div style={cardStyles.explanationHeader}>💡 Giải thích chi tiết từ học liệu:</div>
+          <div style={cardStyles.explanationHeader}>
+            <Lightbulb size={16} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: '6px' }} />
+            Giải thích chi tiết từ học liệu:
+          </div>
           <p style={cardStyles.explanationText}>{question.explanation}</p>
         </div>
       )}

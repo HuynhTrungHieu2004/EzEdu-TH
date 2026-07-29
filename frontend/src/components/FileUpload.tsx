@@ -12,6 +12,7 @@ const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [reused, setReused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -52,10 +53,12 @@ const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    setReused(false);
 
     try {
-      await documentApi.upload(file);
+      const result = await documentApi.upload(file);
       setSuccess(true);
+      setReused(Boolean(result.reused));
       setFile(null);
       if (inputRef.current) {
         inputRef.current.value = '';
@@ -96,7 +99,13 @@ const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">Tải tài liệu lên thành công.</div>}
+        {success && (
+          <div className="alert alert-success">
+            {reused
+              ? 'File này đã có trong học liệu của bạn — đã dùng lại bản cũ, không tải trùng.'
+              : 'Tải tài liệu lên thành công.'}
+          </div>
+        )}
 
         <button type="submit" disabled={!file || loading} className="btn-primary btn-full">
           {loading ? 'Đang tải tài liệu lên...' : 'Tải lên hệ thống'}

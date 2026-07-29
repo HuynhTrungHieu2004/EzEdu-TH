@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AlertTriangle, Globe, Lightbulb, Search, Shield, Zap } from 'lucide-react';
 import type { LocalChatMessage } from '../../types/chat';
 import type { FeedbackRating } from '../../types/feedback';
 import {
@@ -77,36 +78,36 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       <div style={styles.badgeHeader}>
         {retrieval_mode && (
           <span style={{ ...styles.badge, ...getRetrievalStyle(retrieval_mode) }}>
-            🔍 {RETRIEVAL_MODE_LABELS[retrieval_mode]}
+            <Search size={12} aria-hidden="true" /><span>{RETRIEVAL_MODE_LABELS[retrieval_mode]}</span>
           </span>
         )}
         {evidence_status && (
           <span style={{ ...styles.badge, ...getEvidenceStyle(evidence_status) }}>
-            🛡️ {EVIDENCE_STATUS_LABELS[evidence_status]}
+            <Shield size={12} aria-hidden="true" /><span>{EVIDENCE_STATUS_LABELS[evidence_status]}</span>
           </span>
         )}
         {external_search_status && external_search_status !== 'not_used' && (
           <span style={styles.searchBadge}>
-            🌐 {EXTERNAL_SEARCH_STATUS_LABELS[external_search_status]}
+            <Globe size={12} aria-hidden="true" /><span>{EXTERNAL_SEARCH_STATUS_LABELS[external_search_status]}</span>
           </span>
         )}
       </div>
 
       {retrieval_mode === 'model_knowledge' && (
         <div style={styles.warningAlert} role="alert">
-          💡 <strong>Kiến thức nền tảng của AI:</strong> Câu trả lời này dựa trên tri thức có sẵn của mô hình ngôn ngữ lớn và có thể chưa được đối chiếu trực tiếp với các tài liệu học tập của bạn.
+          <Lightbulb size={14} style={styles.alertIcon} aria-hidden="true" /> <strong>Kiến thức nền tảng của AI:</strong> Câu trả lời này dựa trên tri thức có sẵn của mô hình ngôn ngữ lớn và có thể chưa được đối chiếu trực tiếp với các tài liệu học tập của bạn.
         </div>
       )}
 
       {evidence_status === 'insufficient_evidence' && (
         <div style={styles.warningAlert} role="alert">
-          ⚠️ AI chưa tìm thấy đủ bằng chứng hoặc dữ liệu xác thực đáng tin cậy để đưa ra kết luận hoàn toàn chính xác.
+          <AlertTriangle size={14} style={styles.alertIcon} aria-hidden="true" /> AI chưa tìm thấy đủ bằng chứng hoặc dữ liệu xác thực đáng tin cậy để đưa ra kết luận hoàn toàn chính xác.
         </div>
       )}
 
       {evidence_status === 'conflicting_sources' && (
         <div style={styles.warningAlert} role="alert">
-          ⚡ <strong>Nguồn thông tin mâu thuẫn:</strong> Các tài liệu học tập hoặc kết quả tìm kiếm có thông tin trái ngược nhau. Hãy đối chiếu từng trích dẫn nguồn ở cột bên phải.
+          <Zap size={14} style={styles.alertIcon} aria-hidden="true" /> <strong>Nguồn thông tin mâu thuẫn:</strong> Các tài liệu học tập hoặc kết quả tìm kiếm có thông tin trái ngược nhau. Hãy đối chiếu từng trích dẫn nguồn ở cột bên phải.
         </div>
       )}
 
@@ -170,7 +171,9 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
 
       {follow_up_suggestions && follow_up_suggestions.length > 0 && (
         <div style={styles.suggestionsContainer}>
-          <div style={styles.suggestionsTitle}>💡 Gợi ý câu hỏi tiếp theo:</div>
+          <div style={styles.suggestionsTitle}>
+            <Lightbulb size={14} aria-hidden="true" /><span>Gợi ý câu hỏi tiếp theo:</span>
+          </div>
           <div style={styles.suggestionsList}>
             {follow_up_suggestions.map((suggestion, idx) => (
               <button
@@ -211,6 +214,9 @@ const styles = {
     fontWeight: '700',
     padding: '4px 10px',
     borderRadius: '6px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px',
   },
   searchBadge: {
     fontSize: '11px',
@@ -220,6 +226,12 @@ const styles = {
     padding: '4px 10px',
     borderRadius: '6px',
     border: '1px solid var(--border)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px',
+  },
+  alertIcon: {
+    verticalAlign: '-3px',
   },
   warningAlert: {
     fontSize: '12px',
@@ -304,6 +316,9 @@ const styles = {
     fontWeight: '700',
     color: 'var(--text)',
     marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   suggestionsList: {
     display: 'flex',

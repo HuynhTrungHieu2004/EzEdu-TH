@@ -6,7 +6,17 @@ import type { AdminDocumentListParams, AdminDocumentListResponse, AdminDocumentS
 import { hasPermission } from '../utils/adminPermissions';
 import { Badge, EmptyState, Pagination, ReasonModal, dateEnd, dateStart, fmtDateTime, fmtFileSize, fmtNumber } from './AdminContentShared';
 import { apiErrorMessage, isCanceledError } from '../utils/apiError';
-import './AdminContentPages.css';
+import {
+  Button,
+  Card, CardBody,
+  DataTable,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Select,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
 
 type ModalKind = 'delete' | 'reprocess' | 'quarantine';
 
@@ -114,64 +124,137 @@ export default function AdminDocumentsPage() {
     }
   };
 
-  return (
-    <main className="admin-content-page">
-      <header className="admin-content-header">
-        <div>
-          <h1>Quản lý tài liệu</h1>
-          <p>Kiểm tra trạng thái xử lý, lỗi, chunk và câu hỏi liên quan mà không mở nội dung riêng tư.</p>
+  const columns: DataTableColumn<AdminDocumentSummary>[] = [
+    {
+      key: 'title',
+      label: 'Tài liệu',
+      render: (item) => (
+        <div className="ez-datatable-cell-title">
+          <strong>{item.original_filename}</strong>
+          <span className="ez-muted">{item.id}</span>
         </div>
-      </header>
-
-      <section className="admin-content-toolbar">
-        <label className="admin-content-field"><span>Tìm kiếm</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Tên tài liệu" /></label>
-        <label className="admin-content-field"><span>User ID</span><input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} placeholder="ObjectId người sở hữu" /></label>
-        <label className="admin-content-field"><span>Loại file</span><input value={fileType} onChange={(event) => { setFileType(event.target.value); setPage(1); }} placeholder="pdf, docx..." /></label>
-        <label className="admin-content-field"><span>Trạng thái xử lý</span><input value={processingStatus} onChange={(event) => { setProcessingStatus(event.target.value); setPage(1); }} placeholder="uploaded, failed..." /></label>
-        <label className="admin-content-field"><span>Trạng thái</span><select value={status} onChange={(event) => { setStatus(event.target.value as ContentStatus); setPage(1); }}><option value="active">Đang hoạt động</option><option value="quarantined">Cách ly</option><option value="deleted">Đã xóa</option><option value="all">Tất cả</option></select></label>
-        <label className="admin-content-field"><span>Có lỗi</span><select value={hasError} onChange={(event) => { setHasError(event.target.value); setPage(1); }}><option value="">Tất cả</option><option value="true">Có lỗi</option><option value="false">Không lỗi</option></select></label>
-        <label className="admin-content-field"><span>Từ ngày</span><input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} /></label>
-        <label className="admin-content-field"><span>Đến ngày</span><input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} /></label>
-      </section>
-
-      {error && <EmptyState title="Có lỗi" text={error} />}
-      {loading && <EmptyState title="Đang tải" text="Đang lấy dữ liệu tài liệu từ backend." />}
-      {!loading && data && data.items.length === 0 && <EmptyState title="Chưa có tài liệu phù hợp" text="Không có dữ liệu giả để hiển thị." />}
-
-      {!loading && data && data.items.length > 0 && (
+      ),
+    },
+    {
+      key: 'owner',
+      label: 'Chủ sở hữu',
+      render: (item) => item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu',
+    },
+    {
+      key: 'file',
+      label: 'File',
+      render: (item) => (
         <>
-          <div className="admin-content-table-wrap">
-            <table className="admin-content-table">
-              <thead><tr><th>Tài liệu</th><th>Chủ sở hữu</th><th>File</th><th>Upload</th><th>Xử lý</th><th>Trang/chunk/câu hỏi</th><th>Kiểm tra kiến thức</th><th>Lỗi gần nhất</th><th>Hành động</th></tr></thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Tài liệu"><div className="admin-content-title-cell"><strong>{item.original_filename}</strong><span className="admin-content-muted">{item.id}</span></div></td>
-                    <td data-label="Chủ sở hữu">{item.owner.full_name || item.owner.email || item.owner.id || 'Không có dữ liệu'}</td>
-                    <td data-label="File">{item.file_type || 'Không rõ'}<br /><span className="admin-content-muted">{fmtFileSize(item.file_size)}</span></td>
-                    <td data-label="Upload">{fmtDateTime(item.uploaded_at)}</td>
-                    <td data-label="Xử lý"><Badge tone={item.deleted_at || item.is_quarantined ? 'danger' : 'info'}>{item.deleted_at ? 'deleted' : item.is_quarantined ? 'quarantined' : item.processing_status}</Badge></td>
-                    <td data-label="Trang/chunk/câu hỏi">{item.page_count ?? 'Không có dữ liệu'} / {fmtNumber(item.chunk_count)} / {fmtNumber(item.question_count)}</td>
-                    <td data-label="Kiểm tra kiến thức">{item.knowledge_verification_status || 'Không có dữ liệu'}</td>
-                    <td data-label="Lỗi gần nhất">{item.latest_error || 'Không có dữ liệu'}</td>
-                    <td data-label="Hành động">
-                      <div className="admin-content-actions">
-                        <button className="admin-content-btn" type="button" onClick={() => navigate(`/admin/documents/${item.id}`)}>Xem</button>
-                        {canReprocess && !item.deleted_at && <button className="admin-content-btn" type="button" onClick={() => setModal({ kind: 'reprocess', item })}>Xử lý lại</button>}
-                        {canUpdate && !item.deleted_at && !item.is_quarantined && <button className="admin-content-btn" type="button" onClick={() => setModal({ kind: 'quarantine', item })}>Cách ly</button>}
-                        {canUpdate && !item.deleted_at && item.is_quarantined && <button className="admin-content-btn" type="button" disabled={busy} onClick={() => unquarantine(item)}>Bỏ cách ly</button>}
-                        {canDelete && !item.deleted_at && <button className="admin-content-btn admin-content-btn--danger" type="button" onClick={() => setModal({ kind: 'delete', item })}>Xóa mềm</button>}
-                        {canUpdate && item.deleted_at && <button className="admin-content-btn" type="button" disabled={busy} onClick={() => restore(item)}>Khôi phục</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
+          {item.file_type || 'Không rõ'}
+          <br />
+          <span className="ez-muted">{fmtFileSize(item.file_size)}</span>
         </>
-      )}
+      ),
+    },
+    { key: 'uploaded_at', label: 'Upload', render: (item) => fmtDateTime(item.uploaded_at) },
+    {
+      key: 'processing_status',
+      label: 'Xử lý',
+      render: (item) => (
+        <Badge tone={item.deleted_at || item.is_quarantined ? 'danger' : 'info'}>
+          {item.deleted_at ? 'deleted' : item.is_quarantined ? 'quarantined' : item.processing_status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'counts',
+      label: 'Trang/chunk/câu hỏi',
+      render: (item) => `${item.page_count ?? 'Không có dữ liệu'} / ${fmtNumber(item.chunk_count)} / ${fmtNumber(item.question_count)}`,
+    },
+    {
+      key: 'knowledge_verification_status',
+      label: 'Kiểm tra kiến thức',
+      render: (item) => item.knowledge_verification_status || 'Không có dữ liệu',
+    },
+    { key: 'latest_error', label: 'Lỗi gần nhất', render: (item) => item.latest_error || 'Không có dữ liệu' },
+    {
+      key: 'actions',
+      label: 'Hành động',
+      render: (item) => (
+        <div className="ez-datatable-cell-actions">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/documents/${item.id}`)}>Xem</Button>
+          {canReprocess && !item.deleted_at && (
+            <Button variant="outline" size="sm" onClick={() => setModal({ kind: 'reprocess', item })}>Xử lý lại</Button>
+          )}
+          {canUpdate && !item.deleted_at && !item.is_quarantined && (
+            <Button variant="outline" size="sm" onClick={() => setModal({ kind: 'quarantine', item })}>Cách ly</Button>
+          )}
+          {canUpdate && !item.deleted_at && item.is_quarantined && (
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => unquarantine(item)}>Bỏ cách ly</Button>
+          )}
+          {canDelete && !item.deleted_at && (
+            <Button variant="danger" size="sm" onClick={() => setModal({ kind: 'delete', item })}>Xóa mềm</Button>
+          )}
+          {canUpdate && item.deleted_at && (
+            <Button variant="secondary" size="sm" disabled={busy} onClick={() => restore(item)}>Khôi phục</Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Quản lý tài liệu"
+        description="Kiểm tra trạng thái xử lý, lỗi, đoạn nội dung và câu hỏi liên quan mà không mở nội dung riêng tư."
+      />
+
+      <Card>
+        <CardBody>
+          <FilterBar columns={4}>
+            <FormField label="Tìm kiếm">
+              <Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Tên tài liệu" />
+            </FormField>
+            <FormField label="User ID">
+              <Input value={userId} onChange={(event) => { setUserId(event.target.value); setPage(1); }} placeholder="ObjectId người sở hữu" />
+            </FormField>
+            <FormField label="Loại file">
+              <Input value={fileType} onChange={(event) => { setFileType(event.target.value); setPage(1); }} placeholder="pdf, docx..." />
+            </FormField>
+            <FormField label="Trạng thái xử lý">
+              <Input value={processingStatus} onChange={(event) => { setProcessingStatus(event.target.value); setPage(1); }} placeholder="uploaded, failed..." />
+            </FormField>
+            <FormField label="Trạng thái">
+              <Select value={status} onChange={(event) => { setStatus(event.target.value as ContentStatus); setPage(1); }}>
+                <option value="active">Đang hoạt động</option>
+                <option value="quarantined">Cách ly</option>
+                <option value="deleted">Đã xóa</option>
+                <option value="all">Tất cả</option>
+              </Select>
+            </FormField>
+            <FormField label="Có lỗi">
+              <Select value={hasError} onChange={(event) => { setHasError(event.target.value); setPage(1); }}>
+                <option value="">Tất cả</option>
+                <option value="true">Có lỗi</option>
+                <option value="false">Không lỗi</option>
+              </Select>
+            </FormField>
+            <FormField label="Từ ngày">
+              <Input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
+            </FormField>
+            <FormField label="Đến ngày">
+              <Input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
+            </FormField>
+          </FilterBar>
+
+          {error && <EmptyState title="Có lỗi" text={error} />}
+          {loading && <EmptyState title="Đang tải" text="Đang lấy dữ liệu tài liệu từ backend." />}
+          {!loading && data && data.items.length === 0 && <EmptyState title="Chưa có tài liệu phù hợp" text="Không có dữ liệu giả để hiển thị." />}
+
+          {!loading && data && data.items.length > 0 && (
+            <>
+              <DataTable columns={columns} data={data.items} rowKey={(item) => item.id} minWidth={1100} />
+              <Pagination page={data.page} totalPages={data.total_pages} total={data.total} onPage={setPage} />
+            </>
+          )}
+        </CardBody>
+      </Card>
 
       {modal && (
         <ReasonModal
@@ -179,11 +262,18 @@ export default function AdminDocumentsPage() {
           target={modal.item.original_filename}
           reason={reason}
           busy={busy}
+          consequence={modal.kind === 'delete'
+            ? 'Tài liệu sẽ bị ẩn khỏi các luồng sử dụng cho tới khi được khôi phục.'
+            : modal.kind === 'reprocess'
+              ? 'Hệ thống sẽ chạy lại pipeline xử lý và có thể phát sinh tác vụ nền.'
+              : 'Người dùng sẽ tạm thời không thể sử dụng tài liệu này.'}
+          reversible={modal.kind !== 'reprocess'}
+          confirmationText={modal.kind === 'delete' ? 'XÓA' : undefined}
           onReason={setReason}
           onCancel={() => { setModal(null); setReason(''); }}
           onConfirm={runAction}
         />
       )}
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { questionApi } from '../api/questionApi';
 import type { LearningHistoryItem, QuestionSetSummary } from '../api/questionApi';
@@ -56,10 +57,10 @@ const PublishedQuestionSetsPage = () => {
   const visibleItems = activeTab === 'pending' ? pendingItems : completedItems;
 
   return (
-    <main style={styles.container}>
+    <div style={styles.container}>
       <div style={styles.header}>
         <div>
-          <h2 style={styles.title}>Bài thi của bạn</h2>
+          <h1 style={styles.title}>Bài thi của bạn</h1>
           <p style={styles.subtitle}>Bài thi giảng viên vừa ban hành sẽ được đánh dấu đỏ cho đến khi bạn hoàn thành.</p>
         </div>
         <input
@@ -108,7 +109,13 @@ const PublishedQuestionSetsPage = () => {
           <article key={item.id} style={styles.card}>
             <div style={styles.cardStatus}>
               <span style={activeTab === 'pending' ? styles.pendingPill : styles.completedPill}>
-                {activeTab === 'pending' ? '● Bài thi mới' : '✓ Đã hoàn thành'}
+                {activeTab === 'pending' ? (
+                  '● Bài thi mới'
+                ) : (
+                  <>
+                    <Check size={12} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> Đã hoàn thành
+                  </>
+                )}
               </span>
             </div>
             <h3 style={styles.cardTitle}>{item.document_name}</h3>
@@ -129,7 +136,7 @@ const PublishedQuestionSetsPage = () => {
           );
         })}
       </div>
-    </main>
+    </div>
   );
 };
 

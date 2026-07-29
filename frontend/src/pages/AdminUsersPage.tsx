@@ -13,69 +13,55 @@ import type {
   AdminUserStatus,
 } from '../types/adminUsers';
 import { hasPermission, permissionsForRole } from '../utils/adminPermissions';
-import './AdminUsersPage.css';
+import { fmtDateTime, fmtNumber, dateStart, dateEnd, ROLE_LABELS, USER_STATUS_LABELS } from '../utils/adminUtils';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card, CardBody,
+  Checkbox,
+  DataTable,
+  Dialog,
+  EmptyState, ErrorState,
+  FilterBar,
+  FormField,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  SkeletonText,
+  StatGrid, StatTile,
+  Textarea,
+} from '../components/ui';
+import type { DataTableColumn } from '../components/ui';
 
 type LoadState = 'loading' | 'error' | 'ok';
 type ActionKind = 'lock' | 'unlock' | 'delete' | 'restore' | 'forceLogout' | 'resetPassword' | 'role' | 'quota';
 
 const ROLES: AdminRole[] = ['super_admin', 'admin', 'moderator', 'support', 'analyst', 'lecturer', 'student', 'user'];
-const ROLE_LABELS: Record<AdminRole, string> = {
-  super_admin: 'Super Admin',
-  admin: 'Admin',
-  moderator: 'Moderator',
-  support: 'Support',
-  analyst: 'Analyst',
-  lecturer: 'Giảng viên',
-  student: 'Học sinh',
-  user: 'Người dùng',
-};
-const STATUS_LABELS: Record<AdminUserStatus, string> = {
-  active: 'Hoạt động',
-  locked: 'Đã khóa',
-  deleted: 'Đã xóa',
+
+const ACTION_LABELS: Record<ActionKind, string> = {
+  lock: 'Khóa tài khoản',
+  unlock: 'Mở khóa tài khoản',
+  delete: 'Xóa mềm tài khoản',
+  restore: 'Khôi phục tài khoản',
+  forceLogout: 'Buộc đăng xuất',
+  resetPassword: 'Đặt lại mật khẩu',
+  role: 'Thay đổi vai trò',
+  quota: 'Điều chỉnh quota',
 };
 
-function fmtNumber(value: number | undefined) {
-  return (value ?? 0).toLocaleString('vi-VN');
-}
-
-function fmtDateTime(value: string | null | undefined) {
-  if (!value) return 'Không có dữ liệu';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short', hour12: false });
-}
-
-function toIsoDateStart(value: string) {
-  return value ? new Date(`${value}T00:00:00+07:00`).toISOString() : undefined;
-}
-
-function toIsoDateEnd(value: string) {
-  return value ? new Date(`${value}T23:59:59.999+07:00`).toISOString() : undefined;
-}
+const STATUS_BADGE_MAP: Record<AdminUserStatus, 'success' | 'warning' | 'error'> = {
+  active: 'success',
+  locked: 'warning',
+  deleted: 'error',
+};
 
 function isObjectId(value: string) {
   return /^[a-f\d]{24}$/i.test(value.trim());
 }
 
-function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="admin-user-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {sub && <small>{sub}</small>}
-    </div>
-  );
-}
-
-function EmptyData({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="admin-user-empty">
-      <strong>{title}</strong>
-      <p>{text}</p>
-    </div>
-  );
-}
+/* ── Modals ────────────────────────────────────────────────────────────── */
 
 interface ConfirmState {
   kind: ActionKind;
@@ -106,66 +92,85 @@ function ConfirmModal({
   roleOptions: AdminRole[];
 }) {
   const reasonRequired = ['lock', 'delete', 'role', 'quota'].includes(state.kind);
-  const labels: Record<ActionKind, string> = {
-    lock: 'Khóa tài khoản',
-    unlock: 'Mở khóa tài khoản',
-    delete: 'Xóa mềm tài khoản',
-    restore: 'Khôi phục tài khoản',
-    forceLogout: 'Buộc đăng xuất',
-    resetPassword: 'Đặt lại mật khẩu',
-    role: 'Thay đổi vai trò',
-    quota: 'Điều chỉnh quota',
-  };
+  const typedConfirmationRequired = ['delete', 'resetPassword'].includes(state.kind);
+  const [typedConfirmation, setTypedConfirmation] = useState('');
+  const typedConfirmationMatches = !typedConfirmationRequired || typedConfirmation === state.user.email;
 
   return (
-    <div className="admin-user-modal-backdrop" role="presentation">
-      <section className="admin-user-modal" role="dialog" aria-modal="true" aria-labelledby="admin-user-confirm-title">
-        <h3 id="admin-user-confirm-title">{labels[state.kind]}</h3>
-        <p>
-          Người dùng bị ảnh hưởng: <strong>{state.user.full_name}</strong>
-          <span className="admin-user-muted"> · {state.user.email}</span>
-        </p>
-
-        {state.kind === 'role' && (
-          <label className="admin-user-field">
-            <span>Vai trò mới</span>
-            <select value={state.nextRole} onChange={(event) => onRoleChange(event.target.value as AdminRole)}>
-              {roleOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-            </select>
-          </label>
-        )}
-
-        {state.kind === 'quota' && (
-          <label className="admin-user-field">
-            <span>Quota JSON</span>
-            <textarea value={state.quotaText || '{}'} onChange={(event) => onQuotaChange(event.target.value)} rows={6} />
-          </label>
-        )}
-
-        {reasonRequired && (
-          <label className="admin-user-field">
-            <span>Lý do</span>
-            <textarea value={reason} onChange={(event) => onReasonChange(event.target.value)} rows={3} placeholder="Nhập lý do thao tác" />
-          </label>
-        )}
-
-        {state.kind === 'resetPassword' && (
-          <p className="admin-user-warning">Mật khẩu tạm sẽ chỉ hiển thị một lần sau khi đặt lại.</p>
-        )}
-
-        <div className="admin-user-modal-actions">
-          <button type="button" className="admin-action-btn" onClick={onCancel} disabled={busy}>Hủy</button>
-          <button
-            type="button"
-            className="admin-action-btn admin-action-btn--danger"
+    <Dialog
+      open
+      onClose={busy ? () => undefined : onCancel}
+      title={ACTION_LABELS[state.kind]}
+      description={`${state.user.full_name} · ${state.user.email}. ${state.kind === 'delete'
+        ? 'Tài khoản sẽ bị vô hiệu hóa và chỉ quản trị viên có quyền mới khôi phục được.'
+        : state.kind === 'resetPassword'
+          ? 'Mật khẩu hiện tại sẽ ngừng hoạt động và không thể khôi phục.'
+          : 'Thao tác được áp dụng ngay và ghi vào nhật ký quản trị.'}`}
+      closeOnOverlayClick={!busy}
+      footer={
+        <>
+          <Button variant="outline" disabled={busy} onClick={onCancel}>Hủy</Button>
+          <Button
+            variant="danger"
+            disabled={busy || (reasonRequired && !reason.trim()) || !typedConfirmationMatches}
+            loading={busy}
             onClick={onConfirm}
-            disabled={busy || (reasonRequired && !reason.trim())}
           >
-            {busy ? 'Đang xử lý...' : 'Xác nhận'}
-          </button>
-        </div>
-      </section>
-    </div>
+            Xác nhận
+          </Button>
+        </>
+      }
+    >
+      {state.kind === 'role' && (
+        <FormField label="Vai trò mới">
+          <Select
+            value={state.nextRole}
+            onChange={(event) => onRoleChange(event.target.value as AdminRole)}
+          >
+            {roleOptions.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+          </Select>
+        </FormField>
+      )}
+
+      {state.kind === 'quota' && (
+        <FormField label="Quota JSON">
+          <Textarea
+            value={state.quotaText || '{}'}
+            onChange={(event) => onQuotaChange(event.target.value)}
+            rows={6}
+          />
+        </FormField>
+      )}
+
+      {reasonRequired && (
+        <FormField label="Lý do">
+          <Textarea
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={3}
+            placeholder="Nhập lý do thao tác"
+          />
+        </FormField>
+      )}
+
+      {state.kind === 'resetPassword' && (
+        <Alert tone="warning">Mật khẩu tạm sẽ chỉ hiển thị một lần sau khi đặt lại.</Alert>
+      )}
+
+      {typedConfirmationRequired && (
+        <FormField
+          label="Nhập email người dùng để xác nhận"
+          error={typedConfirmation && !typedConfirmationMatches ? 'Email xác nhận chưa khớp.' : undefined}
+        >
+          <Input
+            value={typedConfirmation}
+            onChange={(event) => setTypedConfirmation(event.target.value)}
+            autoComplete="off"
+            invalid={Boolean(typedConfirmation && !typedConfirmationMatches)}
+          />
+        </FormField>
+      )}
+    </Dialog>
   );
 }
 
@@ -185,36 +190,37 @@ function EditUserModal({
   const [verified, setVerified] = useState(user.email_verified);
 
   return (
-    <div className="admin-user-modal-backdrop" role="presentation">
-      <form
-        className="admin-user-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="admin-user-edit-title"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit({ full_name: fullName.trim(), email: email.trim(), email_verified: verified });
-        }}
-      >
-        <h3 id="admin-user-edit-title">Chỉnh sửa người dùng</h3>
-        <label className="admin-user-field">
-          <span>Họ tên</span>
-          <input value={fullName} onChange={(event) => setFullName(event.target.value)} required />
-        </label>
-        <label className="admin-user-field">
-          <span>Email</span>
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </label>
-        <label className="admin-user-check">
-          <input type="checkbox" checked={verified} onChange={(event) => setVerified(event.target.checked)} />
-          <span>Email đã xác minh</span>
-        </label>
-        <div className="admin-user-modal-actions">
-          <button type="button" className="admin-action-btn" onClick={onCancel} disabled={busy}>Hủy</button>
-          <button type="submit" className="admin-action-btn admin-action-btn--primary" disabled={busy}>Lưu</button>
-        </div>
-      </form>
-    </div>
+    <Dialog
+      open
+      onClose={onCancel}
+      title="Chỉnh sửa người dùng"
+      closeOnOverlayClick={!busy}
+      footer={
+        <>
+          <Button variant="outline" disabled={busy} onClick={onCancel}>Hủy</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !fullName.trim() || !email.trim()}
+            loading={busy}
+            onClick={() => onSubmit({ full_name: fullName.trim(), email: email.trim(), email_verified: verified })}
+          >
+            Lưu
+          </Button>
+        </>
+      }
+    >
+      <FormField label="Họ tên" required>
+        <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+      </FormField>
+      <FormField label="Email" required>
+        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+      </FormField>
+      <Checkbox
+        checked={verified}
+        onChange={(event) => setVerified(event.target.checked)}
+        label="Email đã xác minh"
+      />
+    </Dialog>
   );
 }
 
@@ -235,61 +241,64 @@ function CreateUserModal({
   const [password, setPassword] = useState('');
   const [verified, setVerified] = useState(false);
 
+  const handleSubmit = () => {
+    onSubmit({
+      full_name: fullName.trim(),
+      email: email.trim(),
+      role,
+      temporary_password: password.trim(),
+      email_verified: verified,
+    });
+  };
+
   return (
-    <div className="admin-user-modal-backdrop" role="presentation">
-      <form
-        className="admin-user-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="admin-user-create-title"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit({
-            full_name: fullName.trim(),
-            email: email.trim(),
-            role,
-            temporary_password: password.trim(),
-            email_verified: verified,
-          });
-        }}
-      >
-        <h3 id="admin-user-create-title">Tạo người dùng</h3>
-        <label className="admin-user-field">
-          <span>Họ tên</span>
-          <input value={fullName} onChange={(event) => setFullName(event.target.value)} required />
-        </label>
-        <label className="admin-user-field">
-          <span>Email</span>
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </label>
-        <label className="admin-user-field">
-          <span>Vai trò</span>
-          <select value={role} onChange={(event) => setRole(event.target.value as AdminRole)}>
-            {roleOptions.map((option) => <option key={option} value={option}>{ROLE_LABELS[option]}</option>)}
-          </select>
-        </label>
-        <label className="admin-user-field">
-          <span>Mật khẩu tạm</span>
-          <input
-            type="password"
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
-        <label className="admin-user-check">
-          <input type="checkbox" checked={verified} onChange={(event) => setVerified(event.target.checked)} />
-          <span>Email đã xác minh</span>
-        </label>
-        <div className="admin-user-modal-actions">
-          <button type="button" className="admin-action-btn" onClick={onCancel} disabled={busy}>Hủy</button>
-          <button type="submit" className="admin-action-btn admin-action-btn--primary" disabled={busy}>Tạo</button>
-        </div>
-      </form>
-    </div>
+    <Dialog
+      open
+      onClose={onCancel}
+      title="Tạo người dùng"
+      closeOnOverlayClick={!busy}
+      footer={
+        <>
+          <Button variant="outline" disabled={busy} onClick={onCancel}>Hủy</Button>
+          <Button
+            variant="primary"
+            disabled={busy || !fullName.trim() || !email.trim() || password.trim().length < 6}
+            loading={busy}
+            onClick={handleSubmit}
+          >
+            Tạo
+          </Button>
+        </>
+      }
+    >
+      <FormField label="Họ tên" required>
+        <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+      </FormField>
+      <FormField label="Email" required>
+        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+      </FormField>
+      <FormField label="Vai trò">
+        <Select value={role} onChange={(event) => setRole(event.target.value as AdminRole)}>
+          {roleOptions.map((option) => <option key={option} value={option}>{ROLE_LABELS[option]}</option>)}
+        </Select>
+      </FormField>
+      <FormField label="Mật khẩu tạm" required hint="Ít nhất 6 ký tự">
+        <Input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </FormField>
+      <Checkbox
+        checked={verified}
+        onChange={(event) => setVerified(event.target.checked)}
+        label="Email đã xác minh"
+      />
+    </Dialog>
   );
 }
+
+/* ── Main page ─────────────────────────────────────────────────────────── */
 
 export default function AdminUsersPage() {
   const navigate = useNavigate();
@@ -356,10 +365,10 @@ export default function AdminUsersPage() {
           search: appliedFilters.search.trim() || undefined,
           role: appliedFilters.role === 'all' ? undefined : appliedFilters.role as AdminRole,
           status: appliedFilters.status === 'all' ? undefined : appliedFilters.status as AdminUserStatus,
-          created_from: toIsoDateStart(appliedFilters.created_from),
-          created_to: toIsoDateEnd(appliedFilters.created_to),
-          last_login_from: toIsoDateStart(appliedFilters.last_login_from),
-          last_login_to: toIsoDateEnd(appliedFilters.last_login_to),
+          created_from: dateStart(appliedFilters.created_from),
+          created_to: dateEnd(appliedFilters.created_to),
+          last_login_from: dateStart(appliedFilters.last_login_from),
+          last_login_to: dateEnd(appliedFilters.last_login_to),
           sort_by: appliedFilters.sort_by as AdminUserListParams['sort_by'],
           sort_order: appliedFilters.sort_order as AdminUserListParams['sort_order'],
         }, ctrl.signal),
@@ -397,17 +406,17 @@ export default function AdminUsersPage() {
     setAppliedFilters(filters);
   };
 
-  const canTouch = (user: AdminUserDetail) => {
+  const canTouch = useCallback((user: AdminUserDetail) => {
     if (!currentUser) return false;
     if (user.role === 'super_admin' && currentUser.role !== 'super_admin') return false;
     return true;
-  };
+  }, [currentUser]);
 
-  const dangerousSelf = (user: AdminUserDetail, kind: ActionKind) => {
+  const dangerousSelf = useCallback((user: AdminUserDetail, kind: ActionKind) => {
     return user.id === currentUser?.id && ['lock', 'delete'].includes(kind);
-  };
+  }, [currentUser?.id]);
 
-  const openConfirm = (kind: ActionKind, user: AdminUserDetail) => {
+  const openConfirm = useCallback((kind: ActionKind, user: AdminUserDetail) => {
     setReason('');
     setNotice(null);
     setPasswordResult(null);
@@ -417,7 +426,7 @@ export default function AdminUsersPage() {
       nextRole: user.role,
       quotaText: JSON.stringify(user.current_quota || {}, null, 2),
     });
-  };
+  }, []);
 
   const runConfirm = async () => {
     if (!confirm) return;
@@ -479,184 +488,194 @@ export default function AdminUsersPage() {
     }
   };
 
+  /* ── Table columns definition ─────────────────────────────────────────── */
+
+  type RowItem = AdminUserListResponse['items'][number];
+
+  const columns: DataTableColumn<RowItem>[] = useMemo(() => [
+    {
+      key: 'full_name',
+      label: 'Họ tên',
+      render: (item: RowItem) => {
+        const row = rowDetails[item.id] || item;
+        return (
+          <div className="ez-datatable-cell-title">
+            <strong>{row.full_name}</strong>
+            <span className="ez-muted">{row.id}</span>
+          </div>
+        );
+      },
+    },
+    { key: 'email', label: 'Email', render: (item: RowItem) => (rowDetails[item.id] || item).email },
+    { key: 'role', label: 'Vai trò', render: (item: RowItem) => { const r = (rowDetails[item.id] || item).role; return ROLE_LABELS[r] || r; } },
+    {
+      key: 'status',
+      label: 'Trạng thái',
+      render: (item: RowItem) => {
+        const row = rowDetails[item.id] || item;
+        return <Badge variant={STATUS_BADGE_MAP[row.status]}>{USER_STATUS_LABELS[row.status]}</Badge>;
+      },
+    },
+    { key: 'created_at', label: 'Ngày đăng ký', render: (item: RowItem) => fmtDateTime((rowDetails[item.id] || item).created_at) },
+    { key: 'last_login_at', label: 'Đăng nhập gần nhất', render: (item: RowItem) => fmtDateTime((rowDetails[item.id] || item).last_login_at) },
+    { key: 'documents', label: 'Tài liệu', render: (item: RowItem) => { const d = rowDetails[item.id]; return d ? fmtNumber(d.document_count) : '...'; } },
+    { key: 'questions', label: 'Câu hỏi', render: (item: RowItem) => { const d = rowDetails[item.id]; return d ? fmtNumber(d.question_count) : '...'; } },
+    { key: 'ai_usage', label: 'AI usage', render: (item: RowItem) => { const d = rowDetails[item.id]; return d ? `${fmtNumber(d.ai_request_count)} req` : '...'; } },
+    {
+      key: 'actions',
+      label: 'Hành động',
+      render: (item: RowItem) => {
+        const detail = rowDetails[item.id];
+        return (
+          <div className="ez-datatable-cell-actions">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/users/${item.id}`)}>Xem</Button>
+            {detail && can('users.update') && canTouch(detail) && (
+              <Button variant="outline" size="sm" onClick={() => setEditUser(detail)}>Sửa</Button>
+            )}
+            {detail && can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
+              <Button variant="outline" size="sm" onClick={() => openConfirm(detail.status === 'locked' ? 'unlock' : 'lock', detail)}>
+                {detail.status === 'locked' ? 'Mở khóa' : 'Khóa'}
+              </Button>
+            )}
+            {detail && can('users.change_role') && canTouch(detail) && (
+              <Button variant="outline" size="sm" onClick={() => openConfirm('role', detail)}>Role</Button>
+            )}
+            {detail && can('users.manage_quota') && canTouch(detail) && (
+              <Button variant="outline" size="sm" onClick={() => openConfirm('quota', detail)}>Quota</Button>
+            )}
+            {detail && can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
+              <Button variant="outline" size="sm" onClick={() => openConfirm('resetPassword', detail)}>Reset MK</Button>
+            )}
+            {detail && can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
+              <Button variant="outline" size="sm" onClick={() => openConfirm('forceLogout', detail)}>Logout</Button>
+            )}
+            {detail && can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
+              <Button variant="danger" size="sm" onClick={() => openConfirm('delete', detail)}>Xóa</Button>
+            )}
+            {detail && can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
+              <Button variant="secondary" size="sm" onClick={() => openConfirm('restore', detail)}>Khôi phục</Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [rowDetails, can, canTouch, dangerousSelf, navigate, openConfirm]);
+
   return (
-    <div className="admin-users-page">
-      <header className="admin-header admin-users-heading">
-        <div>
-          <h1>Quản lý người dùng</h1>
-          <p className="admin-subtitle">Tìm kiếm, hỗ trợ và quản trị tài khoản theo RBAC.</p>
-        </div>
-        {can('users.create') && (
-          <button type="button" className="admin-action-btn admin-action-btn--primary" onClick={() => setCreateUser(true)}>
-            Tạo người dùng
-          </button>
-        )}
-      </header>
+    <div className="ez-admin-page">
+      <PageHeader
+        title="Quản lý người dùng"
+        description="Tìm kiếm, hỗ trợ và quản trị tài khoản theo RBAC."
+        actions={
+          can('users.create') ? (
+            <Button variant="primary" onClick={() => setCreateUser(true)}>Tạo người dùng</Button>
+          ) : undefined
+        }
+      />
 
       {stats && (
-        <section className="admin-user-stat-grid" aria-label="Thống kê người dùng">
+        <StatGrid aria-label="Thống kê người dùng">
           <StatTile label="Tổng người dùng" value={fmtNumber(stats.total_users)} />
           <StatTile label="Hoạt động 24 giờ" value={fmtNumber(stats.active_last_24_hours)} />
           <StatTile label="Người dùng mới 7 ngày" value={fmtNumber(stats.users_created_last_7_days)} />
           <StatTile label="Tài khoản bị khóa" value={fmtNumber(stats.locked_users)} />
           <StatTile label="Tài khoản đã xóa" value={fmtNumber(stats.deleted_users)} />
-        </section>
+        </StatGrid>
       )}
 
-      <section className="admin-users-panel">
-        <form className="admin-user-filters" onSubmit={submitFilters}>
-          <label>
-            <span>Tìm kiếm</span>
-            <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Tên, email hoặc ID" />
-          </label>
-          <label>
-            <span>Role</span>
-            <select value={filters.role} onChange={(event) => { setPage(1); setFilters({ ...filters, role: event.target.value }); }}>
-              <option value="all">Tất cả</option>
-              {ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Trạng thái</span>
-            <select value={filters.status} onChange={(event) => { setPage(1); setFilters({ ...filters, status: event.target.value }); }}>
-              <option value="all">Tất cả</option>
-              <option value="active">Hoạt động</option>
-              <option value="locked">Đã khóa</option>
-              <option value="deleted">Đã xóa</option>
-            </select>
-          </label>
-          <label>
-            <span>Đăng ký từ</span>
-            <input type="date" value={filters.created_from} onChange={(event) => setFilters({ ...filters, created_from: event.target.value })} />
-          </label>
-          <label>
-            <span>Đăng ký đến</span>
-            <input type="date" value={filters.created_to} onChange={(event) => setFilters({ ...filters, created_to: event.target.value })} />
-          </label>
-          <label>
-            <span>Login từ</span>
-            <input type="date" value={filters.last_login_from} onChange={(event) => setFilters({ ...filters, last_login_from: event.target.value })} />
-          </label>
-          <label>
-            <span>Login đến</span>
-            <input type="date" value={filters.last_login_to} onChange={(event) => setFilters({ ...filters, last_login_to: event.target.value })} />
-          </label>
-          <label>
-            <span>Sắp xếp</span>
-            <select value={filters.sort_by} onChange={(event) => setFilters({ ...filters, sort_by: event.target.value })}>
-              <option value="created_at">Ngày đăng ký</option>
-              <option value="last_login_at">Đăng nhập gần nhất</option>
-              <option value="email">Email</option>
-              <option value="full_name">Họ tên</option>
-              <option value="role">Vai trò</option>
-              <option value="status">Trạng thái</option>
-            </select>
-          </label>
-          <label>
-            <span>Thứ tự</span>
-            <select value={filters.sort_order} onChange={(event) => setFilters({ ...filters, sort_order: event.target.value })}>
-              <option value="desc">Giảm dần</option>
-              <option value="asc">Tăng dần</option>
-            </select>
-          </label>
-          <button type="submit" className="admin-action-btn admin-action-btn--primary">Lọc</button>
-        </form>
+      <Card>
+        <CardBody>
+          <FilterBar columns={5} onSubmit={submitFilters}>
+            <FormField label="Tìm kiếm">
+              <Input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Tên, email hoặc ID" />
+            </FormField>
+            <FormField label="Role">
+              <Select value={filters.role} onChange={(event) => { setPage(1); setFilters({ ...filters, role: event.target.value }); }}>
+                <option value="all">Tất cả</option>
+                {ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Trạng thái">
+              <Select value={filters.status} onChange={(event) => { setPage(1); setFilters({ ...filters, status: event.target.value }); }}>
+                <option value="all">Tất cả</option>
+                <option value="active">Hoạt động</option>
+                <option value="locked">Đã khóa</option>
+                <option value="deleted">Đã xóa</option>
+              </Select>
+            </FormField>
+            <FormField label="Đăng ký từ">
+              <Input type="date" value={filters.created_from} onChange={(event) => setFilters({ ...filters, created_from: event.target.value })} />
+            </FormField>
+            <FormField label="Đăng ký đến">
+              <Input type="date" value={filters.created_to} onChange={(event) => setFilters({ ...filters, created_to: event.target.value })} />
+            </FormField>
+            <FormField label="Login từ">
+              <Input type="date" value={filters.last_login_from} onChange={(event) => setFilters({ ...filters, last_login_from: event.target.value })} />
+            </FormField>
+            <FormField label="Login đến">
+              <Input type="date" value={filters.last_login_to} onChange={(event) => setFilters({ ...filters, last_login_to: event.target.value })} />
+            </FormField>
+            <FormField label="Sắp xếp">
+              <Select value={filters.sort_by} onChange={(event) => setFilters({ ...filters, sort_by: event.target.value })}>
+                <option value="created_at">Ngày đăng ký</option>
+                <option value="last_login_at">Đăng nhập gần nhất</option>
+                <option value="email">Email</option>
+                <option value="full_name">Họ tên</option>
+                <option value="role">Vai trò</option>
+                <option value="status">Trạng thái</option>
+              </Select>
+            </FormField>
+            <FormField label="Thứ tự">
+              <Select value={filters.sort_order} onChange={(event) => setFilters({ ...filters, sort_order: event.target.value })}>
+                <option value="desc">Giảm dần</option>
+                <option value="asc">Tăng dần</option>
+              </Select>
+            </FormField>
+            <Button type="submit" variant="primary">Lọc</Button>
+          </FilterBar>
 
-        {notice && <p className="admin-inline-notice" role="status">{notice}</p>}
-        {passwordResult && (
-          <p className="admin-user-password-result" role="status">
-            Mật khẩu tạm: <strong>{passwordResult}</strong>
-          </p>
-        )}
-        {error && <div className="panel-error" role="alert">{error}</div>}
+          {notice && <Alert tone="success" role="status">{notice}</Alert>}
+          {passwordResult && (
+            <Alert tone="success" role="status">
+              Mật khẩu tạm: <strong style={{ fontFamily: 'var(--ez-font-mono)' }}>{passwordResult}</strong>
+            </Alert>
+          )}
+          {error && <Alert tone="error" role="alert">{error}</Alert>}
 
-        {state === 'loading' && <p className="panel-loading">Đang tải người dùng...</p>}
-        {state === 'error' && <EmptyData title="Không tải được dữ liệu" text="Vui lòng thử lại hoặc kiểm tra quyền truy cập." />}
-        {state === 'ok' && list && list.items.length === 0 && <EmptyData title="Không có người dùng phù hợp" text="Thử thay đổi bộ lọc hoặc khoảng thời gian." />}
+          {state === 'loading' && <SkeletonText lines={5} />}
+          {state === 'error' && (
+            <ErrorState
+              title="Không tải được dữ liệu"
+              description="Vui lòng thử lại hoặc kiểm tra quyền truy cập."
+              onRetry={load}
+            />
+          )}
+          {state === 'ok' && list && list.items.length === 0 && (
+            <EmptyState
+              title="Không có người dùng phù hợp"
+              description="Thử thay đổi bộ lọc hoặc khoảng thời gian."
+            />
+          )}
 
-        {state === 'ok' && list && list.items.length > 0 && (
-          <>
-            <div className="admin-users-table-wrap">
-              <table className="admin-users-table">
-                <thead>
-                  <tr>
-                    <th>Họ tên</th>
-                    <th>Email</th>
-                    <th>Vai trò</th>
-                    <th>Trạng thái</th>
-                    <th>Ngày đăng ký</th>
-                    <th>Đăng nhập gần nhất</th>
-                    <th>Tài liệu</th>
-                    <th>Câu hỏi</th>
-                    <th>AI usage</th>
-                    <th>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => {
-                    const detail = rowDetails[item.id];
-                    const row = detail || item;
-                    return (
-                      <tr key={item.id}>
-                        <td data-label="Họ tên"><strong>{row.full_name}</strong><small>{row.id}</small></td>
-                        <td data-label="Email">{row.email}</td>
-                        <td data-label="Vai trò">{ROLE_LABELS[row.role] || row.role}</td>
-                        <td data-label="Trạng thái">
-                          <span className={`admin-user-status admin-user-status--${row.status}`}>{STATUS_LABELS[row.status]}</span>
-                        </td>
-                        <td data-label="Ngày đăng ký">{fmtDateTime(row.created_at)}</td>
-                        <td data-label="Đăng nhập gần nhất">{fmtDateTime(row.last_login_at)}</td>
-                        <td data-label="Tài liệu">{detail ? fmtNumber(detail.document_count) : '...'}</td>
-                        <td data-label="Câu hỏi">{detail ? fmtNumber(detail.question_count) : '...'}</td>
-                        <td data-label="AI usage">{detail ? `${fmtNumber(detail.ai_request_count)} req` : '...'}</td>
-                        <td data-label="Hành động">
-                          <div className="admin-user-actions">
-                            <button type="button" className="admin-action-btn" onClick={() => navigate(`/admin/users/${item.id}`)}>Xem</button>
-                            {detail && can('users.update') && canTouch(detail) && (
-                              <button type="button" className="admin-action-btn" onClick={() => setEditUser(detail)}>Sửa</button>
-                            )}
-                            {detail && can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
-                              <button type="button" className="admin-action-btn" onClick={() => openConfirm(detail.status === 'locked' ? 'unlock' : 'lock', detail)}>
-                                {detail.status === 'locked' ? 'Mở khóa' : 'Khóa'}
-                              </button>
-                            )}
-                            {detail && can('users.change_role') && canTouch(detail) && (
-                              <button type="button" className="admin-action-btn" onClick={() => openConfirm('role', detail)}>Role</button>
-                            )}
-                            {detail && can('users.manage_quota') && canTouch(detail) && (
-                              <button type="button" className="admin-action-btn" onClick={() => openConfirm('quota', detail)}>Quota</button>
-                            )}
-                            {detail && can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
-                              <button type="button" className="admin-action-btn" onClick={() => openConfirm('resetPassword', detail)}>Reset MK</button>
-                            )}
-                            {detail && can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
-                              <button type="button" className="admin-action-btn" onClick={() => openConfirm('forceLogout', detail)}>Logout</button>
-                            )}
-                            {detail && can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
-                              <button type="button" className="admin-action-btn admin-action-btn--danger" onClick={() => openConfirm('delete', detail)}>Xóa</button>
-                            )}
-                            {detail && can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
-                              <button type="button" className="admin-action-btn admin-action-btn--success" onClick={() => openConfirm('restore', detail)}>Khôi phục</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="admin-user-pagination">
-              <span>Trang {list.page}/{Math.max(list.total_pages, 1)} · {fmtNumber(list.total)} người dùng</span>
-              <div>
-                <button type="button" className="admin-action-btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Trước</button>
-                <button type="button" className="admin-action-btn" disabled={page >= list.total_pages} onClick={() => setPage((value) => value + 1)}>Sau</button>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
+          {state === 'ok' && list && list.items.length > 0 && (
+            <>
+              <DataTable
+                columns={columns}
+                data={list.items}
+                rowKey={(item) => item.id}
+                minWidth={1020}
+              />
+              <Pagination
+                page={list.page}
+                totalPages={list.total_pages}
+                total={list.total}
+                onPageChange={setPage}
+                label="người dùng"
+              />
+            </>
+          )}
+        </CardBody>
+      </Card>
 
       {confirm && (
         <ConfirmModal
