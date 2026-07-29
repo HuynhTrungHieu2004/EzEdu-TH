@@ -369,3 +369,28 @@
 @media (max-width: 480px) {
   .ez-main { padding: var(--ez-space-4) var(--ez-space-4); }
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   BANNER CHÀO MỪNG DASHBOARD
+   Dùng chung cho cả 3 dashboard (giáo viên/học sinh) — render trong AppLayout.
+   ─────────────────────────────────────────────────────────────────────── */
+.ez-dashboard-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ez-space-4);
+  background: var(--ez-gradient-hero);
+  border-radius: var(--ez-radius-xl);
+  padding: var(--ez-space-6);
+  margin-bottom: var(--ez-space-6);
+  color: var(--ez-text-on-brand);
+}
+.ez-dashboard-banner h1,
+.ez-dashboard-banner h2,
+.ez-dashboard-banner p {
+  color: var(--ez-text-on-brand);
+}
+.ez-dashboard-banner-art { width: 80px; height: 80px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .ez-dashboard-banner-art { display: none; }
+}

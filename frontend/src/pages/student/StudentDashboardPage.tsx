@@ -17,6 +17,7 @@ import {
 } from '../../components/ui';
 import { questionApi } from '../../api/questionApi';
 import type { LearningHistoryItem, QuestionSetSummary } from '../../api/questionApi';
+import CharacterIllustration from '../../components/public/CharacterIllustration';
 import { useAuth } from '../../hooks/useAuth';
 import { toolsForRole } from '../../data/toolRegistry';
 import '../dashboard.css';
@@ -85,10 +86,13 @@ export default function StudentDashboardPage() {
 
   return (
     <>
-      <header className="dash-greeting">
-        <h1 className="dash-greeting-title">Chào {firstName}</h1>
-        <p className="dash-greeting-sub">Hôm nay bạn muốn học gì?</p>
-      </header>
+      <div className="ez-dashboard-banner">
+        <header className="dash-greeting">
+          <h1 className="dash-greeting-title">Chào {firstName}</h1>
+          <p className="dash-greeting-sub">Hôm nay bạn muốn học gì?</p>
+        </header>
+        <CharacterIllustration variant="student" className="ez-dashboard-banner-art" />
+      </div>
 
       <div style={{ marginBottom: 'var(--ez-space-6)' }}>
         <SearchCommand

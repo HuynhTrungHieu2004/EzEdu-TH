@@ -28,6 +28,7 @@ import {
 } from '../../components/ui';
 import { ProcessingStatusBadge } from '../../components/domain/ProcessingStatusBadge';
 import { isDocumentReady } from '../../components/domain/documentStatus';
+import CharacterIllustration from '../../components/public/CharacterIllustration';
 import { documentApi } from '../../api/documentApi';
 import type { DocumentResponse } from '../../api/documentApi';
 import { questionApi } from '../../api/questionApi';
@@ -109,10 +110,13 @@ export default function TeacherDashboardPage() {
 
   return (
     <>
-      <header className="dash-greeting">
-        <h1 className="dash-greeting-title">Xin chào, {firstName}</h1>
-        <p className="dash-greeting-sub">Hôm nay bạn muốn chuẩn bị nội dung gì?</p>
-      </header>
+      <div className="ez-dashboard-banner">
+        <header className="dash-greeting">
+          <h1 className="dash-greeting-title">Xin chào, {firstName}</h1>
+          <p className="dash-greeting-sub">Hôm nay bạn muốn chuẩn bị nội dung gì?</p>
+        </header>
+        <CharacterIllustration variant="teacher" className="ez-dashboard-banner-art" />
+      </div>
 
       <div style={{ marginBottom: 'var(--ez-space-6)' }}>
         <SearchCommand
