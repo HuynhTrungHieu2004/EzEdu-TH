@@ -19,6 +19,7 @@ import {
   FinalCta,
   Hero,
   HowItWorks,
+  IntegrationsTeaser,
   PrimaryTool,
   QuickExamples,
   StatsBlock,
@@ -102,6 +103,7 @@ export default function LandingPage() {
         <StudentToolsShowcase />
         <StatsBlock />
         <TestimonialBlock />
+        <IntegrationsTeaser />
         <TrustBlock />
         <Faq />
         <FinalCta />

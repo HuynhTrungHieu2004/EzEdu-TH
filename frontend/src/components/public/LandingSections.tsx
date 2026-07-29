@@ -926,3 +926,24 @@ export function TestimonialBlock({
     </section>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TÍCH HỢP — chưa có, nêu rõ "sắp ra mắt", không bịa tên đối tác
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function IntegrationsTeaser() {
+  return (
+    <section className="ezp-section ezp-section-alt" aria-labelledby="integrations-title">
+      <div className="ezp-container ezp-head-center">
+        <span className="ezp-eyebrow">Sắp ra mắt</span>
+        <h2 className="ezp-title" id="integrations-title">
+          Tích hợp với công cụ bạn đang dùng
+        </h2>
+        <p className="ezp-lede">
+          Chúng tôi đang xây dựng khả năng kết nối với các nền tảng học tập phổ biến. Chưa có
+          tích hợp nào sẵn sàng ở thời điểm hiện tại.
+        </p>
+      </div>
+    </section>
+  );
+}
