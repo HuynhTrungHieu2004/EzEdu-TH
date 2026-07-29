@@ -55,3 +55,6 @@ frontend/test-results/
 playwright-report/
 .playwright-mcp/
 *.tsbuildinfo
+
+# Codex isolated feature worktrees
+.worktrees/
