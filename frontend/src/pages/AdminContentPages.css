@@ -29,7 +29,7 @@
 .admin-content-panel {
   background: var(--surface-primary, #fff);
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 16px;
 }
 
@@ -51,7 +51,7 @@
 .admin-content-field select,
 .admin-content-field textarea {
   border: 1px solid var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 10px 12px;
   font: inherit;
   color: var(--text-primary, #172033);
@@ -71,7 +71,7 @@
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 8px 11px;
   background: var(--surface-primary, #fff);
   color: var(--text-primary, #172033);
@@ -109,7 +109,7 @@
   max-width: 100%;
   background: var(--surface-primary, #fff);
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-content-table {
@@ -156,7 +156,7 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--ez-radius-full);
   padding: 4px 8px;
   font-size: 12px;
   font-weight: 700;
@@ -177,7 +177,7 @@
 .admin-content-state {
   background: var(--surface-primary, #fff);
   border: 1px dashed var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 28px;
   text-align: center;
   color: var(--text-secondary, #667085);
@@ -202,7 +202,7 @@
   gap: 4px;
   padding: 12px;
   border: 1px solid var(--border-color, #eef2f7);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-content-kv span {
@@ -231,7 +231,7 @@
   max-height: 86vh;
   overflow: auto;
   background: var(--surface-primary, #fff);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 20px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
 }
@@ -251,7 +251,7 @@
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--border-color, #eef2f7);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-content-tabs {
@@ -262,7 +262,7 @@
 
 .admin-content-tabs button {
   border: 1px solid var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   background: var(--surface-primary, #fff);
   color: var(--text-primary, #172033);
   padding: 9px 12px;
@@ -328,7 +328,7 @@
 .admin-content-section-row textarea,
 .admin-content-row-head select {
   border: 1px solid var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 9px 10px;
   font: inherit;
   color: var(--text-primary, #172033);
@@ -356,7 +356,7 @@
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--border-color, #eef2f7);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-content-inline-check {
@@ -374,7 +374,7 @@
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   background: #fff;
 }
 
@@ -436,7 +436,7 @@
 
 .admin-content-preview-hero button {
   border: 1px solid #d0d5dd;
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   background: #fff;
   padding: 8px 10px;
   font-weight: 700;
@@ -452,7 +452,7 @@
   gap: 4px;
   padding: 10px;
   border: 1px solid #eef2f7;
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-content-preview footer {
@@ -472,7 +472,7 @@
   align-items: end;
   padding: 12px;
   border: 1px solid var(--border-color, #eef2f7);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
 }
 
 .admin-settings-row--flag {
@@ -492,7 +492,7 @@
 .admin-settings-row textarea {
   width: 100%;
   border: 1px solid var(--border-color, #d0d5dd);
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   padding: 9px 10px;
   font: inherit;
   color: var(--text-primary, #172033);

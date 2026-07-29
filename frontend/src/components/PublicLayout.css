@@ -52,7 +52,7 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--ez-radius-md);
   background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
   color: #fff;
   font-size: 13px;
@@ -83,7 +83,7 @@
   font-weight: 500;
   color: #4c4878;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: var(--ez-radius-md);
   transition: background 0.15s, color 0.15s;
 }
 
@@ -100,7 +100,7 @@
   font-weight: 600;
   color: #fff;
   padding: 8px 18px;
-  border-radius: 999px;
+  border-radius: var(--ez-radius-full);
   transition: opacity 0.15s, transform 0.15s;
 }
 
