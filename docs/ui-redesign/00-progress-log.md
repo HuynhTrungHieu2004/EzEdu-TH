@@ -311,3 +311,18 @@ git checkout -- . && git clean -fd
 git checkout -- frontend/
 rm -rf frontend/src/styles frontend/src/components/ui
 ```
+
+---
+
+## 2026-07-29 — Hoàn tất redesign toàn diện theo phong cách MagicSchool
+
+MagicSchool-style full redesign implemented per `docs/superpowers/plans/2026-07-29-magicschool-full-redesign.md`.
+
+Đây là task 20/20 (task cuối) của kế hoạch — task chỉ kiểm thử, không sửa code chức năng. Kết quả kiểm chứng:
+
+- **Bước 1 — Type check + lint + build**: `npx tsc -b --force` sạch, `npm run lint` sạch (0 lỗi/cảnh báo), `npm run build` thành công (`✓ built in 457ms`).
+- **Bước 2 — Playwright e2e đầy đủ**: `npm run test:e2e` → **438 passed** (5.6m), đúng bằng số lượng trước khi bắt đầu redesign. Không có test nào fail hay bị skip.
+- **Bước 3 — Kiểm tra accessibility**: `npx playwright test e2e/accessibility.spec.ts --project=desktop-1440` → **14 passed** (23.4s).
+- **Bước 4 — Kiểm tra thủ công trên trình duyệt**: Trang chủ `/` hiển thị đúng thứ tự section mới (pill nav, hero kèm minh hoạ nhân vật + sparkles, các pillar, showcase cho giáo viên/học sinh, trust block, FAQ, CTA cuối, footer), không có lỗi console. Trang `/admin/users` (chưa đăng nhập) chuyển hướng an toàn về `/login` với card/nút đều bo góc lớn theo token mới, không có gì vỡ layout. Dark mode và light mode trên trang chủ đều hiển thị đúng màu gradient và minh hoạ nhân vật (dùng token/currentColor), không có chữ chìm vào nền. Không có tài khoản demo hợp lệ trong backend đang chạy tại thời điểm kiểm thử (tài khoản QA đã bị xoá theo mục "4" ở trên) nên chưa xác nhận được dashboard đã đăng nhập bằng mắt — phần này bỏ qua, không chặn việc hoàn tất task.
+
+Toàn bộ 6 bước theo `task-20-brief.md` đã hoàn tất. Chi tiết đầy đủ log lệnh nằm ở `.superpowers/sdd/2026-07-29-magicschool-full-redesign/task-20-report.md`.
