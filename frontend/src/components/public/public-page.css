@@ -232,7 +232,7 @@
 
 .ezp-hero-sparkle-1 { top: 4%; right: 8%; color: var(--ez-secondary); }
 .ezp-hero-sparkle-2 { top: 40%; left: 2%; }
-.ezp-hero-sparkle-3 { bottom: 6%; right: 20%; color: var(--ez-primary-subtle); z-index: -1; }
+.ezp-hero-sparkle-3 { bottom: 6%; right: 20%; color: var(--ez-primary-subtle); }
 
 .ezp-hero-art-wrap {
   display: flex;
@@ -313,18 +313,6 @@
 @media (max-width: 640px) {
   .ezp-hero { padding-top: var(--ez-space-12); }
   .ezp-hero-actions .ez-btn { flex: 1 1 100%; }
-}
-
-/* ───────────────────────────────────────────────────────────────────────
-   HERO ART — minh hoạ riêng của EzEdu AI, dựng bằng SVG nội bộ
-   ─────────────────────────────────────────────────────────────────────── */
-.ezp-hero-art {
-  width: 100%;
-  height: auto;
-  border-radius: var(--ez-radius-2xl);
-  background-color: var(--ez-surface);
-  border: 1px solid var(--ez-border);
-  padding: var(--ez-space-5);
 }
 
 /* ───────────────────────────────────────────────────────────────────────

@@ -5,8 +5,9 @@
  * mặc định, nên trang quản trị Website CMS tiếp tục hoạt động không đổi. Phần
  * bố cục và thị giác được dựng lại bằng design system trong `styles/tokens.css`.
  *
- * Thứ tự section: Hero -> Công cụ chính -> Ví dụ -> Cách hoạt động -> Vì sao ->
- * Tính năng theo vai trò -> Chất lượng & tin cậy -> FAQ -> CTA cuối.
+ * Thứ tự section: Hero -> BuiltForLearning -> Công cụ chính -> Ví dụ -> Cách
+ * hoạt động -> Vì sao -> Tính năng theo vai trò -> AI cho giáo viên -> AI cho
+ * học sinh -> Chất lượng & tin cậy -> Tích hợp -> FAQ -> CTA cuối.
  */
 import { useEffect, useState } from 'react';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
