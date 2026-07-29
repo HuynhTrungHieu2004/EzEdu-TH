@@ -180,6 +180,42 @@ export function TeacherToolsShowcase() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   AI CHO HỌC SINH — công cụ thật, lấy từ toolRegistry
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function StudentToolsShowcase() {
+  const tools = toolsForRole('student').slice(0, 6);
+
+  return (
+    <section className="ezp-section" aria-labelledby="student-tools-title">
+      <div className="ezp-container">
+        <div className="ezp-head">
+          <span className="ezp-eyebrow">AI cho học sinh</span>
+          <h2 className="ezp-title" id="student-tools-title">
+            Luyện tập chủ động, hiểu sâu hơn
+          </h2>
+        </div>
+
+        <div className="ezp-tools-showcase ezp-tools-showcase-reverse">
+          <div className="ezp-grid ezp-grid-2">
+            {tools.map((tool) => (
+              <Link key={tool.id} to="/register" className="ezp-example">
+                <span className="ezp-card-icon ezp-card-icon-secondary" aria-hidden="true">
+                  <tool.icon size={18} />
+                </span>
+                <span className="ezp-example-title">{tool.title}</span>
+                <span className="ezp-example-desc">{tool.description}</span>
+              </Link>
+            ))}
+          </div>
+          <CharacterIllustration variant="student" className="ezp-tools-showcase-art" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    CÔNG CỤ CHÍNH — tải học liệu
    ═══════════════════════════════════════════════════════════════════════ */
 

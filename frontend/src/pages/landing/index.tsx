@@ -21,6 +21,7 @@ import {
   HowItWorks,
   PrimaryTool,
   QuickExamples,
+  StudentToolsShowcase,
   TeacherToolsShowcase,
   TrustBlock,
   WhyEzEdu,
@@ -96,6 +97,7 @@ export default function LandingPage() {
         <WhyEzEdu />
         <FeaturesByRole />
         <TeacherToolsShowcase />
+        <StudentToolsShowcase />
         <TrustBlock />
         <Faq />
         <FinalCta />

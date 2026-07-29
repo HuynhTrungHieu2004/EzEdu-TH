@@ -849,3 +849,10 @@
   .ezp-tools-showcase { grid-template-columns: 1fr; }
   .ezp-tools-showcase-art { max-width: 220px; margin: 0 auto; }
 }
+
+.ezp-tools-showcase-reverse {
+  grid-template-columns: 1fr 280px;
+}
+@media (max-width: 900px) {
+  .ezp-tools-showcase-reverse { grid-template-columns: 1fr; }
+}
