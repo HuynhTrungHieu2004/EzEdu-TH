@@ -4,6 +4,8 @@
  * KHÔNG dùng ảnh chụp thật, KHÔNG sao chép minh hoạ của bất kỳ trang nào
  * khác. Dùng màu qua token để tự đổi theo theme sáng/tối.
  */
+import { useId } from 'react';
+
 export type CharacterVariant = 'hero' | 'teacher' | 'student';
 
 export interface CharacterIllustrationProps {
@@ -12,6 +14,7 @@ export interface CharacterIllustrationProps {
 }
 
 export default function CharacterIllustration({ variant, className }: CharacterIllustrationProps) {
+  const id = useId();
   const title =
     variant === 'hero'
       ? 'Giáo viên và học sinh cùng học với EzEdu AI'
@@ -23,10 +26,10 @@ export default function CharacterIllustration({ variant, className }: CharacterI
     <svg
       viewBox="0 0 320 320"
       role="img"
-      aria-labelledby={`char-illust-${variant}-title`}
+      aria-labelledby={`char-illust-${variant}-${id}`}
       className={className}
     >
-      <title id={`char-illust-${variant}-title`}>{title}</title>
+      <title id={`char-illust-${variant}-${id}`}>{title}</title>
 
       {/* nền khối bo tròn */}
       <circle cx="160" cy="160" r="150" fill="var(--ez-primary-subtle)" />
