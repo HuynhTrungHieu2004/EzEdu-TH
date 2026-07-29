@@ -94,6 +94,55 @@ export function Hero({ content }: { content: HeroContent }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   ĐƯỢC XÂY CHO VIỆC HỌC — 3 trụ đối tượng
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const PILLARS = [
+  {
+    icon: <Users size={22} />,
+    title: 'Dành cho giáo viên',
+    desc: 'Soạn đề, sinh câu hỏi và ban hành cho lớp nhanh hơn, vẫn giữ quyền rà soát cuối cùng.',
+  },
+  {
+    icon: <GraduationCap size={22} />,
+    title: 'Dành cho học sinh',
+    desc: 'Luyện tập theo đề đã ban hành, hỏi đáp có dẫn nguồn, theo dõi tiến độ của chính mình.',
+  },
+  {
+    icon: <ClipboardList size={22} />,
+    title: 'Quản lý lớp học',
+    desc: 'Tạo lớp, thêm học sinh, gán đúng đề cho đúng nhóm — không cần công cụ ngoài.',
+  },
+];
+
+export function BuiltForLearning() {
+  return (
+    <section className="ezp-section" aria-labelledby="built-for-learning-title">
+      <div className="ezp-container">
+        <div className="ezp-head ezp-head-center">
+          <span className="ezp-eyebrow">Được xây cho việc học</span>
+          <h2 className="ezp-title" id="built-for-learning-title">
+            Một nền tảng, đúng việc cho từng vai trò
+          </h2>
+        </div>
+
+        <div className="ezp-grid ezp-grid-3">
+          {PILLARS.map((item) => (
+            <article key={item.title} className="ezp-pillar">
+              <span className="ezp-pillar-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <h3 className="ezp-card-title">{item.title}</h3>
+              <p className="ezp-card-desc">{item.desc}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    CÔNG CỤ CHÍNH — tải học liệu
    ═══════════════════════════════════════════════════════════════════════ */
 

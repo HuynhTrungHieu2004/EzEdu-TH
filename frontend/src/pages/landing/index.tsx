@@ -13,6 +13,7 @@ import AnnouncementBar from '../../components/public/AnnouncementBar';
 import PublicHeader from '../../components/public/PublicHeader';
 import PublicFooter from '../../components/public/PublicFooter';
 import {
+  BuiltForLearning,
   Faq,
   FeaturesByRole,
   FinalCta,
@@ -87,6 +88,7 @@ export default function LandingPage() {
 
       <main id="main" className="ezp-main" tabIndex={-1}>
         <Hero content={content.hero} />
+        <BuiltForLearning />
         {uploadEnabled && <PrimaryTool />}
         <QuickExamples />
         <HowItWorks />
