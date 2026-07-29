@@ -842,15 +842,15 @@ export function FinalCta() {
         <div className="ezp-cta-actions">
           {signedIn ? (
             <Link to={homePath}>
-              <Button size="lg">Vào khu vực của tôi</Button>
+              <Button size="hero">Vào khu vực của tôi</Button>
             </Link>
           ) : (
             <>
               <Link to="/register">
-                <Button size="lg">Tạo tài khoản miễn phí</Button>
+                <Button size="hero">Tạo tài khoản miễn phí</Button>
               </Link>
               <Link to="/login">
-                <Button size="lg" variant="outline">
+                <Button size="hero" variant="outline">
                   Đăng nhập
                 </Button>
               </Link>

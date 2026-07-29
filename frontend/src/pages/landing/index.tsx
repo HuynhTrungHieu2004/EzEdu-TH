@@ -103,8 +103,8 @@ export default function LandingPage() {
         <StudentToolsShowcase />
         <StatsBlock />
         <TestimonialBlock />
-        <IntegrationsTeaser />
         <TrustBlock />
+        <IntegrationsTeaser />
         <Faq />
         <FinalCta />
       </main>
