@@ -65,6 +65,71 @@ def upload_file_to_cloudinary(file_path: str, folder: str = "documents", resourc
         )
     return response
 
+CLEANUP_ASSET_JOB_TYPE = "cleanup_cloudinary_asset"
+
+
+async def enqueue_cloudinary_cleanup(db, *, public_id: str) -> None:
+    """Xoá asset Cloudinary qua hàng đợi job nền (retry có backoff, xem
+    `background_job_service.py`) thay vì gọi đồng bộ trong request rồi im
+    lặng bỏ qua lỗi (`except Exception: pass` trước đây) — asset mồ côi sẽ
+    được thử lại thay vì mất dấu vĩnh viễn khi Cloudinary lỗi tạm thời."""
+    from app.services.background_job_service import enqueue
+
+    if not public_id:
+        return
+    await enqueue(
+        db,
+        job_type=CLEANUP_ASSET_JOB_TYPE,
+        payload={"public_id": public_id},
+        idempotency_key=f"cloudinary-delete:{public_id}",
+    )
+
+
+async def cleanup_cloudinary_asset_job(payload: dict) -> dict:
+    """Handler cho job `cleanup_cloudinary_asset` — gọi từ `app/worker.py`."""
+    delete_file_from_cloudinary(payload["public_id"])
+    return {"deleted": payload["public_id"]}
+
+
+class InvalidWebhookSignature(Exception):
+    pass
+
+
+async def handle_cloudinary_webhook(db, *, body: bytes, timestamp: str, signature: str) -> dict:
+    """Xác thực chữ ký + xử lý idempotent 1 notification Cloudinary. Tách
+    khỏi router để kiểm thử được mà không cần dựng `Request` ASGI thật."""
+    from cloudinary.utils import verify_notification_signature
+
+    if not is_cloudinary_configured():
+        raise ValueError("Cloudinary chưa được cấu hình.")
+    configure_cloudinary()
+
+    if not verify_notification_signature(body.decode("utf-8"), int(timestamp), signature):
+        raise InvalidWebhookSignature("Chữ ký Cloudinary không hợp lệ.")
+
+    import json
+
+    payload = json.loads(body)
+    notification_type = payload.get("notification_type", "unknown")
+    public_id = payload.get("public_id", "unknown")
+
+    async def _apply() -> dict:
+        if payload.get("public_id"):
+            from datetime import datetime, timezone
+
+            await db["documents"].update_one(
+                {"cloudinary_public_id": payload["public_id"]},
+                {"$set": {"cloudinary_notification_status": notification_type, "updated_at": datetime.now(timezone.utc)}},
+            )
+        return {"handled": notification_type}
+
+    from app.core.idempotency import run_idempotent
+
+    return await run_idempotent(
+        db, scope="cloudinary_webhook", key=f"{notification_type}:{public_id}:{timestamp}", fn=_apply
+    )
+
+
 def delete_file_from_cloudinary(public_id: str) -> dict:
     """Deletes a file from Cloudinary given its public_id"""
     if not is_cloudinary_configured():

@@ -166,7 +166,7 @@ def _coerce_value(definition: SettingDefinition, value: Any) -> Any:
 
 
 async def ensure_runtime_config_seeded(database: Any = None) -> None:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     for key, definition in SYSTEM_SETTING_DEFINITIONS.items():
         if await db[SETTINGS_COLLECTION].find_one({"key": key}, {"_id": 1}):
             continue
@@ -181,7 +181,7 @@ async def get_all_settings(database: Any = None, *, force_refresh: bool = False)
     global _settings_cache
     if _settings_cache is not None and not force_refresh:
         return copy.deepcopy(_settings_cache)
-    db = database or get_database()
+    db = database if database is not None else get_database()
     try:
         await ensure_runtime_config_seeded(db)
         docs = await db[SETTINGS_COLLECTION].find({"key": {"$in": list(SYSTEM_SETTING_DEFINITIONS)}}).to_list(None)
@@ -210,7 +210,7 @@ async def update_setting(key: str, value: Any, *, admin_user_id: str, database: 
     if not definition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setting không tồn tại.")
     coerced = _coerce_value(definition, value)
-    db = database or get_database()
+    db = database if database is not None else get_database()
     await ensure_runtime_config_seeded(db)
     before = await db[SETTINGS_COLLECTION].find_one({"key": key}) or _default_setting_doc(definition)
     after = {
@@ -229,7 +229,7 @@ async def get_all_feature_flags(database: Any = None, *, force_refresh: bool = F
     global _feature_flags_cache
     if _feature_flags_cache is not None and not force_refresh:
         return copy.deepcopy(_feature_flags_cache)
-    db = database or get_database()
+    db = database if database is not None else get_database()
     try:
         await ensure_runtime_config_seeded(db)
         docs = await db[FEATURE_FLAGS_COLLECTION].find({"key": {"$in": list(FEATURE_FLAG_DEFINITIONS)}}).to_list(None)
@@ -260,7 +260,7 @@ async def update_feature_flag(
     definition = FEATURE_FLAG_DEFINITIONS.get(key)
     if not definition:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feature flag không tồn tại.")
-    db = database or get_database()
+    db = database if database is not None else get_database()
     await ensure_runtime_config_seeded(db)
     before = await db[FEATURE_FLAGS_COLLECTION].find_one({"key": key}) or _default_flag_doc(definition)
     after = {**_default_flag_doc(definition), **before}

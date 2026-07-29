@@ -250,6 +250,7 @@ async def create_database_indexes():
         await db["documents"].create_index([("status", 1), ("created_at", -1)])
         await db["documents"].create_index([("deleted_at", 1), ("created_at", -1)])
         await db["documents"].create_index([("quarantined_at", 1), ("created_at", -1)])
+        await db["documents"].create_index([("user_id", 1), ("checksum", 1)])
         await db["verification_sessions"].create_index([("document_id", 1), ("created_at", -1)])
         await db["verification_sessions"].create_index([("status", 1), ("created_at", -1)])
 

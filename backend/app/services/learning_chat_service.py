@@ -90,34 +90,26 @@ async def release_lock(conversation_id: ObjectId, lock_token: str) -> bool:
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Sliding Window User-based Rate Limiter
+#
+# Định nghĩa lớp đã chuyển sang app/core/rate_limit.py (dùng chung cho các
+# phân hệ mới — web-knowledge, curriculum ingest...); import lại ở đây để giữ
+# nguyên mọi chỗ đang dùng `learning_chat_service.SlidingWindowLimiter` và
+# `learning_chat_service.rate_limiter` (router chat.py, tests) không phải sửa.
 # ═══════════════════════════════════════════════════════════════════════════
 
-class SlidingWindowLimiter:
-    def __init__(self, limit: int, window: int = 60):
-        self.limit = limit
-        self.window = window
-        self.history: Dict[str, List[float]] = {}
-        self.lock = asyncio.Lock()
+from app.core.rate_limit import SlidingWindowLimiter  # noqa: E402  (re-export có chủ đích)
 
-    async def check_rate_limit(self, user_id: str):
-        async with self.lock:
-            now = time.time()
-            if user_id not in self.history:
-                self.history[user_id] = []
-            
-            # Keep only requests within the window
-            self.history[user_id] = [t for t in self.history[user_id] if now - t < self.window]
-            
-            if len(self.history[user_id]) >= self.limit:
-                from fastapi import HTTPException, status
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Bạn đã vượt quá giới hạn lượt hỏi (tối đa 15 câu hỏi/phút). Vui lòng thử lại sau."
-                )
-            
-            self.history[user_id].append(now)
+_CHAT_RATE_LIMIT_DETAIL = "Bạn đã vượt quá giới hạn lượt hỏi (tối đa 15 câu hỏi/phút). Vui lòng thử lại sau."
 
-rate_limiter = SlidingWindowLimiter(limit=settings.CHAT_RATE_LIMIT_PER_MINUTE)
+
+class _ChatRateLimiter(SlidingWindowLimiter):
+    """Giữ nguyên thông báo lỗi cụ thể cho luồng hỏi-đáp (khác thông báo mặc định dùng chung)."""
+
+    async def check_rate_limit(self, user_id: str, *, detail: str | None = None) -> None:
+        await super().check_rate_limit(user_id, detail=detail or _CHAT_RATE_LIMIT_DETAIL)
+
+
+rate_limiter = _ChatRateLimiter(limit=settings.CHAT_RATE_LIMIT_PER_MINUTE)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -290,23 +282,12 @@ def parse_tag_list(text: str, tag: str) -> List[str]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Domain Authority Scoring
+# Domain Authority Scoring — chuyển sang app/web_knowledge/services/
+# web_knowledge_service.py (Giai đoạn 6, dữ liệu hoá whitelist domain), giữ
+# re-export ở đây để không phá import hiện có.
 # ═══════════════════════════════════════════════════════════════════════════
 
-def get_domain_score(url: str) -> int:
-    """
-    Return priority score for official websites (government, university, official docs).
-    """
-    url_lower = url.lower()
-    if ".gov.vn" in url_lower or ".gov" in url_lower:
-        return 100
-    if ".edu.vn" in url_lower or ".edu" in url_lower:
-        return 90
-    if "developer.mozilla.org" in url_lower or "docs.python.org" in url_lower or "w3.org" in url_lower or "ietf.org" in url_lower:
-        return 80
-    if ".org" in url_lower:
-        return 20
-    return 10
+from app.web_knowledge.services.web_knowledge_service import get_domain_score  # noqa: E402,F401
 
 
 # ═══════════════════════════════════════════════════════════════════════════

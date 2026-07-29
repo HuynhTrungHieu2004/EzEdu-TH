@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     MAX_ANSWER_LENGTH: int = 4000
     MAX_RETRIES: int = 2
     CHAT_RATE_LIMIT_PER_MINUTE: int = 15
+    WEB_KNOWLEDGE_DAILY_QUOTA: int = 20
+    WEB_KNOWLEDGE_CACHE_TTL_HOURS: int = 12
 
     # Admin Analytics Settings
     ADMIN_ANALYTICS_RATE_LIMIT_PER_MINUTE: int = 20
@@ -80,6 +82,10 @@ class Settings(BaseSettings):
     BANDIT_ENABLED: bool = False
     NEURALCD_ENABLED: bool = False
     AKT_ENABLED: bool = False
+    ENABLE_EXAM_BLUEPRINT: bool = False
+    ENABLE_TIMED_EXAM: bool = False
+    ENABLE_WEB_KNOWLEDGE: bool = False
+    ENABLE_CURRICULUM_KB: bool = False
 
     # Personalization model/version metadata. v0 means the feature is scaffolded
     # but no production algorithm/model has been activated yet.
@@ -205,6 +211,10 @@ class Settings(BaseSettings):
             
         if self.CHAT_RATE_LIMIT_PER_MINUTE <= 0:
             raise ValueError("CHAT_RATE_LIMIT_PER_MINUTE must be greater than 0.")
+        if self.WEB_KNOWLEDGE_DAILY_QUOTA <= 0:
+            raise ValueError("WEB_KNOWLEDGE_DAILY_QUOTA must be greater than 0.")
+        if self.WEB_KNOWLEDGE_CACHE_TTL_HOURS <= 0:
+            raise ValueError("WEB_KNOWLEDGE_CACHE_TTL_HOURS must be greater than 0.")
         if self.MAX_KNOWLEDGE_COMPONENTS_PER_ITEM <= 0:
             raise ValueError("MAX_KNOWLEDGE_COMPONENTS_PER_ITEM must be greater than 0.")
         if not 0 <= self.KNOWLEDGE_EXTRACTION_LOW_CONFIDENCE_THRESHOLD <= 1:

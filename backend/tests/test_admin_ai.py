@@ -191,6 +191,15 @@ class AdminAITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(history.total, 2)
         self.assertTrue(all(item.reason for item in history.items))
 
+    def test_quota_payload_rejects_unknown_or_negative_limits(self):
+        from pydantic import ValidationError
+        from app.schemas.admin_ai import AIQuotaUpdateRequest, RoleQuotaUpdateRequest
+
+        with self.assertRaises(ValidationError):
+            AIQuotaUpdateRequest(current_quota={"requests_per_day": -1}, reason="invalid")
+        with self.assertRaises(ValidationError):
+            RoleQuotaUpdateRequest(overrides={"unknown_limit": 10}, reason="invalid")
+
 
 if __name__ == "__main__":
     unittest.main()

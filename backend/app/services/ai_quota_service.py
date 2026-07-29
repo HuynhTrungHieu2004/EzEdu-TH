@@ -143,7 +143,7 @@ async def _role_quota_from_settings(database: Any = None) -> dict[str, dict[str,
                 if isinstance(role, str) and isinstance(value, dict):
                     _apply_overrides(merged, role, value)
 
-    db = database or get_database()
+    db = database if database is not None else get_database()
     try:
         docs = await db[ROLE_QUOTA_COLLECTION].find({}).to_list(None)
     except Exception:
@@ -180,7 +180,7 @@ async def update_role_quota_defaults(
 ) -> dict[str, int]:
     if role not in DEFAULT_ROLE_QUOTAS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role không hợp lệ.")
-    db = database or get_database()
+    db = database if database is not None else get_database()
     now = datetime.now(timezone.utc)
     await db[ROLE_QUOTA_COLLECTION].update_one(
         {"role": role},
@@ -201,7 +201,7 @@ def _month_start(now: datetime) -> datetime:
 
 
 async def usage_snapshot(user_id: str, *, now: Optional[datetime] = None, database: Any = None) -> dict[str, int]:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     now = now or datetime.now(timezone.utc)
     day_start = _day_start(now)
     month_start = _month_start(now)
@@ -256,7 +256,7 @@ async def check_ai_quota(
     document_size_bytes: Optional[int] = None,
     database: Any = None,
 ) -> QuotaCheckResult:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     if quota_override is None or role is None:
         user_doc = await db["users"].find_one({"_id": ObjectId(user_id)}) if ObjectId.is_valid(user_id) else None
         if user_doc:

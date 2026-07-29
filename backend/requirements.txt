@@ -62,7 +62,7 @@ python-pptx==1.0.2
 google-genai>=1.0.0
 groq>=0.9.0
 reportlab==4.5.1
-numpy==1.26.4
+numpy==2.4.6
 requests==2.34.2
 chromadb==1.5.9
 langchain-core==1.4.7
@@ -117,3 +117,10 @@ frozenlist==1.8.0
 
 onnxruntime==1.16.3
 scikit-learn>=1.3.0
+
+# Giai đoạn 3 (feature-expansion) — bộ giải ràng buộc cho sinh đề theo ma trận.
+# Xem docs/feature-expansion/01-target-architecture.md (đánh giá công nghệ).
+ortools==9.15.6755
+pandas==3.0.5
+absl-py==2.5.0
+immutabledict==4.3.1

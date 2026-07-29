@@ -39,7 +39,19 @@ ehthumbs.db
 Thumbs.db
 
 # IDEs and editors
+.claude/
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Test artifacts, build output, coverage, logs
+dist/
+build/
+coverage/
+*.log
+test-results/
+frontend/test-results/
+playwright-report/
+.playwright-mcp/
+*.tsbuildinfo

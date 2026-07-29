@@ -89,7 +89,7 @@ async def record_error_log(
     user_id: Optional[str] = None,
     database: Any = None,
 ) -> dict[str, Any]:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     doc = {
         "error_id": str(uuid.uuid4()),
         "timestamp": now_utc(),
@@ -203,7 +203,7 @@ async def _check_storage():
 
 
 async def get_system_health(*, include_history: bool = True, database: Any = None) -> SystemHealthResponse:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     checks = [
         ("fastapi_backend", _check_fastapi),
         ("mongodb", _check_mongodb),
@@ -317,7 +317,7 @@ async def get_error_monitoring(
     page_size: int = 50,
     database: Any = None,
 ) -> ErrorMonitoringResponse:
-    db = database or get_database()
+    db = database if database is not None else get_database()
     query: dict[str, Any] = {"timestamp": {"$gte": from_date, "$lte": to_date}}
     if severity:
         query["severity"] = severity

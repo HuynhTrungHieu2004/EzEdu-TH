@@ -155,7 +155,7 @@ async def record_admin_audit(
         user_agent_summary=summarize_user_agent(request.headers.get("user-agent") if request else None),
     )
     doc = payload.model_dump(exclude_none=True)
-    db = database or get_database()
+    db = database if database is not None else get_database()
     inserted = await db[COLLECTION].insert_one(doc)
     doc["_id"] = inserted.inserted_id
     return doc

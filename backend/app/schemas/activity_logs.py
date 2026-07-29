@@ -28,6 +28,7 @@ ActivityAction = Literal[
     "password_changed",
     "profile_updated",
     "document_uploaded",
+    "document_reused",
     "document_processing_started",
     "document_processing_completed",
     "document_processing_failed",

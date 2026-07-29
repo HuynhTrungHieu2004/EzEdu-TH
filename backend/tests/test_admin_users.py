@@ -166,6 +166,30 @@ class AdminUsersTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(changed.user.role, "support")
         self.assertEqual(changed.audit_event["metadata"]["new_role"], "support")
 
+    async def test_update_quota_persists_valid_payload(self):
+        from app.routers.admin_users import AdminUserQuotaUpdateRequest, update_admin_user_quota
+
+        updated = await update_admin_user_quota(
+            str(self.target_id),
+            AdminUserQuotaUpdateRequest(current_quota={"requests_per_day": 200}, reason="tăng hạn mức"),
+            current_user=self.admin,
+        )
+        self.assertEqual(updated.user.current_quota, {"requests_per_day": 200})
+
+    async def test_update_quota_rejects_invalid_payload(self):
+        from pydantic import ValidationError
+
+        from app.routers.admin_users import AdminUserQuotaUpdateRequest
+
+        for bad_quota in (
+            {"not_a_real_key": 10},
+            {"requests_per_day": True},
+            {"requests_per_day": -1},
+            {"requests_per_day": 10_000_000_001},
+        ):
+            with self.assertRaises(ValidationError):
+                AdminUserQuotaUpdateRequest(current_quota=bad_quota, reason="test")
+
     async def test_admin_cannot_touch_super_admin(self):
         from app.routers.admin_users import (
             AdminUserReasonRequest,

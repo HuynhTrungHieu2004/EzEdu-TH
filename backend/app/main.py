@@ -15,6 +15,9 @@ from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
 from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, admin_audit_logs, admin_content, admin_ai, admin_notifications, admin_reports, website_content, system_settings, classes
 from app.personalization.api import router as personalization_router, onboarding_router as personalization_onboarding_router
+from app.exam_bank.api import router as exam_bank_router
+from app.web_knowledge.api import router as web_knowledge_router
+from app.curriculum_kb.api import router as curriculum_kb_router
 from app.services.system_settings_service import require_feature_enabled
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +25,57 @@ UPLOADS_DIR = BACKEND_DIR / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 import logging
+from app.core.logging_config import configure_logging
+
+# JSON logging có gắn request_id/correlation_id vào MỌI log line của toàn bộ
+# ứng dụng — cấu hình một lần ở đây, mọi `logging.getLogger(__name__)` hiện
+# có kế thừa tự động, không cần sửa từng nơi gọi logger.info(...). Không ảnh
+# hưởng log riêng của uvicorn (uvicorn dùng logger propagate=False).
+configure_logging()
+
 logger = logging.getLogger("app.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi động kết nối MongoDB khi startup
     await connect_to_mongo()
+
+    # Tạo index cho hạ tầng dùng chung (idempotency-key, hàng đợi job nền) —
+    # idempotent, an toàn gọi lại mỗi lần khởi động.
+    try:
+        from app.database.mongodb import get_database
+        from app.core.idempotency import ensure_idempotency_index
+        from app.services.background_job_service import ensure_background_job_indexes
+
+        _db = get_database()
+        await ensure_idempotency_index(_db)
+        await ensure_background_job_indexes(_db)
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho hạ tầng dùng chung (idempotency/background_jobs): {e}")
+
+    # Index cho ngân hàng câu hỏi & ma trận đề (giai đoạn 3).
+    try:
+        from app.exam_bank.repositories.indexes import ensure_exam_bank_indexes
+
+        await ensure_exam_bank_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho ngân hàng câu hỏi & ma trận đề: {e}")
+
+    # Index cho khám phá kiến thức Internet có kiểm chứng (giai đoạn 6).
+    try:
+        from app.web_knowledge.repositories.indexes import ensure_web_knowledge_indexes
+
+        await ensure_web_knowledge_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho khám phá kiến thức Internet: {e}")
+
+    # Index cho kho tri thức chuẩn (giai đoạn 7).
+    try:
+        from app.curriculum_kb.repositories.indexes import ensure_curriculum_kb_indexes
+
+        await ensure_curriculum_kb_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho kho tri thức chuẩn: {e}")
 
     # BackgroundTasks không tồn tại qua lần khởi động lại. Giải phóng các
     # session còn treo để người dùng có thể chạy kiểm tra lại.
@@ -173,6 +221,16 @@ async def error_monitoring_middleware(request, call_next):
     return response
 
 
+# Đăng ký SAU error_monitoring_middleware một cách có chủ đích: Starlette xây
+# middleware stack theo thứ tự add_middleware(insert ở đầu danh sách), nên
+# middleware đăng ký SAU cùng trở thành lớp NGOÀI CÙNG — request_id/
+# correlation_id phải có sẵn TRƯỚC KHI error_monitoring_middleware chạy để log
+# lỗi cũng gắn được 2 id này.
+from app.core.correlation import correlation_id_middleware  # noqa: E402
+
+app.middleware("http")(correlation_id_middleware)
+
+
 app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 # Đăng ký các router
@@ -204,6 +262,9 @@ app.include_router(
     dependencies=[Depends(require_feature_enabled("enable_personalization"))],
 )
 app.include_router(classes.router, prefix=f"{settings.API_V1_STR}/classes", tags=["Classes"])
+app.include_router(exam_bank_router, prefix=settings.API_V1_STR)
+app.include_router(web_knowledge_router, prefix=settings.API_V1_STR)
+app.include_router(curriculum_kb_router, prefix=settings.API_V1_STR)
 
 
 

@@ -3,10 +3,38 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 SortOrder = Literal["asc", "desc"]
 AIUsageStatus = Literal["success", "failure"]
+
+QUOTA_KEYS = {
+    "requests_per_day",
+    "requests_per_month",
+    "tokens_per_day",
+    "tokens_per_month",
+    "max_questions_per_request",
+    "max_document_size_bytes",
+    "max_documents",
+}
+
+
+def validated_quota(value: dict[str, Any]) -> dict[str, int]:
+    unknown = set(value) - QUOTA_KEYS
+    if unknown:
+        raise ValueError(f"Quota key không hợp lệ: {', '.join(sorted(unknown))}.")
+    result: dict[str, int] = {}
+    for key, raw in value.items():
+        if isinstance(raw, bool):
+            raise ValueError(f"{key} phải là số nguyên không âm.")
+        try:
+            parsed = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{key} phải là số nguyên không âm.") from exc
+        if parsed < 0 or parsed > 10_000_000_000:
+            raise ValueError(f"{key} nằm ngoài phạm vi cho phép.")
+        result[key] = parsed
+    return result
 
 
 class AIUsageFilters(BaseModel):
@@ -100,6 +128,11 @@ class AIQuotaUpdateRequest(BaseModel):
     current_quota: dict[str, Any] = Field(default_factory=dict)
     reason: str = Field(..., min_length=1, max_length=500)
 
+    @field_validator("current_quota")
+    @classmethod
+    def validate_current_quota(cls, value: dict[str, Any]) -> dict[str, int]:
+        return validated_quota(value)
+
 
 class AIQuotaResetRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=500)
@@ -108,6 +141,11 @@ class AIQuotaResetRequest(BaseModel):
 class RoleQuotaUpdateRequest(BaseModel):
     overrides: dict[str, int] = Field(default_factory=dict)
     reason: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("overrides")
+    @classmethod
+    def validate_overrides(cls, value: dict[str, int]) -> dict[str, int]:
+        return validated_quota(value)
 
 
 class AIQuotaMutationResponse(BaseModel):

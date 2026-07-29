@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import os
 import time
 import uuid
@@ -22,7 +23,12 @@ from app.schemas.document import (
     DocumentResponse,
     DocumentUploadResponse,
 )
-from app.services.cloudinary_service import delete_file_from_cloudinary, upload_file_to_cloudinary
+from app.services.cloudinary_service import (
+    InvalidWebhookSignature,
+    enqueue_cloudinary_cleanup,
+    handle_cloudinary_webhook,
+    upload_file_to_cloudinary,
+)
 from app.services.document_mutation_service import (
     MUTATION_TOKEN_FIELD,
     acquire_document_mutation_lock,
@@ -145,6 +151,8 @@ def serialize_document(document: dict) -> DocumentResponse:
         media_kind=document.get("media_kind", "document"),
         status=document.get("status", "uploaded"),
         error_message=document.get("error_message"),
+        checksum=document.get("checksum"),
+        reuse_count=document.get("reuse_count", 0),
         created_at=document["created_at"],
         updated_at=document["updated_at"],
     )
@@ -451,6 +459,30 @@ async def fail_document_indexing(document: dict, error_message: str) -> None:
         pass
 
 
+@router.post("/webhooks/cloudinary", include_in_schema=False)
+async def cloudinary_webhook(request: Request):
+    """Nhận notification từ Cloudinary (ví dụ: xử lý eager transformation
+    xong, kiểm duyệt nội dung). Xác thực bằng chữ ký HMAC của Cloudinary
+    (header `X-Cld-Timestamp`/`X-Cld-Signature`) — KHÔNG dùng JWT người dùng
+    vì Cloudinary gọi thẳng, không qua trình duyệt. Idempotent theo
+    `notification_type+public_id+timestamp` (xem `handle_cloudinary_webhook`)
+    — Cloudinary có thể gửi lại cùng notification nếu không nhận 2xx kịp thời.
+    """
+    body = await request.body()
+    timestamp = request.headers.get("X-Cld-Timestamp")
+    signature = request.headers.get("X-Cld-Signature")
+    if not timestamp or not signature:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Thiếu header xác thực Cloudinary.")
+
+    db = get_database()
+    try:
+        return await handle_cloudinary_webhook(db, body=body, timestamp=timestamp, signature=signature)
+    except InvalidWebhookSignature as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: UploadFile = File(...),
@@ -485,11 +517,13 @@ async def upload_document(
 
     temp_file_path = build_temp_file_path(filename)
     file_size = 0
+    hasher = hashlib.sha256()
 
     try:
         async with aiofiles.open(temp_file_path, "wb") as output_file:
             while chunk := await file.read(1024 * 1024):
                 file_size += len(chunk)
+                hasher.update(chunk)
                 if file_size > max_size:
                     if media_kind == "video":
                         raise HTTPException(
@@ -512,7 +546,56 @@ async def upload_document(
             detail=f"Failed to save temporary file locally: {str(exc)}",
         ) from exc
 
+    checksum = hasher.hexdigest()
     db = get_database()
+
+    # Dedup: cùng người dùng tải lại đúng file đã có (theo checksum nội dung)
+    # -> tái sử dụng bản ghi cũ, không tải lại lên Cloudinary lần nữa (đúng
+    # yêu cầu "lưu trữ học liệu để tái sử dụng về sau", tiết kiệm băng
+    # thông/dung lượng lưu trữ). So khớp trong phạm vi user_id — không dedup
+    # chéo người dùng để tránh rò rỉ việc "ai đã từng tải file này".
+    existing = await db["documents"].find_one(
+        {"user_id": current_user.id, "checksum": checksum, "deleted_at": None}
+    )
+    if existing is not None:
+        cleanup_temp_file(temp_file_path)
+        now = datetime.now(timezone.utc)
+        await db["documents"].update_one(
+            {"_id": existing["_id"]},
+            {"$inc": {"reuse_count": 1}, "$set": {"updated_at": now}},
+        )
+        await record_activity(
+            action="document_reused",
+            category="document",
+            status="success",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=str(existing["_id"]),
+            request=request,
+            metadata={"file_type": file_ext, "file_size": file_size},
+            database=db,
+        )
+        content_doc = await db["document_contents"].find_one({"document_id": str(existing["_id"])})
+        return DocumentUploadResponse(
+            document_id=str(existing["_id"]),
+            user_id=existing["user_id"],
+            original_filename=existing["original_filename"],
+            file_type=existing["file_type"],
+            file_size=existing["file_size"],
+            cloudinary_url=existing["cloudinary_url"],
+            cloudinary_public_id=existing["cloudinary_public_id"],
+            cloudinary_resource_type=existing["cloudinary_resource_type"],
+            media_kind=existing["media_kind"],
+            status=existing["status"],
+            error_message=existing.get("error_message"),
+            checksum=checksum,
+            reuse_count=existing.get("reuse_count", 0) + 1,
+            text_length=content_doc.get("text_length") if content_doc else None,
+            reused=True,
+            created_at=existing["created_at"],
+            updated_at=now,
+        )
+
     max_documents = int(await get_setting_value("max_documents_per_user", 200, database=db))
     if max_documents > 0:
         document_count = await db["documents"].count_documents({"user_id": current_user.id, "deleted_at": None})
@@ -553,6 +636,12 @@ async def upload_document(
         "media_kind": media_kind,
         "status": "uploaded",
         "error_message": None,
+        "checksum": checksum,
+        "reuse_count": 0,
+        "version": 1,
+        "created_by": current_user.id,
+        "updated_by": current_user.id,
+        "deleted_at": None,
         "created_at": now,
         "updated_at": now,
     }
@@ -644,18 +733,12 @@ async def upload_document(
     except HTTPException:
         cloudinary_public_id = document_metadata.get("cloudinary_public_id")
         if cloudinary_public_id and not metadata_saved:
-            try:
-                delete_file_from_cloudinary(cloudinary_public_id)
-            except Exception:
-                pass
+            await enqueue_cloudinary_cleanup(db, public_id=cloudinary_public_id)
         raise
     except Exception as exc:
         cloudinary_public_id = document_metadata.get("cloudinary_public_id")
         if cloudinary_public_id and not metadata_saved:
-            try:
-                delete_file_from_cloudinary(cloudinary_public_id)
-            except Exception:
-                pass
+            await enqueue_cloudinary_cleanup(db, public_id=cloudinary_public_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save document metadata to database: {str(exc)}",
@@ -675,6 +758,7 @@ async def upload_document(
         media_kind=document_metadata["media_kind"],
         status=document_metadata["status"],
         error_message=document_metadata.get("error_message"),
+        checksum=document_metadata.get("checksum"),
         text_length=content_doc.get("text_length") if content_doc else None,
         created_at=document_metadata["created_at"],
         updated_at=document_metadata["updated_at"],
@@ -1461,13 +1545,11 @@ async def delete_document(
     except Exception:
         pass
 
-    # 2. Delete file from Cloudinary / local storage (best-effort)
+    # 2. Delete file from Cloudinary / local storage — qua hàng đợi job nền
+    # (retry có backoff), không xoá đồng bộ rồi im lặng bỏ qua lỗi.
     cloudinary_public_id = document.get("cloudinary_public_id")
     if cloudinary_public_id:
-        try:
-            delete_file_from_cloudinary(cloudinary_public_id)
-        except Exception:
-            pass
+        await enqueue_cloudinary_cleanup(db, public_id=cloudinary_public_id)
 
     # 3. Delete related MongoDB collections
     await db["document_chunks"].delete_many(

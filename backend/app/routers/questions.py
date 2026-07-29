@@ -803,6 +803,11 @@ async def update_question_item(
         question["reviewed_at"] = None
         question["published_at"] = None
 
+    # `questions` là bản sao chuẩn hoá từ _normalize_question_items, tách rời
+    # khỏi qs["questions"]. Thiếu dòng gán ngược này thì thay đổi chỉ nằm trên
+    # bản sao — API trả 200 và có vẻ thành công, nhưng câu hỏi không bao giờ
+    # được lưu vào cơ sở dữ liệu. Mẫu đúng đã có sẵn ở publish_entire_question_set.
+    qs["questions"] = questions
     now = datetime.now(timezone.utc)
     qs["updated_at"] = now
     _with_workflow_metadata(qs)
@@ -881,6 +886,9 @@ async def update_question_workflow(
         question["reviewed_at"] = None
         question["published_at"] = None
 
+    # Xem chú thích tương tự trong update_question_item: phải gán ngược bản đã
+    # sửa vào qs["questions"] thì thay đổi mới thực sự được lưu.
+    qs["questions"] = questions
     qs["updated_at"] = now
     _with_workflow_metadata(qs)
 

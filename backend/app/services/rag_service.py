@@ -126,7 +126,7 @@ def _rerank_chunks(query: str, chunks: list[dict], limit: int) -> list[dict]:
     return reranked[:limit]
 
 
-def _build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
+def build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
     if not texts:
         return "local", []
 
@@ -139,7 +139,7 @@ def _build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
     return "local", _local_hash_embeddings(texts)
 
 
-def _build_query_embedding(text: str) -> tuple[str, list[float]]:
+def build_query_embedding(text: str) -> tuple[str, list[float]]:
     if settings.GEMINI_API_KEY:
         try:
             return "gemini", _normalize_vector(get_embedding(text))
@@ -157,7 +157,7 @@ async def add_document_chunks(document_id: str, user_id: str, chunks: list[str])
         return
 
     db = get_database()
-    source, embeddings = _build_embeddings(chunks)
+    source, embeddings = build_embeddings(chunks)
     if not embeddings:
         return
 
@@ -214,7 +214,7 @@ async def search_relevant_chunks(document_id: str, user_id: str, query: str, n_r
     if not query.strip():
         return []
 
-    source, query_embedding = _build_query_embedding(query)
+    source, query_embedding = build_query_embedding(query)
     dimension = len(query_embedding) if query_embedding else EMBEDDING_DIMENSION
     collection = _get_collection(source, dimension)
     fetch_limit = max(n_results, min(n_results * 3, 30))
@@ -262,7 +262,7 @@ async def search_user_chunks_advanced(
     if not query.strip():
         return []
 
-    source, query_embedding = _build_query_embedding(query)
+    source, query_embedding = build_query_embedding(query)
     dimension = len(query_embedding) if query_embedding else EMBEDDING_DIMENSION
     collection = _get_collection(source, dimension)
 

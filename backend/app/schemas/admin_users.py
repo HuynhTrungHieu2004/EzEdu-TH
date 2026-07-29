@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.rbac import ROLE_NAMES
+from app.schemas.admin_ai import validated_quota
 
 
 UserStatus = Literal["active", "locked", "deleted"]
@@ -78,6 +79,11 @@ class AdminUserRoleUpdateRequest(BaseModel):
 class AdminUserQuotaUpdateRequest(BaseModel):
     current_quota: dict[str, Any] = Field(default_factory=dict)
     reason: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("current_quota")
+    @classmethod
+    def validate_current_quota(cls, value: dict[str, Any]) -> dict[str, int]:
+        return validated_quota(value)
 
 
 class AdminUserReasonRequest(BaseModel):

@@ -14,6 +14,8 @@ class DocumentMetadataBase(BaseModel):
     media_kind: str = "document"
     status: str = "uploaded"
     error_message: Optional[str] = None
+    checksum: Optional[str] = None
+    reuse_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -23,6 +25,7 @@ class DocumentResponse(DocumentMetadataBase):
 class DocumentUploadResponse(DocumentMetadataBase):
     document_id: str
     text_length: Optional[int] = None
+    reused: bool = False
 
     class Config:
         json_schema_extra = {

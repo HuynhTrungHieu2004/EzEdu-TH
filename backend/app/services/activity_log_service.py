@@ -199,7 +199,7 @@ async def record_activity(
             user_agent_summary=summarize_user_agent(request.headers.get("user-agent") if request else None),
         )
         doc = payload.model_dump(exclude_none=True)
-        db = database or get_database()
+        db = database if database is not None else get_database()
         await db[COLLECTION].insert_one(doc)
     except Exception as exc:  # pragma: no cover - defensive by design
         logger.warning("Activity logging failed: %s", type(exc).__name__)
