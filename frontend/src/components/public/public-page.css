@@ -871,3 +871,17 @@
   color: var(--ez-text-secondary);
   font-size: var(--ez-text-body-sm);
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   TESTIMONIAL BLOCK
+   ─────────────────────────────────────────────────────────────────────── */
+.ezp-testimonial {
+  background: var(--ez-surface);
+  border-radius: var(--ez-radius-xl);
+  border: 1px solid var(--ez-border);
+  padding: var(--ez-space-6);
+  margin: 0;
+}
+.ezp-testimonial-icon { color: var(--ez-secondary); margin-bottom: var(--ez-space-3); }
+.ezp-testimonial-quote { font-size: var(--ez-text-h6); margin: 0 0 var(--ez-space-4); }
+.ezp-testimonial-author { color: var(--ez-text-secondary); font-size: var(--ez-text-body-sm); font-weight: var(--ez-weight-semibold); }

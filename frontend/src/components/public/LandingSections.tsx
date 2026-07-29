@@ -890,3 +890,39 @@ export function StatsBlock({ stats }: { stats?: Array<{ value: string; label: st
     </section>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TESTIMONIAL — chỉ hiện khi có lời chứng thực thật, không bịa
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function TestimonialBlock({
+  testimonials,
+}: {
+  testimonials?: Array<{ quote: string; name: string; role: string }>;
+}) {
+  if (!testimonials || testimonials.length === 0) return null;
+
+  return (
+    <section className="ezp-section" aria-labelledby="testimonial-title">
+      <div className="ezp-container">
+        <div className="ezp-head ezp-head-center">
+          <span className="ezp-eyebrow">Người dùng nói gì</span>
+          <h2 className="ezp-title" id="testimonial-title">
+            Được tin dùng bởi giáo viên và học sinh
+          </h2>
+        </div>
+        <div className="ezp-grid ezp-grid-3">
+          {testimonials.map((item) => (
+            <figure key={item.name} className="ezp-testimonial">
+              <MessageSquareQuote size={20} aria-hidden="true" className="ezp-testimonial-icon" />
+              <blockquote className="ezp-testimonial-quote">{item.quote}</blockquote>
+              <figcaption className="ezp-testimonial-author">
+                {item.name} — {item.role}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

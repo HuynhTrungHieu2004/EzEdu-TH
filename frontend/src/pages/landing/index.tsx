@@ -24,6 +24,7 @@ import {
   StatsBlock,
   StudentToolsShowcase,
   TeacherToolsShowcase,
+  TestimonialBlock,
   TrustBlock,
   WhyEzEdu,
 } from '../../components/public/LandingSections';
@@ -100,6 +101,7 @@ export default function LandingPage() {
         <TeacherToolsShowcase />
         <StudentToolsShowcase />
         <StatsBlock />
+        <TestimonialBlock />
         <TrustBlock />
         <Faq />
         <FinalCta />
