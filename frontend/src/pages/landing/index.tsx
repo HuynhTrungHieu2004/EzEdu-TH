@@ -9,6 +9,7 @@
  * Tính năng theo vai trò -> Chất lượng & tin cậy -> FAQ -> CTA cuối.
  */
 import { useEffect, useState } from 'react';
+import AnnouncementBar from '../../components/public/AnnouncementBar';
 import PublicHeader from '../../components/public/PublicHeader';
 import PublicFooter from '../../components/public/PublicFooter';
 import {
@@ -81,6 +82,7 @@ export default function LandingPage() {
         Bỏ qua tới nội dung chính
       </a>
 
+      <AnnouncementBar message={null} />
       <PublicHeader content={content.header} identity={content.site_identity} />
 
       <main id="main" className="ezp-main" tabIndex={-1}>

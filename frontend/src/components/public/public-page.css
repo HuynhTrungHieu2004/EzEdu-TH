@@ -146,6 +146,9 @@
   display: none;
   align-items: center;
   gap: var(--ez-space-1);
+  background-color: var(--ez-surface-muted);
+  border-radius: var(--ez-radius-full);
+  padding: var(--ez-space-1);
 }
 
 @media (min-width: 900px) {
@@ -154,7 +157,7 @@
 
 .ezp-nav-link {
   padding: var(--ez-space-2) var(--ez-space-3);
-  border-radius: var(--ez-radius-md);
+  border-radius: var(--ez-radius-full);
   color: var(--ez-text-secondary);
   font-size: var(--ez-text-body-sm);
   font-weight: var(--ez-weight-medium);
@@ -162,7 +165,7 @@
 }
 
 .ezp-nav-link:hover {
-  background-color: var(--ez-surface-hover);
+  background-color: var(--ez-surface);
   color: var(--ez-text);
   text-decoration: none;
 }
