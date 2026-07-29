@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
 import { useAuth } from '../hooks/useAuth';
+import { Button } from '../components/ui';
 
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -153,9 +154,9 @@ const RegisterPage = () => {
             />
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary btn-full">
+          <Button type="submit" size="hero" block disabled={loading}>
             {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
-          </button>
+          </Button>
         </form>
 
         <div className="auth-footer">

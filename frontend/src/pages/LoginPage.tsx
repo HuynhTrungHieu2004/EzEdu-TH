@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
 import { useAuth } from '../hooks/useAuth';
+import { Button } from '../components/ui';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -98,9 +99,9 @@ const LoginPage = () => {
             />
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary btn-full">
+          <Button type="submit" size="hero" block disabled={loading}>
             {loading ? 'Đang xác thực...' : 'Đăng nhập'}
-          </button>
+          </Button>
         </form>
 
         <div className="auth-footer">

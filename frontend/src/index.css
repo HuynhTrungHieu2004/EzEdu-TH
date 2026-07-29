@@ -1239,6 +1239,8 @@ code, .counter { font-family: var(--mono); }
   display: grid;
   place-items: center;
   padding: clamp(24px, 5vw, 50px);
+  background: var(--ez-gradient-hero);
+  background-size: 200% 200%;
 }
 
 .auth-card {
