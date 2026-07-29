@@ -24,6 +24,7 @@ import { Alert, Button } from '../ui';
 import { useAuth } from '../../hooks/useAuth';
 import SparkleStar from './SparkleStar';
 import CharacterIllustration from './CharacterIllustration';
+import { toolsForRole } from '../../data/toolRegistry';
 import type { HeroContent } from '../../types/websiteContent';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -136,6 +137,42 @@ export function BuiltForLearning() {
               <p className="ezp-card-desc">{item.desc}</p>
             </article>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AI CHO GIÁO VIÊN — công cụ thật, lấy từ toolRegistry
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function TeacherToolsShowcase() {
+  const tools = toolsForRole('teacher').slice(0, 6);
+
+  return (
+    <section className="ezp-section ezp-section-alt" aria-labelledby="teacher-tools-title">
+      <div className="ezp-container">
+        <div className="ezp-head">
+          <span className="ezp-eyebrow">AI cho giáo viên</span>
+          <h2 className="ezp-title" id="teacher-tools-title">
+            Tiết kiệm thời gian, tập trung vào việc dạy
+          </h2>
+        </div>
+
+        <div className="ezp-tools-showcase">
+          <CharacterIllustration variant="teacher" className="ezp-tools-showcase-art" />
+          <div className="ezp-grid ezp-grid-2">
+            {tools.map((tool) => (
+              <Link key={tool.id} to="/register" className="ezp-example">
+                <span className="ezp-card-icon" aria-hidden="true">
+                  <tool.icon size={18} />
+                </span>
+                <span className="ezp-example-title">{tool.title}</span>
+                <span className="ezp-example-desc">{tool.description}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </section>

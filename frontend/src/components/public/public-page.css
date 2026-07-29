@@ -834,3 +834,18 @@
   color: var(--ez-text-on-brand);
   margin-bottom: var(--ez-space-4);
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   AI CHO GIÁO VIÊN — công cụ showcase
+   ─────────────────────────────────────────────────────────────────────── */
+.ezp-tools-showcase {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--ez-space-8);
+  align-items: center;
+}
+.ezp-tools-showcase-art { width: 100%; height: auto; }
+@media (max-width: 900px) {
+  .ezp-tools-showcase { grid-template-columns: 1fr; }
+  .ezp-tools-showcase-art { max-width: 220px; margin: 0 auto; }
+}
