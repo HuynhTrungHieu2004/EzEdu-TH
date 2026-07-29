@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { Alert, Button } from '../ui';
 import { useAuth } from '../../hooks/useAuth';
-import HeroArt from './HeroArt';
+import SparkleStar from './SparkleStar';
+import CharacterIllustration from './CharacterIllustration';
 import type { HeroContent } from '../../types/websiteContent';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -37,6 +38,10 @@ export function Hero({ content }: { content: HeroContent }) {
 
   return (
     <section className="ezp-container ezp-hero" aria-labelledby="hero-title">
+      <SparkleStar variant="four-point" size={28} className="ezp-hero-sparkle ezp-hero-sparkle-1" />
+      <SparkleStar variant="sparkle" size={20} className="ezp-hero-sparkle ezp-hero-sparkle-2" />
+      <SparkleStar variant="blob" size={40} className="ezp-hero-sparkle ezp-hero-sparkle-3" />
+
       <div className="ezp-hero-grid">
         <div>
           <h1 className="ezp-hero-title" id="hero-title">
@@ -52,15 +57,15 @@ export function Hero({ content }: { content: HeroContent }) {
           <div className="ezp-hero-actions">
             {signedIn ? (
               <Link to={homePath}>
-                <Button size="lg">Vào khu vực của tôi</Button>
+                <Button size="hero">Vào khu vực của tôi</Button>
               </Link>
             ) : (
               <>
                 <Link to="/register">
-                  <Button size="lg">{content.primary_cta_label || 'Bắt đầu miễn phí'}</Button>
+                  <Button size="hero">{content.primary_cta_label || 'Bắt đầu miễn phí'}</Button>
                 </Link>
                 <a href="#cong-cu">
-                  <Button size="lg" variant="outline">
+                  <Button size="hero" variant="outline">
                     {content.secondary_cta_label || 'Khám phá công cụ'}
                   </Button>
                 </a>
@@ -80,7 +85,9 @@ export function Hero({ content }: { content: HeroContent }) {
           )}
         </div>
 
-        <HeroArt />
+        <div className="ezp-hero-art-wrap">
+          <CharacterIllustration variant="hero" className="ezp-hero-character" />
+        </div>
       </div>
     </section>
   );

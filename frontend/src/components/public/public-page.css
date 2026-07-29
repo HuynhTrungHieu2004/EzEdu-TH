@@ -214,8 +214,36 @@
    HERO
    ─────────────────────────────────────────────────────────────────────── */
 .ezp-hero {
-  padding-top: var(--ez-space-20);
+  position: relative;
+  overflow: visible;
+  padding-top: var(--ez-space-16);
   padding-bottom: var(--ez-space-16);
+}
+
+.ezp-hero-sparkle {
+  position: absolute;
+  color: var(--ez-accent);
+  pointer-events: none;
+}
+
+.ezp-hero-sparkle-1 { top: 4%; right: 8%; color: var(--ez-secondary); }
+.ezp-hero-sparkle-2 { top: 40%; left: 2%; }
+.ezp-hero-sparkle-3 { bottom: 6%; right: 20%; color: var(--ez-primary-subtle); z-index: -1; }
+
+.ezp-hero-art-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ezp-hero-character {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+}
+
+@media (max-width: 640px) {
+  .ezp-hero-sparkle { display: none; }
 }
 
 .ezp-hero-grid {
