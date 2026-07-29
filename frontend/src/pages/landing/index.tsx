@@ -21,6 +21,7 @@ import {
   HowItWorks,
   PrimaryTool,
   QuickExamples,
+  StatsBlock,
   StudentToolsShowcase,
   TeacherToolsShowcase,
   TrustBlock,
@@ -98,6 +99,7 @@ export default function LandingPage() {
         <FeaturesByRole />
         <TeacherToolsShowcase />
         <StudentToolsShowcase />
+        <StatsBlock />
         <TrustBlock />
         <Faq />
         <FinalCta />

@@ -866,3 +866,27 @@ export function FinalCta() {
     </section>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SỐ LIỆU — chỉ hiện khi có dữ liệu thật, không bịa
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function StatsBlock({ stats }: { stats?: Array<{ value: string; label: string }> }) {
+  if (!stats || stats.length === 0) return null;
+
+  return (
+    <section className="ezp-section ezp-section-alt" aria-labelledby="stats-title">
+      <div className="ezp-container">
+        <h2 className="ez-sr-only" id="stats-title">Số liệu sử dụng thực tế</h2>
+        <div className="ezp-grid ezp-grid-3">
+          {stats.map((stat) => (
+            <div key={stat.label} className="ezp-stat">
+              <strong className="ezp-stat-value">{stat.value}</strong>
+              <span className="ezp-stat-label">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -856,3 +856,18 @@
 @media (max-width: 900px) {
   .ezp-tools-showcase-reverse { grid-template-columns: 1fr; }
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   STATS BLOCK
+   ─────────────────────────────────────────────────────────────────────── */
+.ezp-stat { text-align: center; }
+.ezp-stat-value {
+  display: block;
+  font-size: var(--ez-text-h1);
+  font-weight: var(--ez-weight-extrabold);
+  color: var(--ez-primary);
+}
+.ezp-stat-label {
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+}
