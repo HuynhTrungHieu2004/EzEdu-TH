@@ -183,14 +183,16 @@
    4. BORDER RADIUS
    ─────────────────────────────────────────────────────────────────────── */
 :root {
+  /* Bo góc lớn hơn hẳn theo tinh thần MagicSchool — quyết định ở
+     docs/superpowers/specs/2026-07-29-magicschool-full-redesign-design.md */
   --ez-radius-none: 0;
-  --ez-radius-xs:   4px;
-  --ez-radius-sm:   6px;
-  --ez-radius-md:   10px;   /* input, button */
-  --ez-radius-lg:   14px;   /* card */
-  --ez-radius-xl:   20px;   /* card lớn, khối hero */
-  --ez-radius-2xl:  28px;   /* section nổi */
-  --ez-radius-full: 9999px; /* chip, badge, avatar */
+  --ez-radius-xs:   6px;
+  --ez-radius-sm:   10px;
+  --ez-radius-md:   16px;   /* input, button */
+  --ez-radius-lg:   24px;   /* card */
+  --ez-radius-xl:   28px;   /* card lớn, khối hero */
+  --ez-radius-2xl:  32px;   /* section nổi */
+  --ez-radius-full: 9999px; /* chip, badge, avatar, pill nav/button */
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -213,6 +215,19 @@
   --ez-ring-width: 2px;
   --ez-ring-offset: 2px;
   --ez-ring-color: var(--ez-indigo-500);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   5b. GRADIENT — dùng cho hero/CTA nổi bật, tinh thần MagicSchool
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-amber-400) 0%, var(--ez-indigo-500) 55%, var(--ez-indigo-700) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-indigo-600) 0%, var(--ez-indigo-700) 100%);
+}
+
+[data-theme='dark'] {
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-amber-500) 0%, var(--ez-indigo-600) 55%, var(--ez-indigo-900) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-indigo-500) 0%, var(--ez-indigo-700) 100%);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
