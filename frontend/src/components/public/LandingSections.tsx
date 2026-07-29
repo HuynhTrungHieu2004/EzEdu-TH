@@ -702,7 +702,7 @@ const TRUST = [
 
 export function TrustBlock() {
   return (
-    <section className="ezp-section" aria-labelledby="tin-cay-title" id="tin-cay">
+    <section className="ezp-section ezp-section-glow" aria-labelledby="tin-cay-title" id="tin-cay">
       <div className="ezp-container">
         <div className="ezp-head">
           <span className="ezp-eyebrow">Chất lượng &amp; tin cậy</span>

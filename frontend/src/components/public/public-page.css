@@ -45,6 +45,10 @@
   color: var(--ez-neutral-50);
 }
 
+.ezp-section-glow {
+  background: radial-gradient(ellipse at top, var(--ez-primary-subtle) 0%, transparent 60%);
+}
+
 @media (max-width: 768px) {
   .ezp-section { padding-block: var(--ez-section-y-sm); }
 }
