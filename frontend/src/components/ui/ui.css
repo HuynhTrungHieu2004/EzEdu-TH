@@ -73,7 +73,7 @@
 }
 
 .ez-btn-hero {
-  min-height: 56px;
+  min-height: var(--ez-control-hero);
   padding: 0 var(--ez-space-8);
   font-size: var(--ez-text-h5);
   border-radius: var(--ez-radius-full);

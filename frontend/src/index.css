@@ -328,7 +328,7 @@ code, .counter { font-family: var(--mono); }
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--ez-radius-lg);
+  border-radius: var(--ez-radius-md);
   flex: 0 0 auto;
   color: #fff;
   background: linear-gradient(135deg, #8b7cf8, #c084fc, #f74a8a);
@@ -704,7 +704,7 @@ code, .counter { font-family: var(--mono); }
 .hero-mark {
   width: 56px;
   height: 56px;
-  border-radius: var(--ez-radius-sm);
+  border-radius: var(--ez-radius-md);
   font-size: 20px;
 }
 
@@ -1262,7 +1262,7 @@ code, .counter { font-family: var(--mono); }
   width: 54px;
   height: 54px;
   margin: 0 auto 16px;
-  border-radius: var(--ez-radius-xl);
+  border-radius: var(--ez-radius-md);
   font-size: 18px;
 }
 
@@ -1824,7 +1824,7 @@ code, .counter { font-family: var(--mono); }
   place-items: center;
   width: 54px;
   height: 54px;
-  border-radius: var(--ez-radius-sm);
+  border-radius: var(--ez-radius-md);
   color: #fff;
   background: linear-gradient(135deg, #8b7cf8, #c084fc);
   box-shadow: 0 10px 28px rgba(139,124,248,0.3);
@@ -2101,7 +2101,7 @@ code, .counter { font-family: var(--mono); }
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: var(--ez-radius-sm);
+  border-radius: var(--ez-radius-md);
   color: #fff;
   background: linear-gradient(135deg, var(--crystal-500), var(--ice-500));
   box-shadow: 0 8px 24px rgba(139,124,248,0.24);

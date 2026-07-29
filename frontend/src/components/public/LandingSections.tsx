@@ -151,7 +151,7 @@ export function TeacherToolsShowcase() {
   const tools = toolsForRole('teacher').slice(0, 6);
 
   return (
-    <section className="ezp-section ezp-section-alt" aria-labelledby="teacher-tools-title">
+    <section className="ezp-section" aria-labelledby="teacher-tools-title">
       <div className="ezp-container">
         <div className="ezp-head">
           <span className="ezp-eyebrow">AI cho giáo viên</span>
@@ -774,7 +774,7 @@ export function Faq({ headingId = 'faq-title' }: { headingId?: string }) {
   const baseId = useId();
 
   return (
-    <section className="ezp-section ezp-section-alt" aria-labelledby={headingId} id="faq">
+    <section className="ezp-section" aria-labelledby={headingId} id="faq">
       <div className="ezp-container">
         <div className="ezp-head ezp-head-center">
           <span className="ezp-eyebrow">Câu hỏi thường gặp</span>
@@ -934,7 +934,7 @@ export function TestimonialBlock({
 export function IntegrationsTeaser() {
   return (
     <section className="ezp-section ezp-section-alt" aria-labelledby="integrations-title">
-      <div className="ezp-container ezp-head-center">
+      <div className="ezp-container ezp-head ezp-head-center">
         <span className="ezp-eyebrow">Sắp ra mắt</span>
         <h2 className="ezp-title" id="integrations-title">
           Tích hợp với công cụ bạn đang dùng
