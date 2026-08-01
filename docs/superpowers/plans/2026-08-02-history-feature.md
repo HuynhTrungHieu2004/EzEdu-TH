@@ -534,10 +534,12 @@ git commit -m "fix: soft-delete documents instead of hard-delete to preserve stu
 - Modify: `backend/app/exam_bank/services/exam_service.py` (thêm `delete_exam`)
 - Modify: `backend/app/exam_bank/api/exams.py` (thêm route DELETE)
 - Test: `backend/tests/test_exam_bank_exam.py`
+- Modify: `frontend/src/api/examBankApi.ts` (thêm hàm `deleteExam`)
 
 **Interfaces:**
 - Produces: `exam_service.delete_exam(db, exam_id, *, version: int, actor_id: str, is_admin: bool) -> ExamResponse` — set `deleted_at`.
 - Produces route: `DELETE /exams/{exam_id}?version=` — Task 8 (frontend teacher content-history) gọi khi bấm Xóa.
+- Produces: `examBankApi.deleteExam(id: string, version: number): Promise<ExamItem>` — Task 8 gọi trực tiếp hàm này, KHÔNG phải chỉ điều hướng sang trang khác.
 
 - [ ] **Step 1: Viết test (thất bại trước)**
 
@@ -626,15 +628,26 @@ async def delete_exam(
     )
 ```
 
-- [ ] **Step 5: Chạy test, xác nhận PASS**
+- [ ] **Step 5: Thêm hàm frontend `deleteExam`**
+
+`frontend/src/api/examBankApi.ts` — thêm vào `examBankApi` object, ngay sau `setAllowRetake` (đã thêm ở Task 1):
+
+```typescript
+  deleteExam: async (id: string, version: number): Promise<ExamItem> => {
+    const response = await client.delete<ExamItem>(`/exams/${id}`, { params: { version } });
+    return response.data;
+  },
+```
+
+- [ ] **Step 6: Chạy test, xác nhận PASS**
 
 Run: `cd backend && python -m pytest tests/test_exam_bank_exam.py -v`
 Expected: PASS toàn bộ file
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/exam_bank/services/exam_service.py backend/app/exam_bank/api/exams.py backend/tests/test_exam_bank_exam.py
+git add backend/app/exam_bank/services/exam_service.py backend/app/exam_bank/api/exams.py backend/tests/test_exam_bank_exam.py frontend/src/api/examBankApi.ts
 git commit -m "feat: add soft-delete endpoint for exam_bank exams"
 ```
 
@@ -695,7 +708,7 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
         exam_id = ObjectId()
         await self.db["exams"].insert_one({
             "_id": exam_id, "owner_id": self.teacher.id, "code": "101", "blueprint_id": "bp-1",
-            "created_at": created_at, "deleted_at": deleted_at,
+            "created_at": created_at, "deleted_at": deleted_at, "allow_retake": True, "version": 3,
         })
         return exam_id
 
@@ -711,6 +724,9 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["total"], 2)
         self.assertEqual(result["items"][0]["item_type"], "exam")
         self.assertEqual(result["items"][1]["item_type"], "document")
+        self.assertTrue(result["items"][0]["allow_retake"])
+        self.assertEqual(result["items"][0]["version"], 3)
+        self.assertIsNone(result["items"][1]["allow_retake"])
 
     async def test_filters_by_type(self):
         await self._seed_document(created_at=datetime.now(timezone.utc))
@@ -813,6 +829,8 @@ async def _exam_items(db, *, owner_id: str, search: Optional[str]) -> List[Dict[
             "created_at": doc["created_at"],
             "cloudinary_url": None,
             "blueprint_id": doc.get("blueprint_id"),
+            "allow_retake": doc.get("allow_retake", False),
+            "version": doc.get("version", 1),
         })
     return items
 
@@ -867,6 +885,8 @@ async def get_content_history(
         item.setdefault("attempt_count", None)
         item.setdefault("avg_score", None)
         item.setdefault("last_attempt_at", None)
+        item.setdefault("allow_retake", None)
+        item.setdefault("version", None)
 
     return {"items": page, "total": total, "skip": skip, "limit": limit}
 ```
@@ -1145,6 +1165,8 @@ export interface ContentHistoryItem {
   attempt_count: number | null;
   avg_score: number | null;
   last_attempt_at: string | null;
+  allow_retake: boolean | null;
+  version: number | null;
 }
 
 export interface ContentHistoryResponse {
@@ -1189,7 +1211,8 @@ git commit -m "feat: add teacherHistoryApi and update LearningHistoryItem shape"
 - Modify: `frontend/src/components/AppLayout.tsx` (nav item)
 
 **Interfaces:**
-- Consumes: `teacherHistoryApi.list` (Task 7), `documentApi.delete` (đã có), `examBankApi.setAllowRetake`/`listExams` (Task 1), `ConfirmDialog`/`DataTable`/`FilterBar`/`Pagination`/`Tabs` từ `components/ui`.
+- Consumes: `teacherHistoryApi.list` (Task 7), `documentApi.delete` (đã có), `examBankApi.setAllowRetake`/`examBankApi.deleteExam` (Task 1/Task 4), `ConfirmDialog`/`DataTable`/`FilterBar`/`Pagination`/`Tabs` từ `components/ui`.
+- Bảng có cột checkbox "Cho làm lại" cho item loại `exam` — gọi `examBankApi.setAllowRetake` khi tick/bỏ tick; nút Xóa gọi `examBankApi.deleteExam` cho item loại `exam` (KHÔNG chỉ điều hướng sang trang khác).
 
 - [ ] **Step 1: Tạo trang**
 
@@ -1202,6 +1225,7 @@ import { Trash2, ExternalLink, Pencil } from 'lucide-react';
 import { teacherHistoryApi } from '../../api/teacherHistoryApi';
 import type { ContentHistoryItem, ContentHistoryType } from '../../api/teacherHistoryApi';
 import { documentApi } from '../../api/documentApi';
+import { examBankApi } from '../../api/examBankApi';
 import { getApiErrorDetail } from '../../api/errors';
 import {
   Alert,
@@ -1236,6 +1260,7 @@ export default function ContentHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ContentHistoryItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -1259,10 +1284,7 @@ export default function ContentHistoryPage() {
       if (pendingDelete.item_type === 'document') {
         await documentApi.delete(pendingDelete.id);
       } else {
-        toast({ tone: 'error', title: 'Xóa đề thi: vào trang chi tiết ma trận đề để xóa.' });
-        setPendingDelete(null);
-        setDeleting(false);
-        return;
+        await examBankApi.deleteExam(pendingDelete.id, pendingDelete.version ?? 1);
       }
       toast({ tone: 'success', title: 'Đã xóa khỏi lịch sử.' });
       setPendingDelete(null);
@@ -1271,6 +1293,19 @@ export default function ContentHistoryPage() {
       toast({ tone: 'error', title: getApiErrorDetail(err) ?? 'Xóa thất bại.' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleToggleRetake = async (row: ContentHistoryItem) => {
+    if (row.item_type !== 'exam' || row.version === null) return;
+    setTogglingId(row.id);
+    try {
+      await examBankApi.setAllowRetake(row.id, row.version, !row.allow_retake);
+      load();
+    } catch (err) {
+      toast({ tone: 'error', title: getApiErrorDetail(err) ?? 'Cập nhật thất bại.' });
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -1295,6 +1330,23 @@ export default function ContentHistoryPage() {
       key: 'avg_score',
       label: 'Điểm TB',
       render: (row) => (row.item_type === 'exam' ? row.avg_score ?? '—' : '—'),
+    },
+    {
+      key: 'allow_retake',
+      label: 'Cho làm lại',
+      render: (row) =>
+        row.item_type === 'exam' ? (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={row.allow_retake ?? false}
+              disabled={togglingId === row.id}
+              onChange={() => handleToggleRetake(row)}
+            />
+          </label>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'actions',
