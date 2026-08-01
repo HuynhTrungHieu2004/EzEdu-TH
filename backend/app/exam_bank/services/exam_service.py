@@ -37,6 +37,7 @@ def _to_response(doc: dict) -> ExamResponse:
         published_at=doc.get("published_at"),
         audience_type=doc.get("audience_type", "all"),
         target_class_ids=doc.get("target_class_ids", []),
+        allow_retake=doc.get("allow_retake", False),
         version=doc["version"],
         owner_id=doc["owner_id"],
         created_by=doc["created_by"],
@@ -118,6 +119,7 @@ async def generate_exams(
             "published_at": None,
             "audience_type": "all",
             "target_class_ids": [],
+            "allow_retake": False,
             "version": 1,
             "owner_id": actor_id,
             "created_by": actor_id,
@@ -387,4 +389,20 @@ async def archive_exam(db, exam_id: str, *, version: int, actor_id: str, is_admi
     except VersionConflict:
         raise version_conflict_http_error()
 
+    return _to_response(updated)
+
+
+async def set_allow_retake(
+    db, exam_id: str, *, version: int, allow_retake: bool, actor_id: str, is_admin: bool
+) -> ExamResponse:
+    existing = await _load_owned_exam(db, exam_id, actor_id=actor_id, is_admin=is_admin)
+    try:
+        updated = await compare_and_set(
+            db[EXAMS],
+            filter_query={"_id": existing["_id"]},
+            expected_version=version,
+            update={"$set": {"allow_retake": allow_retake, "updated_by": actor_id, "updated_at": _now()}},
+        )
+    except VersionConflict:
+        raise version_conflict_http_error()
     return _to_response(updated)

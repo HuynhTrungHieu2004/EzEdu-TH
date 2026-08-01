@@ -13,6 +13,7 @@ from app.exam_bank.schemas.exam import (
     ExamPublishRequest,
     ExamRegenerateSectionRequest,
     ExamResponse,
+    ExamRetakePolicyRequest,
 )
 from app.exam_bank.services import exam_service
 from app.exam_bank.services.exam_service import BlueprintInfeasibleError
@@ -150,4 +151,17 @@ async def archive_exam(
     db = get_database()
     return await exam_service.archive_exam(
         db, exam_id, version=version, actor_id=current_user.id, is_admin=is_admin_actor(current_user)
+    )
+
+
+@router.patch("/exams/{exam_id}/retake-policy", response_model=ExamResponse)
+async def set_allow_retake(
+    exam_id: str,
+    payload: ExamRetakePolicyRequest,
+    current_user: UserResponse = Depends(require_exam_bank_actor),
+):
+    db = get_database()
+    return await exam_service.set_allow_retake(
+        db, exam_id, version=payload.version, allow_retake=payload.allow_retake,
+        actor_id=current_user.id, is_admin=is_admin_actor(current_user),
     )
