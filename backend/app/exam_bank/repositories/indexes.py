@@ -21,6 +21,11 @@ from app.exam_bank.constants.collections import (
 logger = logging.getLogger("app.exam_bank.repositories.indexes")
 
 
+_LEGACY_INDEXES_TO_DROP: tuple = (
+    (EXAM_ATTEMPTS, "attempt_exam_student"),
+)
+
+
 @dataclass(frozen=True)
 class IndexSpec:
     collection: str
@@ -43,12 +48,22 @@ EXAM_BANK_INDEXES: tuple = (
     IndexSpec(EXAMS, [("blueprint_id", ASCENDING)], "exam_blueprint_id"),
     IndexSpec(EXAMS, [("equivalent_group_id", ASCENDING)], "exam_equivalent_group"),
     IndexSpec(EXAMS, [("owner_id", ASCENDING), ("status", ASCENDING), ("updated_at", DESCENDING)], "exam_owner_status_updated"),
-    IndexSpec(EXAM_ATTEMPTS, [("exam_id", ASCENDING), ("student_id", ASCENDING)], "attempt_exam_student", unique=True),
+    IndexSpec(
+        EXAM_ATTEMPTS,
+        [("exam_id", ASCENDING), ("student_id", ASCENDING), ("attempt_number", ASCENDING)],
+        "attempt_exam_student_number",
+        unique=True,
+    ),
     IndexSpec(EXAM_ATTEMPTS, [("status", ASCENDING), ("due_at", ASCENDING)], "attempt_status_due_at"),
 )
 
 
 async def ensure_exam_bank_indexes(db) -> None:
+    for collection, index_name in _LEGACY_INDEXES_TO_DROP:
+        try:
+            await db[collection].drop_index(index_name)
+        except Exception:  # noqa: BLE001 - không tồn tại thì bỏ qua, không chặn startup
+            pass
     for spec in EXAM_BANK_INDEXES:
         try:
             await db[spec.collection].create_index(spec.keys, name=spec.name, unique=spec.unique)
