@@ -98,6 +98,34 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         second = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
         self.assertEqual(first.id, second.id)
 
+    async def test_retake_blocked_when_allow_retake_false(self):
+        exam = await self._publish_exam()
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        await attempt_service.submit_attempt(
+            self.db, started.id, version=1, answers={}, student_id=self.student_id
+        )
+        with self.assertRaises(HTTPException) as ctx:
+            await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_retake_creates_new_attempt_when_allowed(self):
+        exam = await self._publish_exam()
+        await exam_service.set_allow_retake(
+            self.db, exam.id, version=exam.version, allow_retake=True, actor_id=self.teacher_id, is_admin=False
+        )
+        first = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        await attempt_service.submit_attempt(
+            self.db, first.id, version=1, answers={}, student_id=self.student_id
+        )
+        second = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        self.assertNotEqual(first.id, second.id)
+
+    async def test_resume_in_progress_attempt_without_allow_retake(self):
+        exam = await self._publish_exam()
+        first = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        second = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        self.assertEqual(first.id, second.id)
+
     async def test_start_rejects_unpublished_exam(self):
         await _seed_approved_question(self.db, self.teacher_id)
         blueprint = await blueprint_service.create_blueprint(

@@ -103,24 +103,30 @@ async def start_attempt(db, exam_id: str, *, student_id: str) -> AttemptStartRes
     if exam["status"] != "published":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Đề thi chưa được publish.")
 
-    existing = await db[EXAM_ATTEMPTS].find_one({"exam_id": exam_id, "student_id": student_id})
-    if existing is not None:
+    latest = await db[EXAM_ATTEMPTS].find_one(
+        {"exam_id": exam_id, "student_id": student_id}, sort=[("attempt_number", -1)]
+    )
+    if latest is not None and latest["status"] == "in_progress":
         return AttemptStartResponse(
-            id=str(existing["_id"]),
+            id=str(latest["_id"]),
             exam_id=exam_id,
-            exam_code=existing["exam_code"],
-            started_at=_aware(existing["started_at"]),
-            due_at=_aware(existing["due_at"]),
+            exam_code=latest["exam_code"],
+            started_at=_aware(latest["started_at"]),
+            due_at=_aware(latest["due_at"]),
             server_now=_now(),
-            status=existing["status"],
+            status=latest["status"],
         )
+    if latest is not None and not exam.get("allow_retake", False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Đề thi này không cho phép làm lại.")
 
+    next_attempt_number = (latest.get("attempt_number", 1) + 1) if latest is not None else 1
     now = _now()
     due_at = now + timedelta(minutes=exam["duration_minutes"])
     doc = {
         "exam_id": exam_id,
         "exam_code": exam["code"],
         "student_id": student_id,
+        "attempt_number": next_attempt_number,
         "status": "in_progress",
         "answers": {},
         "started_at": now,
@@ -137,8 +143,10 @@ async def start_attempt(db, exam_id: str, *, student_id: str) -> AttemptStartRes
     try:
         insert_result = await db[EXAM_ATTEMPTS].insert_one(doc)
     except DuplicateKeyError:
-        # Race: 2 request "start" đồng thời — request thua cuộc đọc lại bản đã tạo.
-        existing = await db[EXAM_ATTEMPTS].find_one({"exam_id": exam_id, "student_id": student_id})
+        # Race: 2 request "start" đồng thời cùng attempt_number — request thua cuộc đọc lại bản mới nhất.
+        existing = await db[EXAM_ATTEMPTS].find_one(
+            {"exam_id": exam_id, "student_id": student_id}, sort=[("attempt_number", -1)]
+        )
         return AttemptStartResponse(
             id=str(existing["_id"]),
             exam_id=exam_id,
