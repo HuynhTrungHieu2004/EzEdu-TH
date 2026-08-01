@@ -1,0 +1,50 @@
+@startuml
+title EzEdu AI – Sequence: hỏi đáp RAG theo tài liệu
+skinparam shadowing false
+autonumber
+
+actor "Người học" as User
+participant "React UI" as UI
+participant "Auth / Chat API" as API
+database "MongoDB" as Mongo
+participant "RAG Service" as RAG
+database "ChromaDB" as Chroma
+participant "LLM Provider\nGemini/Groq" as LLM
+
+User -> UI: Nhập câu hỏi, chọn tài liệu
+UI -> API: POST /chat (JWT, question, documentIds)
+API -> API: Xác thực JWT, quyền sở hữu, rate limit
+alt Yêu cầu không hợp lệ
+  API --> UI: 400/401/403/429
+  UI --> User: Hiển thị thông báo phù hợp
+else Hợp lệ
+  API -> Mongo: Tạo/đọc conversation
+  API -> RAG: answer(question, contextScope)
+  RAG -> Chroma: similaritySearch(embedding, filters)
+  Chroma --> RAG: top-k chunks + metadata
+  alt Không đủ ngữ cảnh
+    RAG -> API: insufficient_context
+    API --> UI: Câu trả lời an toàn / đề nghị bổ sung
+  else Có ngữ cảnh
+    RAG -> LLM: prompt + chunks + guardrails
+    alt Nhà cung cấp lỗi / hết quota
+      LLM --> RAG: timeout / quota error
+      RAG -> LLM: thử provider dự phòng
+    end
+    LLM --> RAG: answer + usage
+    RAG -> RAG: Chuẩn hóa trích dẫn, confidence
+    RAG --> API: answer + citations + usage
+    API -> Mongo: Lưu message và AI usage event
+    Mongo --> API: Đã lưu
+    API --> UI: 200 answer + citations
+    UI --> User: Hiển thị đáp án, nguồn, nút phản hồi
+    opt Người dùng phản hồi
+      User -> UI: Like / dislike + nhận xét
+      UI -> API: POST feedback
+      API -> Mongo: Lưu feedback
+      API --> UI: 201 Created
+    end
+  end
+end
+@enduml
+

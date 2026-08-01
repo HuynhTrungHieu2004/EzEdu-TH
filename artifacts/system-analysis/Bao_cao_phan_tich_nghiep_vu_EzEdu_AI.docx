@@ -1,0 +1,937 @@
+# BÁO CÁO KHẢO SÁT VÀ PHÂN TÍCH NGHIỆP VỤ HỆ THỐNG EZEDU AI
+
+**Hệ thống sinh câu hỏi đánh giá năng lực tự động từ học liệu điện tử bằng mô hình ngôn ngữ lớn**
+
+- Phiên bản khảo sát: 1.0
+- Ngày khảo sát: 29/07/2026
+- Phạm vi: toàn bộ mã nguồn frontend, backend, dữ liệu, dịch vụ AI, worker và tài liệu kiểm thử trong repository
+- Chuẩn mô hình: UML 2.x và ERD logic
+- Công cụ đích cho mô hình dữ liệu: CASE Studio 2 qua reverse engineering DDL MySQL
+
+---
+
+## TÓM TẮT ĐIỀU HÀNH
+
+EzEdu AI là nền tảng giáo dục số hỗ trợ hai nhóm nghiệp vụ chính: giảng viên chuẩn bị học liệu và đánh giá; học sinh học, hỏi đáp, luyện tập, thi và nhận nội dung cá nhân hóa. Hệ thống không chỉ “sinh câu hỏi bằng AI” mà đã phát triển thành một nền tảng nhiều phân hệ gồm quản lý học liệu, RAG, kiểm chứng kiến thức, chat có trích dẫn, ngân hàng câu hỏi, ma trận đề, thi có giới hạn thời gian, chấm tự luận, lớp học, mô hình người học, khuyến nghị, kho tri thức Internet/chương trình và quản trị vận hành.
+
+Kiến trúc hiện tại là SPA React gọi API FastAPI. MongoDB là kho dữ liệu nghiệp vụ; ChromaDB lưu vector; Cloudinary hoặc thư mục cục bộ lưu file; Gemini và Groq cung cấp các năng lực sinh nội dung, kiểm chứng, embedding, grounding, phiên âm và chấm tự luận. Hệ thống có worker riêng dựa trên hàng đợi MongoDB cho tác vụ bền qua restart, song một số luồng cũ vẫn dùng FastAPI `BackgroundTasks`.
+
+Hệ thống đã có phân quyền hai tầng: frontend chặn route để bảo đảm trải nghiệm, backend thực thi quyền cuối cùng bằng JWT, role và permission. Tám vai trò hiện hữu gồm `student`, `lecturer`, `user` cũ và năm vai trò quản trị `analyst`, `support`, `moderator`, `admin`, `super_admin`. Các tính năng lớn còn được kiểm soát bằng feature flag.
+
+Mức độ hoàn thiện chức năng là cao: code hiện tại có 199 endpoint được phát hiện từ decorator FastAPI và 46 collection/logical data surfaces trong inventory. Báo cáo QA mới nhất trong repository ghi nhận 411 backend tests và 438 Playwright checks trên 6 viewport. Tuy vậy, mức sẵn sàng sản xuất chưa đồng đều: dữ liệu cá nhân hóa thực còn ít/không có trong lần audit gần nhất; một số tác vụ AI phụ thuộc quota mạng; ChromaDB local cần persistent volume; happy-path E2E với backend thật và audit screen reader thủ công chưa hoàn chỉnh.
+
+Kết luận nghiệp vụ: hệ thống phù hợp với mô hình triển khai trường học/nhóm học quy mô nhỏ đến vừa, nhưng trước khi vận hành chính thức cần khóa chính sách dữ liệu, SLA, quota AI, lưu trữ bền, quy trình duyệt nội dung AI và kiểm thử tích hợp bằng dữ liệu cô lập.
+
+## 1. MỤC TIÊU, PHẠM VI VÀ PHƯƠNG PHÁP KHẢO SÁT
+
+### 1.1 Mục tiêu khảo sát
+
+Báo cáo nhằm:
+
+1. Mô tả đúng hiện trạng kỹ thuật và nghiệp vụ đang tồn tại trong code.
+2. Xác định tác nhân, phân hệ, luồng nghiệp vụ, dữ liệu và tích hợp.
+3. Chuẩn hóa yêu cầu chức năng, phi chức năng và quy tắc nghiệp vụ.
+4. Chỉ ra khoảng trống, rủi ro và mức ưu tiên hoàn thiện.
+5. Tạo một mô hình thống nhất để các sơ đồ Use Case, Activity, Sequence, Class và ERD không mâu thuẫn nhau.
+
+### 1.2 Phạm vi
+
+Phạm vi bao gồm:
+
+- Website công khai, đăng ký, đăng nhập và onboarding học sinh.
+- Khu vực học sinh, giảng viên và quản trị.
+- API, middleware, worker, database, vector store và dịch vụ ngoài.
+- Tất cả collection nghiệp vụ, log, cache và cấu hình quan trọng.
+- Các tính năng đang tắt mặc định nhưng đã có code và feature flag.
+- Kiểm thử backend, frontend, responsive và accessibility đang có trong repository.
+
+Ngoài phạm vi:
+
+- Hạ tầng production thật, số người dùng đồng thời và SLA chưa được cung cấp.
+- Chi phí thực tế của Gemini/Groq/Cloudinary.
+- Tạo tệp `.dm2` trực tiếp, vì CASE Studio 2 không có trong môi trường macOS hiện tại.
+- Đánh giá chất lượng sư phạm của từng câu hỏi bằng chuyên gia môn học.
+
+### 1.3 Phương pháp và nguồn bằng chứng
+
+Phương pháp khảo sát là static analysis kết hợp đối chiếu tài liệu QA:
+
+- Đọc router được include tại `backend/app/main.py`.
+- Trích xuất decorator FastAPI thành `inventory/api_inventory.csv`.
+- Đối chiếu schema Pydantic, dict MongoDB, index và collection constants.
+- Đọc route frontend tại `frontend/src/App.tsx` và guard theo vai trò.
+- Đọc service của document, RAG, verification, exam, chat, personalization và admin.
+- Đọc cấu hình tại `backend/app/core/config.py` và `backend/app/core/rbac.py`.
+- Đối chiếu báo cáo tích hợp, accessibility và responsive mới nhất.
+
+Khi tài liệu cũ mâu thuẫn với code, code hiện tại và báo cáo mới hơn được ưu tiên. Ví dụ, README mô tả embedding `gemini-embedding-001`, trong khi code hiện tại gọi `text-embedding-004`; báo cáo này ghi nhận trạng thái theo code.
+
+## 2. KHẢO SÁT HIỆN TRẠNG HỆ THỐNG
+
+### 2.1 Bài toán nghiệp vụ hiện tại
+
+Trong quy trình truyền thống, giảng viên phải tự đọc học liệu, chọn nội dung, soạn câu hỏi, tạo nhiều mã đề, chấm bài và theo dõi tiến độ. Học sinh khó khai thác tài liệu dài, thiếu kênh hỏi đáp gắn với nguồn và ít nhận được đề xuất phù hợp năng lực. Ban quản trị lại cần kiểm soát người dùng, nội dung, AI, cấu hình và sự cố trên nhiều bề mặt.
+
+EzEdu AI giải quyết bài toán bằng một chuỗi số hóa:
+
+1. Nhận học liệu PDF, DOCX, PPTX hoặc video.
+2. Trích xuất văn bản hoặc phiên âm.
+3. Kiểm chứng, chia chunk, tạo embedding và lập chỉ mục.
+4. Hỗ trợ tìm kiếm/nghĩa, chat có bằng chứng và khám phá web.
+5. Sinh câu hỏi, duyệt, xuất hoặc đưa vào ngân hàng.
+6. Tạo ma trận đề, sinh mã đề, phân phối và tổ chức thi có giờ.
+7. Chấm tự động/AI, cho phép giảng viên điều chỉnh.
+8. Ghi sự kiện học, cập nhật mastery/ability và sinh khuyến nghị.
+9. Quản trị tập trung tài khoản, nội dung, AI, CMS, cấu hình và vận hành.
+
+### 2.2 Bên liên quan và tác nhân
+
+| Tác nhân | Mục tiêu nghiệp vụ | Phạm vi chính |
+|---|---|---|
+| Khách | Tìm hiểu sản phẩm, đăng ký, đăng nhập | Trang công khai, FAQ, auth |
+| Học sinh | Làm bài, thi, hỏi đáp, theo dõi tiến độ, nhận khuyến nghị | Khu vực học sinh |
+| Giảng viên | Quản lý học liệu, lớp, câu hỏi, blueprint, đề thi, chấm bài | Khu vực giảng viên |
+| User cũ | Tương thích tài khoản legacy, được xử lý gần vai trò giảng viên | Các route giáo viên tương thích |
+| Analyst | Xem analytics, AI usage và xuất báo cáo | Khu vực quản trị theo permission |
+| Support | Xem người dùng và lịch sử hoạt động để hỗ trợ | Khu vực quản trị theo permission |
+| Moderator | Kiểm duyệt tài liệu/câu hỏi và xem activity log | Khu vực quản trị nội dung |
+| Admin | Quản trị đầy đủ người dùng, nội dung, AI, CMS, cấu hình | Khu vực quản trị |
+| Super Admin | Toàn quyền, kể cả thao tác nhạy cảm và quản lý admin | Khu vực quản trị |
+| Gemini | Sinh/đánh giá nội dung, embedding, grounding, kiểm chứng | Dịch vụ ngoài |
+| Groq | Sinh nội dung, Whisper transcription và dự phòng AI | Dịch vụ ngoài |
+| Cloudinary | Lưu file/video và webhook tài sản | Dịch vụ ngoài |
+| MongoDB | Dữ liệu nghiệp vụ, log, cache, queue | Hạ tầng dữ liệu |
+| ChromaDB | Vector index phục vụ RAG | Hạ tầng dữ liệu |
+
+### 2.3 Kiến trúc tổng thể
+
+Hệ thống áp dụng kiến trúc client–server nhiều dịch vụ:
+
+1. **Presentation layer:** React SPA, route lazy-load, AuthContext, RoleRoute/AdminRoute, component UI dùng chung.
+2. **API layer:** FastAPI, Pydantic, dependency authentication/authorization, feature flag.
+3. **Application services:** document pipeline, RAG, question generation, exam, chat, personalization, admin.
+4. **Data layer:** MongoDB qua Motor; repository rõ nhất ở personalization, các phân hệ cũ thao tác dict trực tiếp.
+5. **Vector layer:** ChromaDB persistent local; vector được namespace theo source/dimension.
+6. **File layer:** Cloudinary; khi chưa cấu hình có fallback local trong môi trường phát triển.
+7. **AI layer:** Gemini và Groq; một số nghiệp vụ có cross-validation hai mô hình.
+8. **Background layer:** MongoDB `background_jobs` + worker cho chấm tự luận, cleanup Cloudinary, ingest kho chuẩn và sweep attempt hết giờ.
+9. **Observability layer:** correlation/request ID, error log, activity log, admin audit, AI usage, health snapshot.
+
+### 2.4 Công nghệ sử dụng
+
+| Lớp | Công nghệ hiện tại | Nhận xét |
+|---|---|---|
+| Frontend | React 19.2, TypeScript 6, Vite 8, React Router 7 | SPA; state chủ yếu local/Context |
+| HTTP client | Axios | Gắn JWT và chuẩn hóa lỗi |
+| UI | Vanilla CSS, design tokens, lucide-react | Có responsive, dark mode và accessibility automation |
+| Backend | FastAPI 0.137, Uvicorn, Pydantic 2 | API async, OpenAPI tự động |
+| Database | MongoDB, Motor/PyMongo | NoSQL; không dùng ODM toàn hệ thống |
+| Mock/dev DB | mongomock-motor | Fallback local; không đại diện production |
+| Vector store | ChromaDB | Cần persistent disk khi deploy |
+| Document parsing | PyMuPDF, python-docx, python-pptx | Chưa có OCR đa phương tiện hoàn chỉnh |
+| AI | Google GenAI, Groq | Phụ thuộc API key, quota, latency |
+| ML/Optimization | NumPy, scikit-learn, OR-Tools, pandas | RAG rerank, K-Means, blueprint solver |
+| Export | ReportLab, python-docx | Xuất bộ câu hỏi PDF/DOCX |
+| File storage | Cloudinary | Có checksum dedup theo user |
+| Testing | pytest, Playwright, axe | Có backend tests và responsive/a11y checks |
+
+### 2.5 Danh mục phân hệ
+
+| Mã | Phân hệ | Năng lực hiện có |
+|---|---|---|
+| SYS-01 | Public & Identity | Landing, nội dung công khai, đăng ký, đăng nhập, JWT, logout, onboarding |
+| SYS-02 | Documents & RAG | Upload, dedup, extract/transcribe, index, chunk, search, similar, cluster |
+| SYS-03 | Verification | Phiên kiểm chứng, issue, duyệt, áp dụng sửa, re-index |
+| SYS-04 | Generated Question Sets | Sinh từ học liệu, workflow, publish, practice, export |
+| SYS-05 | Classes | CRUD lớp, tìm/thêm/xóa học sinh, phân phối theo lớp |
+| SYS-06 | Exam Bank | Taxonomy, câu hỏi độc lập, blueprint, solver, mã đề |
+| SYS-07 | Timed Exam | Start, lấy đề ẩn đáp án, autosave, submit, auto-submit, grading |
+| SYS-08 | Chat & Knowledge | Chat đơn giản/nâng cao, citation, web grounding, feedback, kho chuẩn |
+| SYS-09 | Personalization | Knowledge graph, learning event, BKT/IRT, twin, ranking, bandit |
+| SYS-10 | Administration | Dashboard, users, content, AI, CMS, settings, notification, reports |
+| SYS-11 | Operations | Health, error monitoring, logs, quota, idempotency, worker |
+
+### 2.6 Hiện trạng quy trình quản lý học liệu
+
+1. Giảng viên chọn file; backend kiểm tra role, extension, kích thước và cấu hình runtime.
+2. File được ghi tạm theo chunk, đồng thời tính SHA-256.
+3. Hệ thống tìm tài liệu cùng checksum trong phạm vi cùng `user_id`.
+4. Nếu trùng, bản ghi cũ được tái sử dụng và tăng `reuse_count`; không dedup chéo người dùng.
+5. Nếu mới, hệ thống kiểm tra giới hạn số tài liệu và quota AI, upload Cloudinary, lưu metadata.
+6. PDF/DOCX/PPTX được trích xuất ngay trong request upload; video chờ endpoint transcribe.
+7. Trạng thái tài liệu đi qua `uploaded`, `extracting/transcribing`, `processed/transcribed`, `indexing`, `indexed` hoặc trạng thái lỗi.
+8. Khi index, văn bản được chia semantic chunk, tạo embedding, ghi MongoDB và ChromaDB.
+9. Tài liệu bị quarantine không được tiếp tục xử lý hoặc dùng cho các nghiệp vụ phụ thuộc.
+10. Xóa tài liệu dùng mutation lock và cleanup dữ liệu phụ thuộc/tài sản ngoài.
+
+Điểm mạnh hiện tại là ownership, checksum, quota, log và mutation lock đã có. Hạn chế là extraction tài liệu vẫn đồng bộ trong request; video transcription và verification cũ dùng BackgroundTasks nên cần chiến lược phục hồi rõ hơn khi restart.
+
+### 2.7 Hiện trạng quy trình sinh và quản lý câu hỏi
+
+Hệ thống tồn tại hai miền câu hỏi song song:
+
+**Miền A – bộ câu hỏi sinh từ học liệu (`question_sets`):**
+
+- Câu hỏi nhúng trong `question_sets.questions[]`.
+- Dùng cho sinh nhanh, chỉnh sửa, duyệt, publish, luyện tập và xuất file.
+- Workflow mỗi câu: `draft → review_pending → approved → published`.
+- Lượt làm `question_attempts` là luyện tập tự do, không có đồng hồ.
+
+**Miền B – ngân hàng câu hỏi/đề thi (`questions`, `exam_blueprints`, `exams`):**
+
+- Câu hỏi là collection độc lập, có version, taxonomy, điểm, thời gian dự kiến và nguồn.
+- Blueprint chứa ràng buộc topic/Bloom/difficulty/type, tổng điểm và thời gian.
+- OR-Tools giải bài toán chọn câu; kết quả có thể `OPTIMAL`, `FEASIBLE` hoặc `INFEASIBLE`.
+- Exam có mã đề tương đương, seed đảo câu/đáp án, audience và target classes.
+- `exam_attempts` là phiên thi có giờ với autosave, auto-submit và grading.
+
+Hai miền không được hợp nhất tùy tiện. Miền A bảo toàn contract UI cũ; miền B cung cấp năng lực thi chính thức và tái sử dụng câu hỏi.
+
+### 2.8 Hiện trạng quy trình thi và chấm điểm
+
+1. Giảng viên tạo/duyệt câu hỏi ngân hàng.
+2. Giảng viên tạo và validate blueprint.
+3. Solver chọn câu; hệ thống sinh một hoặc nhiều mã đề.
+4. Giảng viên publish cho tất cả hoặc một số lớp.
+5. Học sinh bắt đầu; server tạo `started_at`, `due_at` và chỉ cho một attempt theo exam/student.
+6. Học sinh lấy đề với đáp án/lời giải bị ẩn.
+7. Client autosave kèm `version`; server dùng optimistic concurrency.
+8. Khi hết giờ, có ba lớp auto-submit: client, request autosave/submit tiếp theo, worker sweep.
+9. Trắc nghiệm/đúng-sai được chấm ngay.
+10. Tự luận tạo job chấm AI, lưu điểm/độ tin cậy/phản hồi.
+11. Giảng viên có thể override điểm và ghi feedback; điểm cuối ưu tiên teacher score khi có.
+
+### 2.9 Hiện trạng chat, tìm kiếm và tri thức
+
+Chat có hai luồng:
+
+- Chat đơn giản theo một tài liệu dùng `chat_messages`.
+- Chat nâng cao dùng `conversations` và `conversation_messages`, hỗ trợ scope general/document/multiple/all/web-only.
+
+Chat nâng cao:
+
+1. Xác thực ownership các tài liệu.
+2. Tìm chunk nội bộ bằng RAG.
+3. Có thể bật Google Search Grounding qua Gemini.
+4. Trích citation thật từ grounding metadata.
+5. Loại bỏ URL không thuộc tập citation đã xác minh.
+6. Trả `retrieval_mode`, `evidence_status`, `confidence`, internal/web citations.
+7. Lưu cuộc trò chuyện, tin nhắn và feedback.
+
+Phân hệ Web Knowledge lưu nguồn web có review workflow, cache và quota ngày. Phân hệ Curriculum KB đăng ký nguồn chuẩn, duyệt, ingest bằng worker và tìm kiếm nguồn đã publish. Quy tắc cốt lõi là nội dung web không tự động trở thành tri thức chuẩn nếu chưa qua duyệt.
+
+### 2.10 Hiện trạng cá nhân hóa
+
+Pipeline cá nhân hóa gồm:
+
+1. Trích xuất Knowledge Component và cạnh prerequisite/related.
+2. Ánh xạ learning item ↔ knowledge component qua Q-matrix.
+3. Ghi learning event theo user, item, session và idempotency key.
+4. Cập nhật mastery bằng BKT và ability/difficulty bằng Rasch/IRT.
+5. Tạo learner profile, learner knowledge state và digital twin.
+6. Sinh candidate theo điểm yếu, prerequisite, forgetting, mục tiêu, lỗi gần đây và sở thích.
+7. Rank/re-rank theo trọng số, hard constraints và diversity.
+8. Ghi recommendation log, feedback và model version.
+9. Contextual bandit chỉ được dùng sau lớp an toàn; mặc định có kill switch/shadow mode.
+10. NeuralCD và AKT là hướng nghiên cứu, chỉ bật khi đủ dữ liệu/readiness.
+
+Điểm quản trị AI quan trọng: AI không trực tiếp quyết định mastery, theta, rank score hoặc bandit reward. Các đại lượng này do thuật toán xác định; AI chỉ trích xuất, gắn nhãn hoặc giải thích sau khi đã lọc ownership.
+
+### 2.11 Hiện trạng quản trị
+
+Khu vực quản trị hiện có:
+
+- Dashboard tổng quan, usage, quality, latency/error và evaluation.
+- Quản lý tài khoản, vai trò, trạng thái, quota, force logout và reset password.
+- Quản lý tài liệu, quarantine, reprocess, xóa/restore.
+- Quản lý câu hỏi và nội dung đề.
+- Theo dõi AI usage, pricing và quota.
+- CMS website có draft, publish, rollback, reorder và version.
+- System settings, feature flags, maintenance mode.
+- Notification center và xuất báo cáo CSV/PDF/XLSX.
+- Activity log, audit log bất biến, error monitoring và health.
+
+RBAC quản trị dùng catalog permission trung tâm. `super_admin` và `admin` có toàn bộ permission; `moderator`, `support`, `analyst` chỉ có tập quyền theo chức trách.
+
+### 2.12 Dữ liệu và lưu trữ
+
+- MongoDB lưu dữ liệu nghiệp vụ, cache, log và hàng đợi.
+- ChromaDB lưu vector; Mongo `document_chunks` lưu text/metadata song song.
+- Cloudinary lưu file; URL/local fallback không được xem là khóa nghiệp vụ.
+- Các id MongoDB được truyền qua API dưới dạng chuỗi 24 ký tự.
+- Một số cấu trúc là embedded document: `question_sets.questions[]`, `exam_attempts.results[]`, constraint/map.
+- Các quan hệ NoSQL được thực thi bằng ownership check, schema validation và index thay vì FK vật lý.
+
+Inventory chi tiết có 46 collection/logical data surfaces tại `inventory/data_inventory.csv`.
+
+### 2.13 Bảo mật và kiểm soát truy cập
+
+Các cơ chế đang có:
+
+- Mật khẩu bcrypt; JWT Bearer có thời hạn.
+- Backend kiểm tra user active/locked/deleted và thời điểm token.
+- Role/permission guard; frontend route guard không thay thế backend.
+- Ownership filter theo user/document/conversation/item.
+- Feature flag ở tầng dependency cho phân hệ thử nghiệm.
+- AI quota theo role/user; rate limit cho chat/admin analytics.
+- Idempotency key cho một số mutation/job/event.
+- Correlation ID, audit log và activity log.
+- Quarantine nội dung; maintenance mode cho phép admin bypass.
+- URL/citation validation và lọc citation ảo.
+
+Rủi ro còn lại:
+
+- Rate limiter dạng memory không phù hợp nhiều replica nếu chưa chuyển sang shared store.
+- Secret trong `.env` phải được quản lý ngoài Git và rotate khi cần.
+- Prompt injection từ học liệu chỉ được giảm thiểu bằng schema/validation, không thể loại bỏ hoàn toàn.
+- MongoDB fallback mock có thể khiến local health “pass” nhưng không đại diện dữ liệu thật.
+
+### 2.14 Kiểm thử, responsive và accessibility
+
+Repository có:
+
+- Pytest backend cho auth, RBAC, document, question, exam, chat, admin, personalization và tích hợp.
+- Playwright cho public/teacher/student/admin, 6 viewport từ desktop 1440 đến mobile 360.
+- Axe automation cho nhiều bề mặt light/dark và dialog.
+- Lint, TypeScript build và Vite production build.
+
+Báo cáo mới nhất ghi nhận:
+
+- 411 backend tests pass.
+- 438 Playwright checks pass.
+- 6 viewport không tràn ngang.
+- Các bề mặt được quét không còn axe violation trong fixture.
+
+Giới hạn của bằng chứng:
+
+- Playwright chủ yếu chứng minh route, guard, responsive, loading/error state với fixture, không phải toàn bộ happy path backend thật.
+- Chưa có audit VoiceOver/NVDA, zoom 200–400%, forced-colors và keyboard happy path đầy đủ.
+- Một số kiểm thử cũ có thể chạm provider AI nếu không mock chặt.
+
+### 2.15 Hạn chế và nợ kỹ thuật hiện tại
+
+1. README và một số báo cáo cũ đã lệch code hiện tại.
+2. Không có ODM thống nhất; nhiều router/service thao tác dict MongoDB trực tiếp.
+3. `learning_chat_service.py`, `documents.py`, `questions.py` và một số trang frontend rất lớn.
+4. BackgroundTasks cũ không bền qua restart; worker mới chưa thay thế mọi luồng.
+5. ChromaDB local cần persistent volume và kế hoạch backup/re-index.
+6. Extraction chưa có OCR đầy đủ cho công thức/hình/sơ đồ.
+7. Dữ liệu personalization thực chưa đủ để tuyên bố hiệu quả ML.
+8. Chưa có SLA, concurrency target và capacity test chính thức.
+9. Một số permission nghiệp vụ cũ vẫn là role-check thô thay vì permission catalog.
+10. Happy-path E2E với dữ liệu tích hợp thật và audit accessibility thủ công còn thiếu.
+
+## 3. PHÂN TÍCH YÊU CẦU
+
+### 3.1 Nguyên tắc đặc tả
+
+Mỗi yêu cầu chức năng có mã ổn định. Cột “Nghiệm thu” mô tả kết quả quan sát được; yêu cầu không chỉ là tên màn hình. Quyền cuối cùng luôn do backend quyết định. Những tính năng phụ thuộc AI phải có trạng thái chờ/lỗi/thử lại rõ ràng và không được coi kết quả AI là sự thật tuyệt đối khi chưa có bằng chứng hoặc duyệt.
+
+### 3.2 Yêu cầu chức năng – Tài khoản và phân quyền
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-AUTH-01 | Cho phép khách đăng ký tài khoản học sinh hoặc giảng viên bằng email, họ tên và mật khẩu | Khách | Email đúng định dạng, mật khẩu đạt độ dài, email trùng bị từ chối |
+| FR-AUTH-02 | Xác thực tài khoản và phát JWT Bearer | Khách/Người dùng | Sai mật khẩu, tài khoản locked/deleted hoặc inactive không nhận token |
+| FR-AUTH-03 | Trả hồ sơ người dùng hiện tại từ token | Người dùng | `/auth/me` trả đúng id, role, status, permission override và onboarding state |
+| FR-AUTH-04 | Đăng xuất và vô hiệu hóa phiên theo mốc thời gian | Người dùng | Token phát trước `force_logout_at` không còn hợp lệ |
+| FR-AUTH-05 | Điều hướng người dùng về đúng khu vực theo vai trò | Frontend | Student, teacher/legacy và admin-area không nhìn thấy route trái phép |
+| FR-AUTH-06 | Cho phép học sinh hoàn thành onboarding lớp, môn mạnh/yếu và tổ hợp thi | Học sinh | Onboarding hoạt động ngay cả khi personalization feature tắt |
+| FR-AUTH-07 | Hỗ trợ role và permission override chi tiết cho quản trị | Admin/Super Admin | Backend trả 403 nếu thiếu role/permission; frontend chỉ là lớp trải nghiệm |
+
+**Tiền điều kiện chung:** hệ thống không ở maintenance mode hoặc người dùng có quyền bypass; MongoDB khả dụng.  
+**Ngoại lệ chính:** token hết hạn, tài khoản bị khóa/xóa, role không hợp lệ, email đã tồn tại.
+
+### 3.3 Yêu cầu chức năng – Học liệu, trích xuất và RAG
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-DOC-01 | Tải lên PDF, DOCX, PPTX và video được phép | Giảng viên/Admin | Kiểm tra extension, kích thước, role, quota và giới hạn số tài liệu |
+| FR-DOC-02 | Tính checksum và tái sử dụng file trùng trong phạm vi người dùng | Giảng viên/Admin | Không upload lại Cloudinary; tăng `reuse_count`; không lộ trùng chéo user |
+| FR-DOC-03 | Lưu file trên Cloudinary hoặc fallback local ở dev | Hệ thống | Metadata chứa URL, public id, resource type; lỗi ngoài trả mã phù hợp |
+| FR-DOC-04 | Trích xuất văn bản từ PDF/DOCX/PPTX | Giảng viên/Admin | Lưu `document_contents`, text length và status processed/failed |
+| FR-DOC-05 | Phiên âm video bằng Groq Whisper | Giảng viên/Admin | Chỉ video hợp lệ; status transcribing/transcribed/failed; có transcript |
+| FR-DOC-06 | Chia văn bản thành semantic chunk | Hệ thống | Chunk có index, text, owner/document metadata; không tạo chunk rỗng |
+| FR-DOC-07 | Tạo embedding và lập chỉ mục RAG | Giảng viên/Admin | Ghi Mongo `document_chunks` và vector ChromaDB; status indexed/index_failed |
+| FR-DOC-08 | Tìm kiếm semantic trong một tài liệu | Người sở hữu | Kết quả chỉ thuộc document/user, có chunk, score/distance và giới hạn n |
+| FR-DOC-09 | Lấy danh sách chunk, transcript và nội dung xem trước | Người sở hữu | Không trả dữ liệu của user khác; id không hợp lệ trả 400/404 rõ ràng |
+| FR-DOC-10 | Nhóm tài liệu và tìm tài liệu tương tự | Giảng viên | Chỉ dùng vector thuộc user; trường hợp thiếu mẫu trả empty/validation state |
+| FR-DOC-11 | Xóa tài liệu và dữ liệu phụ thuộc an toàn | Người sở hữu/Admin | Có mutation lock; xóa chunk/content/question/verification/vector và cleanup asset |
+| FR-DOC-12 | Cách ly, bỏ cách ly, tái xử lý và khôi phục nội dung | Moderator/Admin | Mọi mutation cần permission/lý do/audit; tài liệu quarantine bị chặn sử dụng |
+
+**Tiền điều kiện:** người dùng là lecturer/user legacy hoặc admin phù hợp; file chưa bị quarantine.  
+**Ngoại lệ:** sai định dạng, quá kích thước/quota, file hỏng, provider/storage unavailable, mutation conflict, nội dung rỗng.
+
+### 3.4 Yêu cầu chức năng – Kiểm chứng học liệu
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-VER-01 | Khởi tạo phiên kiểm chứng trên snapshot nội dung hiện tại | Giảng viên | Không tạo phiên trùng cùng hash; phiên đang chạy được tái sử dụng |
+| FR-VER-02 | Kiểm tra từng batch chunk bằng Gemini/Groq và có thể đối chiếu web | Hệ thống | Issue có loại, severity, confidence, nguồn, provider và chunk index |
+| FR-VER-03 | Theo dõi tiến độ và phát hiện kết quả stale | Giảng viên | Status trả processed count, issue stats, error và `is_stale` |
+| FR-VER-04 | Cho phép accept/reject/edit từng issue | Giảng viên | Chỉ issue cùng document/session/user; conflict trả 409 |
+| FR-VER-05 | Áp dụng bản sửa được duyệt và re-index | Giảng viên | Nội dung cập nhật theo revision guard; issue đánh dấu applied; index nhất quán |
+| FR-VER-06 | Phục hồi phiên bị gián đoạn sau restart | Hệ thống | Phiên treo được đánh failed để người dùng có thể chạy lại |
+
+### 3.5 Yêu cầu chức năng – Bộ câu hỏi sinh từ học liệu và luyện tập
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-QS-01 | Sinh 1–50 câu hỏi từ tài liệu đã indexed | Giảng viên | Chọn difficulty, type, Bloom; tài liệu khác owner hoặc chưa indexed bị từ chối |
+| FR-QS-02 | Trích keyword TF-IDF làm tín hiệu nội dung | Hệ thống | Kết quả keyword/score lưu trong question set |
+| FR-QS-03 | Sinh và cross-validate bằng Gemini/Groq khi khả dụng | Hệ thống | Loại câu không hợp lệ; lưu validation stats; có fallback khi chỉ một provider |
+| FR-QS-04 | Chỉnh nội dung, đáp án, giải thích, tag và phân loại câu | Giảng viên/Moderator | Validate độ dài/enum; cập nhật timestamp, người sửa và audit |
+| FR-QS-05 | Điều khiển workflow từng câu | Giảng viên/Reviewer | Chỉ transition hợp lệ; lưu reviewed/published metadata |
+| FR-QS-06 | Publish cả bộ cho tất cả hoặc một số lớp | Giảng viên | Target class phải thuộc giảng viên; chỉ câu đạt điều kiện được publish |
+| FR-QS-07 | Liệt kê lịch sử theo cursor và filter | Giảng viên | Không lộ questions[] ở summary; cursor ký và ràng buộc query |
+| FR-QS-08 | Hiển thị bộ đã publish theo quyền lớp | Học sinh | Chỉ thấy `all` hoặc class mình thuộc; không thấy bộ bị xóa |
+| FR-QS-09 | Nộp bài luyện tập và chấm đúng/sai | Học sinh | Lưu answer, correct answer, correctness, score, percent và thời gian |
+| FR-QS-10 | Xem lịch sử luyện tập và tiến độ | Học sinh | Chỉ lịch sử của current user; liên kết đúng question set/document |
+| FR-QS-11 | Xuất bộ câu hỏi ra DOCX/PDF | Giảng viên | File tải có tên hợp lệ, nội dung câu hỏi/đáp án/giải thích và log export |
+| FR-QS-12 | Xóa mềm bộ câu hỏi và ẩn khỏi mọi danh sách hoạt động | Giảng viên/Admin | Ownership/permission được kiểm tra; record có `deleted_at` |
+
+### 3.6 Yêu cầu chức năng – Lớp học
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-CLASS-01 | Tạo, xem, sửa và xóa mềm lớp | Giảng viên/Admin | Lớp có owner, tên, mô tả, timestamps; user khác không sửa được |
+| FR-CLASS-02 | Tìm học sinh theo tên/email | Giảng viên | Chỉ trả account student active, giới hạn kết quả và escape regex |
+| FR-CLASS-03 | Thêm nhiều học sinh vào lớp, không trùng | Giảng viên | Validate ObjectId/role; deduplicate `student_ids` |
+| FR-CLASS-04 | Xóa học sinh khỏi lớp | Giảng viên | Chỉ lớp thuộc owner; roster cập nhật nhất quán |
+| FR-CLASS-05 | Cho học sinh xem lớp mình thuộc mà không lộ toàn bộ roster | Học sinh | Response chỉ có id, tên, student_count |
+| FR-CLASS-06 | Dùng lớp làm audience cho bộ câu hỏi và đề thi | Giảng viên/Học sinh | Nội dung chỉ hiển thị khi user thuộc target class |
+
+### 3.7 Yêu cầu chức năng – Ngân hàng câu hỏi, ma trận đề và thi có giờ
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-EXAM-01 | Quản lý taxonomy môn/chương/chủ đề/chuẩn đầu ra | Giảng viên/Admin | Node có type, parent, grade, curriculum version; quan hệ cha hợp lệ |
+| FR-EXAM-02 | Tạo/import câu hỏi độc lập vào ngân hàng | Giảng viên/Admin | Lưu taxonomy, Bloom, difficulty, type, content, answer, point, source và owner |
+| FR-EXAM-03 | Sửa câu hỏi bằng optimistic version | Giảng viên/Admin | Version mismatch trả 409; owner/role được kiểm tra |
+| FR-EXAM-04 | Duyệt workflow ngân hàng và bulk approve/archive | Giảng viên/Admin | Chỉ transition draft/reviewing/approved/published/archived hợp lệ |
+| FR-EXAM-05 | Tạo/cập nhật/clone/archive blueprint | Giảng viên/Admin | Blueprint có tổng điểm, thời gian và constraint có count/points |
+| FR-EXAM-06 | Validate blueprint bằng solver | Giảng viên/Admin | Trả OPTIMAL/FEASIBLE/INFEASIBLE, thời gian giải và nhóm thiếu |
+| FR-EXAM-07 | Sinh một hoặc nhiều mã đề từ blueprint | Giảng viên/Admin | Dùng seed nếu có; các mã đề cùng equivalent group và cân bằng ràng buộc |
+| FR-EXAM-08 | Preview, regenerate section, clone, publish và archive exam | Giảng viên/Admin | Version/ownership/status transition hợp lệ; audience được kiểm tra |
+| FR-EXAM-09 | Bắt đầu lượt thi có giờ | Học sinh | Feature flag bật; exam publish và user thuộc audience; một attempt/exam/student |
+| FR-EXAM-10 | Lấy câu hỏi thi mà không lộ đáp án | Học sinh | `hide_answers=true`; server trả thứ tự/câu/điểm nhưng answer/explanation null |
+| FR-EXAM-11 | Autosave đáp án với optimistic version | Học sinh | Không mất answer hợp lệ; quá hạn thì tự submit; conflict trả 409 |
+| FR-EXAM-12 | Nộp bài thủ công hoặc tự động khi hết giờ | Học sinh/Hệ thống | Ghi submitted_at, auto_submitted và đóng trạng thái in_progress |
+| FR-EXAM-13 | Chấm khách quan ngay và tự luận qua AI job | Hệ thống | Result từng câu có points, correctness/AI score/confidence/feedback |
+| FR-EXAM-14 | Cho giảng viên xem attempt và override điểm | Giảng viên | Chỉ đề thuộc owner; teacher score không vượt points possible; có feedback |
+| FR-EXAM-15 | Worker quét attempt quá hạn | Hệ thống | Attempt đóng tab vẫn được auto-submit trong chu kỳ sweep |
+
+### 3.8 Yêu cầu chức năng – Chat, RAG và phản hồi
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-CHAT-01 | Hỏi đáp đơn giản trong một tài liệu | Người sở hữu | RAG chỉ tìm chunk của document/user; câu trả lời có source chunks |
+| FR-CHAT-02 | Hỏi đáp nâng cao theo nhiều scope | Học sinh/Giảng viên | Validate document ids, scope, question length, response style và quota |
+| FR-CHAT-03 | Kết hợp RAG nội bộ và web grounding | Người dùng | Retrieval mode đúng internal/web/hybrid; web search chỉ khi được bật |
+| FR-CHAT-04 | Trả citation nội bộ/web có thể truy vết | Hệ thống | Citation có source id, excerpt/URL; URL không xác minh không thành hyperlink |
+| FR-CHAT-05 | Lưu, phân trang, tìm, pin, đổi tên và xóa mềm conversation | Người dùng | Chỉ owner thao tác; cursor ổn định; title chuẩn hóa |
+| FR-CHAT-06 | Chống gửi trùng và xung đột conversation | Hệ thống | request_id idempotent; chat lock có TTL; duplicate trả kết quả an toàn |
+| FR-CHAT-07 | Thu thập feedback helpful/not helpful và lý do | Người dùng | Một feedback/user/message, cho phép update, kiểm tra ownership |
+| FR-CHAT-08 | Trả confidence/evidence status và gợi ý câu hỏi tiếp | Hệ thống | Giá trị nằm trong schema; không dùng confidence AI làm mastery |
+| FR-CHAT-09 | Áp dụng rate limit và timeout cho chat/search/AI | Hệ thống | Vượt ngưỡng trả thông báo thân thiện, không treo request vô hạn |
+
+### 3.9 Yêu cầu chức năng – Tri thức Internet và kho chương trình
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-KNOW-01 | Khám phá kiến thức Internet bằng grounding | Người dùng | Feature flag/quota cho phép; trả query, answer và source evidence |
+| FR-KNOW-02 | Cache query web có TTL | Hệ thống | Query chuẩn hóa dùng lại kết quả chưa hết hạn |
+| FR-KNOW-03 | Áp quota web theo user/ngày | Hệ thống | Unique user/date; vượt quota không gọi provider |
+| FR-KNOW-04 | Lưu source web để review | Giảng viên/Admin | Source có owner, URL, title, content, score, provenance và status |
+| FR-KNOW-05 | Review/approve/reject source web | Giảng viên/Admin | Quyết định và người duyệt được lưu; source chưa duyệt không là tri thức chuẩn |
+| FR-KNOW-06 | Đăng ký nguồn Curriculum KB từ dữ liệu nhập hoặc nguồn web | Giảng viên/Admin | Lưu taxonomy, review status, ingest status và provenance |
+| FR-KNOW-07 | Review và publish nguồn chương trình | Reviewer/Admin | Chỉ nguồn được duyệt mới có thể ingest/publish |
+| FR-KNOW-08 | Ingest nguồn chương trình bằng background job | Hệ thống | Job idempotent, retry/dead-letter; trạng thái nguồn phản ánh kết quả |
+| FR-KNOW-09 | Tìm kiếm trong kho chương trình đã publish | Học sinh/Giảng viên | Filter subject/grade/query; không trả nguồn chưa publish |
+| FR-KNOW-10 | Tách namespace vector của kho chuẩn khỏi tài liệu cá nhân | Hệ thống | Không trộn kết quả cross-source ngoài ý định truy vấn |
+
+### 3.10 Yêu cầu chức năng – Cá nhân hóa học tập
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-PERS-01 | Trích xuất Knowledge Component từ học liệu của owner | Giảng viên/Hệ thống | Output schema hợp lệ, có evidence/provenance/confidence và trạng thái review |
+| FR-PERS-02 | Tạo/duyệt cạnh prerequisite hoặc related | Giảng viên/Admin | Không self-loop, duplicate hoặc prerequisite cycle |
+| FR-PERS-03 | Quản lý Learning Item và Q-matrix | Hệ thống | KC ids hợp lệ; primary KC thuộc tập; weights được normalize |
+| FR-PERS-04 | Ghi learning event chuẩn hóa và idempotent | Học sinh/Hệ thống | user lấy từ token; event có occurred_at/schema version; không ghi trùng key |
+| FR-PERS-05 | Cập nhật mastery và ability bằng BKT/IRT | Hệ thống | Không gọi AI để tính; xác suất clamp; correct_count không vượt attempt_count |
+| FR-PERS-06 | Cung cấp profile, mastery, strengths, weaknesses và summary | Học sinh | Chỉ dữ liệu current user; empty/cold-start state rõ ràng |
+| FR-PERS-07 | Tạo digital twin có model/version/data quality | Học sinh | Kết hợp knowledge, behavior, cluster, progress và difficulty range |
+| FR-PERS-08 | Sinh candidate theo nhiều nguồn tín hiệu | Hệ thống | Loại item unauthorized, unsafe difficulty, failed verification hoặc prerequisite nặng |
+| FR-PERS-09 | Rank/re-rank và tạo explanation sau chọn | Hệ thống | Lưu component scores/reason codes/version; AI explanation có fallback deterministic |
+| FR-PERS-10 | Nhận feedback và lưu lịch sử recommendation | Học sinh | Feedback idempotent; cache invalidated; chỉ log current user |
+| FR-PERS-11 | K-Means offline có version, metric và rollback | Admin/Hệ thống | Lưu feature schema, scaler, centroid, k, random state, status |
+| FR-PERS-12 | Contextual bandit có kill switch/shadow mode | Admin/Hệ thống | Chỉ chạy trên candidate đã qua hard constraints; exploration bị giới hạn |
+| FR-PERS-13 | Chỉ kích hoạt NeuralCD/AKT khi đạt readiness | Admin/Hệ thống | Audit data minimum/Q-matrix/sparsity/sequence pass trước production |
+
+### 3.11 Yêu cầu chức năng – Quản trị và vận hành
+
+| Mã | Yêu cầu | Tác nhân | Nghiệm thu tối thiểu |
+|---|---|---|---|
+| FR-ADMIN-01 | Dashboard tổng quan user, document, conversation, AI, quality và lỗi | Admin/Analyst | Filter thời gian/bucket hợp lệ; query timeout/cache; số liệu có nguồn |
+| FR-ADMIN-02 | Liệt kê, tìm, lọc và xem chi tiết người dùng | Support/Admin | Permission `users.view`; không lộ password hash/sensitive fields |
+| FR-ADMIN-03 | Tạo/sửa/khóa/mở khóa/xóa/restore user | Admin/Super Admin | Chặn tự hạ quyền/xóa actor không phù hợp; lý do/audit bắt buộc |
+| FR-ADMIN-04 | Đổi role và permission override | Admin/Super Admin | Chỉ role hợp lệ; hierarchy được thực thi; session cũ bị vô hiệu nếu cần |
+| FR-ADMIN-05 | Quản lý quota, reset quota, force logout và password reset | Admin | Validate key/value/range; sinh password an toàn; audit before/after |
+| FR-ADMIN-06 | Duyệt và điều khiển tài liệu/câu hỏi trên toàn hệ thống | Moderator/Admin | Permission theo chức trách; quarantine/restore/reprocess/regenerate có audit |
+| FR-ADMIN-07 | Theo dõi AI usage, token, cost, latency, error và pricing | Admin/Analyst | Filter provider/model/user/date; aggregate và warning nhất quán |
+| FR-ADMIN-08 | Quản lý quota AI mặc định theo role và riêng user | Admin | Thay đổi runtime DB-backed, lịch sử trước/sau được lưu |
+| FR-ADMIN-09 | Quản lý CMS draft/publish/rollback/reorder/version | Admin | Validate URL/color/content; public chỉ đọc bản published |
+| FR-ADMIN-10 | Quản lý system settings và feature flags | Admin | Validate kiểu/range; allowed roles/users; cache runtime invalidated |
+| FR-ADMIN-11 | Bật maintenance mode và cho admin bypass | Admin | Health/runtime config/login phù hợp vẫn truy cập; user khác nhận 503 |
+| FR-ADMIN-12 | Tạo, sửa, publish, cancel thông báo theo audience | Admin | Audience count đúng; thời gian/status hợp lệ; read tracking unique |
+| FR-ADMIN-13 | Xuất báo cáo CSV/PDF/XLSX | Analyst/Admin | Permission export, filter/date range/search, file UTF-8 và tên an toàn |
+| FR-ADMIN-14 | Xem activity log, admin audit và chi tiết thay đổi | Support/Moderator/Admin | Search/filter/pagination; snapshot được sanitize; audit bất biến |
+| FR-OPS-01 | Cung cấp liveness/readiness và component health | Hệ thống/Admin | Health Mongo/Chroma/provider/storage/job/index, có timeout và trạng thái |
+| FR-OPS-02 | Ghi error chuẩn hóa cho response 4xx/5xx và exception | Hệ thống | Có request/correlation id, endpoint, duration, code, user nếu biết |
+| FR-OPS-03 | Hàng đợi job bền, lock, retry backoff và dead-letter | Worker | Hai worker không nhận cùng job; idempotency key ngăn duplicate |
+| FR-OPS-04 | Auto-submit attempt hết hạn theo chu kỳ | Worker | Không phụ thuộc tab browser; không submit lại attempt đã đóng |
+| FR-OPS-05 | Tạo index MongoDB idempotent khi startup | Hệ thống | Lỗi một index được log, startup không treo; readiness phản ánh tình trạng |
+| FR-OPS-06 | Gắn correlation id xuyên request/log | Hệ thống | Error log và activity/audit có thể truy vết cùng request |
+
+### 3.12 Yêu cầu phi chức năng
+
+| Mã | Nhóm | Yêu cầu |
+|---|---|---|
+| NFR-SEC-01 | Xác thực | Mọi API riêng tư phải yêu cầu JWT hợp lệ; token hết hạn hoặc phát trước `force_logout_at` bị từ chối |
+| NFR-SEC-02 | Phân quyền | Backend phải kiểm tra role/permission độc lập với frontend; mọi truy vấn dữ liệu học tập phải scope theo owner/current user |
+| NFR-SEC-03 | Mật khẩu | Mật khẩu phải hash bằng bcrypt; không log/trả hash hoặc secret |
+| NFR-SEC-04 | Input | Validate ObjectId, enum, chiều dài, URL, file type/size, version, score và query range |
+| NFR-SEC-05 | File | Tên file phải loại path traversal; file tạm được xóa; webhook Cloudinary phải xác minh chữ ký |
+| NFR-SEC-06 | Audit | Mutation quản trị nhạy cảm phải có lý do, before/after snapshot đã sanitize và actor/time/request |
+| NFR-SEC-07 | Privacy | Không dedup chéo user, không gửi identifier không cần thiết sang AI, không lộ dữ liệu learner khác |
+| NFR-SEC-08 | Prompt safety | Kết quả AI phải qua schema/validation; nội dung nguồn được coi là dữ liệu, không là chỉ thị hệ thống |
+| NFR-PERF-01 | Độ trễ | API đọc thông thường nên hoàn thành trong 2 giây ở tải mục tiêu; tác vụ AI dài phải có timeout/trạng thái chờ |
+| NFR-PERF-02 | Phân trang | Danh sách lớn phải dùng limit/cursor hoặc skip/limit có giới hạn, không tải toàn collection |
+| NFR-PERF-03 | Tối ưu DB | Truy vấn chính phải có index theo owner, status, time và khóa liên kết |
+| NFR-PERF-04 | Cache | Analytics/runtime config/web query/recommendation được cache với TTL và invalidation đúng |
+| NFR-PERF-05 | Upload | File được đọc theo chunk, không nạp toàn bộ file lớn vào RAM |
+| NFR-REL-01 | Tính nhất quán | Mutation dài phải dùng lock/version/revision để tránh lost update và apply sai snapshot |
+| NFR-REL-02 | Idempotency | Job, learning event, message request và thao tác có nguy cơ lặp phải hỗ trợ idempotency |
+| NFR-REL-03 | Retry | Tác vụ nền/storage/AI có retry giới hạn và exponential backoff; hết lượt vào dead-letter hoặc lỗi rõ ràng |
+| NFR-REL-04 | Restart | Job bền phải phục hồi sau restart; các BackgroundTasks không bền phải đánh failed/retry được |
+| NFR-REL-05 | Time | Timer thi dựa trên giờ server UTC; không tin đồng hồ client |
+| NFR-AVL-01 | Health | Có liveness/readiness tách biệt và hiển thị dependency degraded/unavailable |
+| NFR-AVL-02 | Graceful degradation | Khi AI/provider không có, hệ thống phải trả lỗi thân thiện hoặc fallback đã thiết kế, không tạo kết quả giả |
+| NFR-SCL-01 | Scale | MongoDB/Cloudinary có thể dùng managed service; worker tách khỏi API; ChromaDB cần chiến lược server/persistent disk khi tăng tải |
+| NFR-SCL-02 | Multi-replica | Rate limit, lock và cache cần shared store nếu triển khai nhiều replica; memory-only không đủ |
+| NFR-USA-01 | Ngôn ngữ | UI và thông báo nghiệp vụ chính bằng tiếng Việt, thuật ngữ kỹ thuật được giải thích |
+| NFR-USA-02 | Trạng thái | Mọi trang async có loading, empty, success, validation, permission và error state |
+| NFR-USA-03 | Responsive | Không tràn ngang ở 1440, 1280, 1024, 768, 390 và 360 px |
+| NFR-A11Y-01 | Accessibility | Mục tiêu WCAG 2.1 AA cho contrast, keyboard, focus, labels, dialog, landmark và reduced motion |
+| NFR-A11Y-02 | Audit | Tự động axe không thay thế audit VoiceOver/NVDA, zoom và forced-colors |
+| NFR-OBS-01 | Logging | Log phải có timestamp UTC, severity, request/correlation id, endpoint và duration; không chứa secret |
+| NFR-OBS-02 | AI telemetry | Ghi provider/model/feature/status/token/latency/cost estimate và quota event |
+| NFR-MNT-01 | Maintainability | Phân hệ mới nên theo vertical slice api/schema/service/repository/constants; tránh tăng file monolithic |
+| NFR-MNT-02 | Versioning | Entity mutable, model ML và schema event phải có version; migration có dry-run/rollback |
+| NFR-MNT-03 | Testability | Provider ngoài phải mock trong unit/CI; có test ownership, permission, concurrency, state transition và failure path |
+| NFR-COM-01 | Compatibility | API hiện có của question set/practice/document phải giữ backward compatibility khi mở rộng |
+| NFR-DAT-01 | Backup | Phải có backup MongoDB, Cloudinary metadata/tài sản và ChromaDB hoặc khả năng re-index |
+| NFR-DAT-02 | Retention | Xác định retention cho activity/error/AI usage/audit; audit quản trị không bị sửa tùy tiện |
+| NFR-AI-01 | AI governance | Nội dung AI phải có nguồn/provenance/confidence khi phù hợp; reviewer quyết định publish kiến thức/câu hỏi quan trọng |
+| NFR-AI-02 | Model readiness | Không tuyên bố hiệu quả personalization/NeuralCD/AKT/bandit nếu dữ liệu thật và metric chưa đủ |
+
+### 3.13 Quy tắc nghiệp vụ
+
+| Mã | Quy tắc |
+|---|---|
+| BR-01 | Tài khoản đăng ký công khai chỉ chọn `student` hoặc `lecturer`; vai trò quản trị do admin cấp |
+| BR-02 | `user` là vai trò legacy và được đối xử gần `lecturer` ở các route tương thích |
+| BR-03 | `super_admin` có toàn permission; admin không được thực hiện hành động vượt hierarchy đã định |
+| BR-04 | Frontend ẩn route không phải bằng chứng phân quyền; backend luôn kiểm tra lại |
+| BR-05 | Học sinh phải hoàn tất onboarding cơ bản; onboarding không phụ thuộc personalization feature flag |
+| BR-06 | Upload học liệu chỉ dành cho giảng viên/user legacy/admin phù hợp |
+| BR-07 | Dedup file chỉ trong phạm vi cùng user và checksum SHA-256 |
+| BR-08 | Tài liệu quarantine không được extract, index, chat hoặc sinh câu hỏi |
+| BR-09 | Chỉ tài liệu `processed` hoặc `transcribed` mới được index |
+| BR-10 | Chỉ tài liệu `indexed` mới được dùng để sinh bộ câu hỏi từ học liệu |
+| BR-11 | Mọi read/mutation tài liệu phải xác minh ownership hoặc permission admin |
+| BR-12 | Chỉ một mutation dài được giữ lock trên một document tại một thời điểm |
+| BR-13 | Phiên verification trùng content hash có thể tái sử dụng; kết quả khác revision là stale |
+| BR-14 | Chỉ issue accepted/edited mới được áp dụng; rejected không thay đổi nội dung |
+| BR-15 | Áp dụng sửa phải re-chunk/re-index để tránh vector lệch text |
+| BR-16 | Question set cũ và ngân hàng câu hỏi mới là hai aggregate khác nhau |
+| BR-17 | Workflow câu trong question set: draft, review_pending, approved, published |
+| BR-18 | Workflow question bank: draft → reviewing → approved → published → archived, với các nhánh quay lại được định nghĩa |
+| BR-19 | Học sinh chỉ thấy question set publish cho `all` hoặc class mình thuộc |
+| BR-20 | Practice attempt không thay thế timed exam attempt |
+| BR-21 | Blueprint constraint có `question_count`, `points` hoặc cả hai; nếu có cả hai thì phải đồng thời thỏa |
+| BR-22 | Blueprint infeasible phải trả nhóm thiếu, không tự ý bỏ constraint |
+| BR-23 | Exam chỉ publish khi trạng thái/phiên bản hợp lệ và audience class thuộc giảng viên |
+| BR-24 | Một học sinh chỉ có một `exam_attempt` cho một exam |
+| BR-25 | `due_at` do server tính; client countdown chỉ để hiển thị |
+| BR-26 | Hết giờ dẫn tới auto-submit ở client, request kế tiếp hoặc worker sweep |
+| BR-27 | Đáp án/lời giải exam không được trả cho học sinh trước khi điều kiện xem kết quả cho phép |
+| BR-28 | Câu khách quan chấm deterministic; tự luận có AI score nhưng teacher override quyết định final score khi có |
+| BR-29 | Teacher score không được nhỏ hơn 0 hoặc vượt điểm tối đa câu |
+| BR-30 | Conversation/message/feedback chỉ owner được đọc hoặc thay đổi |
+| BR-31 | Citation web chỉ bấm được nếu URL nằm trong metadata grounding đã xác minh |
+| BR-32 | Confidence do AI tự báo cáo không được dùng trực tiếp làm mastery |
+| BR-33 | Source web chưa duyệt không tự động trở thành curriculum knowledge |
+| BR-34 | Chỉ curriculum source approved/published được ingest hoặc hiển thị tìm kiếm công khai |
+| BR-35 | Learning event lấy `user_id` từ token, không tin `user_id` frontend gửi |
+| BR-36 | Mastery/ability/ranking được tính bằng thuật toán, không bằng prompt AI |
+| BR-37 | Knowledge graph không cho self-loop, duplicate prerequisite hoặc cycle |
+| BR-38 | Recommendation hard constraints chạy trước bandit/explanation AI |
+| BR-39 | Contextual bandit mặc định kill switch; exploration không vượt ngưỡng cấu hình |
+| BR-40 | NeuralCD/AKT chỉ là research cho đến khi readiness audit đạt |
+| BR-41 | Mutation quản trị nguy hiểm phải có lý do và audit before/after |
+| BR-42 | Audit log quản trị bất biến; không cung cấp API sửa/xóa thông thường |
+| BR-43 | Feature flag có thể giới hạn theo role/user; tắt phải chặn backend, không chỉ ẩn UI |
+| BR-44 | Maintenance mode cho phép health/runtime config và login cần thiết; admin/super_admin có thể bypass |
+| BR-45 | Background job có idempotency key không được tạo hai bản cho cùng thao tác logic |
+
+### 3.14 Yêu cầu dữ liệu
+
+1. **Định danh:** mọi entity MongoDB dùng `_id`; API serialize sang string. ERD CASE Studio 2 ánh xạ sang `VARCHAR(24)`.
+2. **Ownership:** entity cá nhân phải có `user_id`, `owner_id`, `student_id`, `created_by` hoặc chuỗi liên kết ownership có thể kiểm chứng.
+3. **Thời gian:** lưu UTC cho `created_at`, `updated_at`, `occurred_at`, `started_at`, `due_at`, `submitted_at`.
+4. **Version:** question bank, blueprint, exam, attempt và model ML dùng version để concurrency/audit.
+5. **Soft delete:** user, document, class, question set và một số content entity cần `deleted_at`; query mặc định loại record đã xóa.
+6. **Embedded data:** câu trong question set, result trong exam attempt, constraint, score map và citation có thể nhúng vì đọc cùng aggregate.
+7. **Reference data:** user, document, class, question, exam, conversation và knowledge component dùng tham chiếu chuỗi.
+8. **Vector:** text/metadata ở Mongo; vector ở ChromaDB; phải có cách tái tạo từ content nếu vector mất.
+9. **Provenance:** source, AI model, version, evidence ids và người duyệt phải được lưu cho nội dung do AI/web tạo.
+10. **Indexes:** owner+status+time, unique business key, TTL cache/lock và idempotency key phải được index.
+11. **Retention:** audit/admin audit giữ theo chính sách dài hạn; cache/lock TTL; activity/error/AI usage cần cấu hình retention.
+12. **Privacy:** log và snapshot phải sanitize password, token, API key và payload nhạy cảm.
+
+### 3.15 Yêu cầu tích hợp
+
+| Tích hợp | Dữ liệu gửi | Dữ liệu nhận | Failure handling |
+|---|---|---|---|
+| MongoDB | Entity, log, cache, job | Document/query/aggregate | Timeout, health, mock chỉ ở dev |
+| ChromaDB | Chunk id, vector, metadata | Similarity result | Fallback/re-index, persistent volume |
+| Cloudinary | File, resource type, folder | URL, public id, webhook | Retry cleanup job, signature verify |
+| Gemini | Prompt, context đã lọc, file/query khi cần | JSON/text/embedding/grounding | Timeout, quota, validation, fallback |
+| Groq | Prompt hoặc audio | JSON/text/transcript | Timeout, quota, fallback |
+| Browser/React | JSON API và file upload | JWT, data, download | Loading/error/permission/empty state |
+| Worker | Job payload nhỏ, idempotency key | Result/error/status | Lock, retry, backoff, dead-letter |
+
+## 4. ĐẶC TẢ USE CASE CHÍNH
+
+### UC-01 – Đăng ký, đăng nhập và onboarding
+
+- **Tác nhân chính:** Khách, Học sinh, Giảng viên.
+- **Tiền điều kiện:** hệ thống cho phép auth; email chưa tồn tại khi đăng ký.
+- **Luồng chính:** nhập thông tin → validate → tạo account/hash → đăng nhập → nhận JWT → tải `/auth/me` → điều hướng theo role → học sinh cập nhật onboarding.
+- **Luồng thay thế:** sai credentials; account locked/deleted; onboarding chỉ cho student.
+- **Hậu điều kiện:** user có phiên hợp lệ; learner profile cơ bản được tạo/cập nhật.
+
+### UC-02 – Quản lý và lập chỉ mục học liệu
+
+- **Tác nhân chính:** Giảng viên.
+- **Tác nhân phụ:** Cloudinary, Gemini/Groq, MongoDB, ChromaDB.
+- **Tiền điều kiện:** role hợp lệ, quota chưa hết, file đúng loại/kích thước.
+- **Luồng chính:** upload → checksum/dedup → lưu file → extract/transcribe → lưu content → chunk → embed → index → status indexed.
+- **Luồng thay thế:** reused document; file hỏng; provider unavailable; mutation conflict; index failure.
+- **Hậu điều kiện:** tài liệu, content, chunks và vector đồng bộ hoặc có trạng thái lỗi truy vết được.
+
+### UC-03 – Kiểm chứng và sửa học liệu
+
+- **Tác nhân chính:** Giảng viên.
+- **Tiền điều kiện:** tài liệu có content và không quarantine.
+- **Luồng chính:** tạo/reuse verification session → AI kiểm tra → xem issue → accept/reject/edit → apply → re-index.
+- **Luồng thay thế:** session đang chạy; content revision đổi; provider lỗi; issue stale.
+- **Hậu điều kiện:** content đã duyệt và index cùng revision.
+
+### UC-04 – Sinh, duyệt và phát hành bộ câu hỏi
+
+- **Tác nhân chính:** Giảng viên.
+- **Tiền điều kiện:** tài liệu indexed và thuộc owner.
+- **Luồng chính:** chọn cấu hình → TF-IDF/context → AI generate/validate/classify → lưu draft → sửa/review → publish cho all/classes.
+- **Luồng thay thế:** thiếu câu hợp lệ; quota/provider lỗi; class không thuộc owner.
+- **Hậu điều kiện:** question set có workflow và audience rõ ràng.
+
+### UC-05 – Luyện tập bộ câu hỏi
+
+- **Tác nhân chính:** Học sinh.
+- **Tiền điều kiện:** question set được publish và user thuộc audience.
+- **Luồng chính:** mở bộ → trả lời → submit → chấm đúng/sai → lưu attempt → xem score/lịch sử.
+- **Luồng thay thế:** bộ đã xóa/không thuộc lớp; answer index không hợp lệ.
+- **Hậu điều kiện:** question attempt được lưu và có thể phát sinh learning event.
+
+### UC-06 – Tạo ngân hàng câu hỏi và ma trận đề
+
+- **Tác nhân chính:** Giảng viên.
+- **Tiền điều kiện:** feature flag exam blueprint bật.
+- **Luồng chính:** quản lý taxonomy → tạo/import/review question → tạo blueprint → validate solver → sửa constraint nếu thiếu.
+- **Luồng thay thế:** version conflict; workflow sai; blueprint infeasible.
+- **Hậu điều kiện:** blueprint validated và câu hỏi đủ điều kiện sinh đề.
+
+### UC-07 – Sinh, phát hành và tổ chức thi có giờ
+
+- **Tác nhân chính:** Giảng viên, Học sinh.
+- **Tác nhân phụ:** Worker, Gemini/Groq.
+- **Tiền điều kiện:** exam/timed flags bật; blueprint hợp lệ; exam publish.
+- **Luồng chính:** sinh mã đề → publish → student start → lấy đề ẩn đáp án → autosave → submit/auto-submit → chấm → teacher review.
+- **Luồng thay thế:** quá hạn; duplicate attempt; version conflict; AI grading lỗi; teacher override.
+- **Hậu điều kiện:** attempt đóng, kết quả có final score và audit cần thiết.
+
+### UC-08 – Hỏi đáp AI có bằng chứng
+
+- **Tác nhân chính:** Học sinh/Giảng viên.
+- **Tác nhân phụ:** Gemini, ChromaDB, Google Search Grounding.
+- **Tiền điều kiện:** JWT hợp lệ, scope/document ownership hợp lệ.
+- **Luồng chính:** gửi câu hỏi → RAG/web retrieval → LLM tổng hợp → validate citation → lưu conversation/message → hiển thị answer/evidence/confidence.
+- **Luồng thay thế:** không đủ evidence; provider/rate limit; clarification required; duplicate request.
+- **Hậu điều kiện:** lịch sử và citation truy vết được; feedback có thể cập nhật.
+
+### UC-09 – Quản lý lớp và phân phối nội dung
+
+- **Tác nhân chính:** Giảng viên.
+- **Tác nhân phụ:** Học sinh.
+- **Luồng chính:** tạo lớp → tìm/thêm học sinh → chọn lớp khi publish question set/exam → học sinh thấy nội dung được giao.
+- **Ngoại lệ:** student id sai, không đúng role, lớp không thuộc owner.
+- **Hậu điều kiện:** audience và roster nhất quán.
+
+### UC-10 – Cập nhật mô hình người học và khuyến nghị
+
+- **Tác nhân chính:** Học sinh/Hệ thống.
+- **Tiền điều kiện:** personalization flag bật cho các API tương ứng; item/KC hợp lệ.
+- **Luồng chính:** ghi learning event → BKT/IRT update → digital twin → candidate → hard constraints → rank/re-rank → log/explain → feedback.
+- **Ngoại lệ:** cold start, thiếu data, item unauthorized, bandit kill switch.
+- **Hậu điều kiện:** learner state và recommendation log có version/provenance.
+
+### UC-11 – Quản trị người dùng, nội dung và cấu hình
+
+- **Tác nhân chính:** Admin/Super Admin/Moderator/Support/Analyst.
+- **Tiền điều kiện:** permission phù hợp.
+- **Luồng chính:** xem/filter → mở chi tiết → thực hiện mutation có lý do → validate hierarchy → ghi audit → phản hồi UI.
+- **Ngoại lệ:** thiếu permission, tự tác động bị cấm, version/data invalid.
+- **Hậu điều kiện:** before/after và actor/request truy vết được.
+
+### UC-12 – Giám sát và xử lý tác vụ nền
+
+- **Tác nhân chính:** Hệ thống/Worker/Admin.
+- **Luồng chính:** health check → enqueue idempotent → worker claim lock → process → success hoặc retry/dead-letter → error/usage/health log.
+- **Ngoại lệ:** worker chết, lock hết hạn, handler lỗi, dependency unavailable.
+- **Hậu điều kiện:** job có trạng thái cuối hoặc lịch retry; admin quan sát được sự cố.
+
+## 5. SƠ ĐỒ PHÂN TÍCH VÀ THIẾT KẾ
+
+### 5.1 Use Case Diagram
+
+Sơ đồ thể hiện ranh giới chức năng và phân quyền ở mức nghiệp vụ. Các hệ thống AI/lưu trữ được coi là tác nhân phụ, không phải người dùng.
+
+![Use Case Diagram](diagrams/use-case-diagram.png)
+
+### 5.2 Activity Diagram
+
+Sơ đồ activity mô tả chuỗi giá trị cốt lõi từ học liệu của giảng viên đến đánh giá và cá nhân hóa cho học sinh. Các nhánh lỗi kết thúc ở trạng thái có thể sửa/chạy lại, không âm thầm bỏ qua.
+
+![Activity Diagram](diagrams/activity-diagram.png)
+
+### 5.3 Sequence Diagram
+
+Sơ đồ sequence mô tả phiên thành công có điều kiện của cùng quy trình. Nó cho thấy ranh giới UI, API, dữ liệu, AI, vector và worker; không hàm ý mọi bước đều chạy đồng bộ trong một HTTP request.
+
+![Sequence Diagram](diagrams/sequence-diagram.png)
+
+### 5.4 Class Diagram
+
+Sơ đồ class là mô hình lớp nghiệp vụ khái niệm. Nó không sao chép toàn bộ class Pydantic/service, mà gom các aggregate quan trọng và giữ đúng cardinality/ownership.
+
+![Class Diagram](diagrams/class-diagram.png)
+
+### 5.5 ERD
+
+Hệ thống chạy MongoDB, do đó ERD bên dưới là mô hình quan hệ logic phục vụ phân tích và CASE Studio 2. Collection nhúng được tách thành bảng con khi cần biểu diễn cardinality. Mô hình vật lý MongoDB vẫn được mô tả trong data inventory.
+
+![ERD](diagrams/erd-diagram.png)
+
+## 6. MA TRẬN TRUY VẾT
+
+| Miền | Tác nhân | Yêu cầu | Use case | Entity/Collection chính | API tiêu biểu |
+|---|---|---|---|---|---|
+| Identity | Khách/User/Admin | FR-AUTH-* | UC-01, UC-11 | users, learner_profiles | `/auth/*`, `/admin/users/*` |
+| Documents | Giảng viên/Admin | FR-DOC-* | UC-02 | documents, document_contents, document_chunks | `/documents/*` |
+| Verification | Giảng viên | FR-VER-* | UC-03 | verification_sessions, verification_issues | `/documents/{id}/verify/*` |
+| Generated sets | Giảng viên/Học sinh | FR-QS-* | UC-04, UC-05 | question_sets, question_attempts | `/questions/*` |
+| Classes | Giảng viên/Học sinh | FR-CLASS-* | UC-09 | classes, users | `/classes/*` |
+| Exam bank | Giảng viên | FR-EXAM-01..08 | UC-06, UC-07 | curriculum_taxonomy, questions, exam_blueprints, exams | `/question-bank/*`, `/exam-blueprints/*`, `/exams/*` |
+| Timed exam | Học sinh/Giảng viên | FR-EXAM-09..15 | UC-07 | exam_attempts, background_jobs | `/exam-attempts/*`, `/exams/{id}/attempts` |
+| Chat | Học sinh/Giảng viên | FR-CHAT-* | UC-08 | conversations, conversation_messages, ai_answer_feedback | `/chat/*` |
+| Knowledge | User/Reviewer | FR-KNOW-* | UC-08 | web_knowledge_*, curriculum_kb_sources | `/web-knowledge/*`, `/curriculum-kb/*` |
+| Personalization | Học sinh/Hệ thống | FR-PERS-* | UC-10 | knowledge_components, learning_events, learner_* , recommendation_logs | `/personalization/*` |
+| Administration | Admin roles | FR-ADMIN-* | UC-11 | admin_audit_logs, settings, flags, CMS, notifications | `/admin/*` |
+| Operations | Worker/Admin | FR-OPS-* | UC-12 | background_jobs, error/health/usage logs | `/health*`, `/admin/dashboard/backend-health` |
+
+## 7. RỦI RO, KHOẢNG TRỐNG VÀ KIẾN NGHỊ
+
+### 7.1 Sổ rủi ro
+
+| Mã | Rủi ro | Xác suất | Tác động | Dấu hiệu hiện tại | Xử lý đề xuất |
+|---|---|---|---|---|---|
+| R-01 | Provider AI hết quota, timeout hoặc thay đổi model | Cao | Cao | Nhiều luồng phụ thuộc Gemini/Groq | Quota, circuit breaker, fallback, mock CI, model config/version |
+| R-02 | ChromaDB mất dữ liệu trên disk ephemeral | Trung bình | Cao | Persistent client local | Gắn volume/server riêng, backup và re-index runbook |
+| R-03 | BackgroundTasks mất khi restart | Trung bình | Cao | Verification/transcription cũ | Chuyển dần sang `background_jobs`, recovery và idempotency |
+| R-04 | Dữ liệu MongoDB không có FK tạo orphan/inconsistent owner | Trung bình | Cao | Dict raw, quan hệ string | Index, validation service, reconciliation job và defense-in-depth filter |
+| R-05 | Tài liệu cũ mâu thuẫn code gây vận hành sai | Cao | Trung bình | README/audit snapshot lệch phiên bản | Tạo tài liệu “current state”, version/date, archive snapshot cũ |
+| R-06 | Đáp án thi bị lộ qua API/UI | Thấp–Trung bình | Rất cao | Hai miền question set/exam dễ nhầm | Contract riêng hide_answers, security regression tests |
+| R-07 | Lost update khi autosave/sửa câu hỏi | Trung bình | Cao | Nhiều client mutation | Version/409, UI refresh/merge, test concurrency |
+| R-08 | Prompt injection hoặc citation sai | Trung bình | Cao | Content/web đưa vào LLM | Delimit context, strict schema, source allowlist, reviewer, output validation |
+| R-09 | Rate limit memory không hoạt động khi scale nhiều replica | Cao khi scale | Trung bình | Sliding window local | Redis/shared rate limiter hoặc gateway policy |
+| R-10 | Chi phí AI vượt ngân sách | Trung bình | Cao | Nhiều feature AI | Cost budget, daily quota, alert, cache, batch, model routing |
+| R-11 | Personalization đưa khuyến nghị kém do thiếu data | Cao ban đầu | Trung bình | Audit thực từng ghi nhận 0 events | Cold-start rules, deterministic baseline, metric/no-data state |
+| R-12 | Bandit/advanced model tối ưu sai mục tiêu | Thấp khi tắt | Cao khi bật | Shadow/kill switch có sẵn | Giữ shadow, offline evaluation, safety review, rollback |
+| R-13 | Không đáp ứng accessibility cho người dùng thật | Trung bình | Trung bình | Axe pass nhưng chưa screen reader | Audit thủ công, keyboard happy path, zoom/forced-colors |
+| R-14 | Happy-path E2E không phản ánh backend thật | Trung bình | Cao | Fixture chủ yếu trả error state | Môi trường test cô lập, seed data, fake provider deterministically |
+| R-15 | CASE Studio 2 mô hình hóa sai MongoDB | Trung bình | Trung bình | Công cụ thiên về RDBMS | Ghi rõ logical projection, giữ data dictionary và embedded/reference notes |
+
+### 7.2 Kiến nghị ưu tiên
+
+**P0 – Trước production:**
+
+1. Xây môi trường test tích hợp cô lập và chạy happy path upload → index → generate → publish → attempt.
+2. Chốt retention/privacy/backup/restore và rotate secret.
+3. Bảo đảm ChromaDB/Cloudinary/MongoDB có persistent/backup và runbook.
+4. Mock hoàn toàn provider ngoài trong CI; thêm test không lộ đáp án/ownership.
+5. Chuyển tác vụ dài còn lại sang job queue bền hoặc có recovery rõ ràng.
+
+**P1 – Trong giai đoạn ổn định:**
+
+1. Tách file/service monolithic và đưa MongoDB access về repository.
+2. Chuyển rate limit/cache/lock cần chia sẻ sang shared store khi có nhiều replica.
+3. Audit accessibility thủ công.
+4. Thiết lập dashboard SLO: error rate, p95 latency, job backlog, AI quota/cost.
+5. Đồng bộ README và tài liệu vận hành với code hiện tại.
+
+**P2 – Khi có dữ liệu học thật:**
+
+1. Đánh giá BKT/IRT, K-Means và ranking bằng dữ liệu thật.
+2. Chỉ mở bandit/NeuralCD/AKT sau readiness gate và A/B/shadow evaluation.
+3. Xây policy giải thích khuyến nghị và cơ chế khiếu nại/điều chỉnh hồ sơ.
+
+## 8. TIÊU CHÍ NGHIỆM THU HỆ THỐNG
+
+Một phiên bản được coi là đạt nghiệp vụ cốt lõi khi:
+
+1. Mỗi vai trò chỉ truy cập đúng route/API và ownership tests pass.
+2. Upload tài liệu hợp lệ tạo content; index tạo chunk/vector; file lỗi có trạng thái rõ.
+3. Verification không áp dụng sửa stale hoặc không được duyệt.
+4. Question set publish đúng audience; học sinh không thuộc lớp không thấy.
+5. Exam không lộ answer; autosave/submit/auto-submit không mất dữ liệu và không tạo attempt trùng.
+6. Điểm khách quan đúng deterministic; teacher override bị giới hạn bởi max score.
+7. Chat citation truy vết được và URL ngoài grounding không bấm được.
+8. Learning event không nhận user id giả; mastery/ranking không do AI tính trực tiếp.
+9. Admin mutation có permission, lý do và audit.
+10. Health, error log, background retry/dead-letter hoạt động trong failure test.
+11. Frontend build/lint/typecheck, backend test và responsive/accessibility automation pass.
+12. Backup/restore hoặc re-index đã được diễn tập trên môi trường test.
+
+## 9. PHỤ LỤC
+
+### 9.1 Danh mục trạng thái chính
+
+| Aggregate | Trạng thái |
+|---|---|
+| User | active, locked, deleted |
+| Document | uploaded, extracting, processed, transcribing, transcribed, indexing, indexed, failed, index_failed, deleting |
+| Verification session | processing, completed, failed |
+| Verification issue | pending, accepted, rejected, edited, applied |
+| Question item nhúng | draft, review_pending, approved, published |
+| Question bank | draft, reviewing, approved, published, archived |
+| Blueprint | draft, validated, published, archived |
+| Exam | draft, ready, published, closed, archived |
+| Exam attempt | in_progress, submitted, graded |
+| Background job | pending, running, succeeded, failed, dead_letter |
+| Knowledge component | draft, active, archived, needs_review |
+| Knowledge graph edge | proposed, verified, rejected |
+| Cluster model | draft, training, active, retired, failed |
+
+### 9.2 Feature flags đáng chú ý
+
+- `enable_personalization`
+- `enable_exam_blueprint`
+- `enable_timed_exam`
+- `enable_web_knowledge`
+- `enable_curriculum_kb`
+- `enable_video_upload`
+- `enable_maintenance_mode`
+- Các flag model/recommendation/bandit/neural/AKT trong config
+
+Giá trị mặc định không đồng nghĩa giá trị runtime; admin có thể cập nhật flag DB-backed theo thiết kế hiện tại.
+
+### 9.3 Danh mục API
+
+Danh mục đầy đủ 199 endpoint được trích xuất từ code nằm tại:
+
+`inventory/api_inventory.csv`
+
+CSV gồm method, path, phân hệ, actor dự kiến, handler, mục đích và file:dòng nguồn.
+
+### 9.4 Danh mục dữ liệu
+
+Danh mục 46 collection/logical data surfaces nằm tại:
+
+`inventory/data_inventory.csv`
+
+Mỗi dòng có domain, logical key, owner field, mục đích và quan hệ chính.
+
+### 9.5 Thuật ngữ
+
+| Thuật ngữ | Giải thích |
+|---|---|
+| RAG | Retrieval-Augmented Generation: tìm ngữ cảnh trước khi LLM trả lời |
+| Chunk | Đoạn văn bản nhỏ được index và truy xuất |
+| Embedding | Vector biểu diễn ngữ nghĩa |
+| Grounding | Gắn câu trả lời với kết quả tìm kiếm/nguồn có metadata |
+| Bloom | Phân loại mức nhận thức: remember, understand, apply, analyze |
+| Blueprint | Ma trận/ràng buộc để chọn câu sinh đề |
+| BKT | Bayesian Knowledge Tracing, ước lượng mastery |
+| IRT/Rasch | Mô hình năng lực người học và độ khó câu hỏi |
+| Q-matrix | Ánh xạ câu/vật phẩm học với knowledge component |
+| Digital Twin | Ảnh tổng hợp có version về kiến thức, hành vi và sở thích người học |
+| Idempotency | Gọi lại cùng thao tác logic không tạo kết quả trùng |
+| Optimistic concurrency | Client gửi version; server từ chối nếu record đã đổi |
+| Dead-letter | Job hết retry và chờ xử lý thủ công |
+| CASE Studio 2 | Công cụ mô hình dữ liệu quan hệ; nhận DDL để reverse-engineer ERD |
+
+### 9.6 Nguồn code chính
+
+- `frontend/src/App.tsx`
+- `frontend/src/contexts/AuthContext.tsx`
+- `frontend/src/utils/adminPermissions.ts`
+- `backend/app/main.py`
+- `backend/app/core/config.py`
+- `backend/app/core/rbac.py`
+- `backend/app/database/mongodb.py`
+- `backend/app/routers/auth.py`
+- `backend/app/routers/documents.py`
+- `backend/app/routers/questions.py`
+- `backend/app/routers/chat.py`
+- `backend/app/routers/classes.py`
+- `backend/app/routers/verification.py`
+- `backend/app/exam_bank/`
+- `backend/app/personalization/`
+- `backend/app/web_knowledge/`
+- `backend/app/curriculum_kb/`
+- `backend/app/services/background_job_service.py`
+- `backend/app/worker.py`
+- `docs/feature-expansion/70-final-integration-qa.md`
+- `docs/ui-redesign/17-claude-final-completion.md`
+- `docs/ui-redesign/13-playwright-responsive-report.md`
+- `docs/ui-redesign/14-accessibility-report.md`
+
+### 9.7 Lưu ý về CASE Studio 2
+
+CASE Studio 2 tạo model `.dm2`, nhưng định dạng này phải được tạo/lưu từ chính ứng dụng để bảo đảm hợp lệ. Bộ bàn giao cung cấp DDL MySQL, data dictionary và ERD logic. Trên máy Windows có CASE Studio 2, người dùng reverse-engineer DDL, sắp xếp diagram và lưu thành `.dm2`. Không nên đổi tên một file SQL/XML thành `.dm2`.
+
+### 9.8 Kết quả xác minh tại thời điểm lập báo cáo
+
+Ngày 29/07/2026, bộ mã nguồn và tài liệu bàn giao được xác minh lại như sau:
+
+| Hạng mục | Kết quả |
+|---|---|
+| Backend pytest | 411 passed, 13 subtests passed; 19 cảnh báo deprecation/user warning |
+| Frontend lint | Pass, không có ESLint error |
+| Frontend typecheck và production build | Pass; Vite cảnh báo chunk chính lớn hơn 500 kB |
+| DDL CASE Studio 2 | 49 bảng, 94 tham chiếu FK; delimiter cân bằng và không có FK trỏ bảng thiếu |
+| Inventory tự động | 199 FastAPI routes và 46 collection/logical data surfaces |
+| DOCX visual QA | Render 39 trang; đã kiểm tra contact sheet, trang bìa, sơ đồ, bảng rộng và trang kết |
+| Playwright responsive | Không chạy lại trong phiên này; dùng báo cáo repository mới nhất ghi nhận 438 checks trên 6 viewport |

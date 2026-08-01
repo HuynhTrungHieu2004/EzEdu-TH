@@ -1,0 +1,71 @@
+@startuml
+title EzEdu AI – Activity: tải tài liệu, xử lý, xác minh và khai thác
+skinparam shadowing false
+
+|Người dùng|
+start
+:Chọn tệp và mục đích sử dụng;
+:Gửi yêu cầu tải lên;
+
+|Frontend|
+:Kiểm tra định dạng / dung lượng;
+if (Dữ liệu hợp lệ?) then (Có)
+  :Gửi multipart kèm token;
+else (Không)
+  :Hiển thị lỗi nhập liệu;
+  stop
+endif
+
+|Backend API|
+:Xác thực và kiểm tra quyền;
+if (Được phép?) then (Có)
+  :Tính checksum;
+else (Không)
+  :Trả 401/403;
+  stop
+endif
+if (Trùng tài liệu của người dùng?) then (Có)
+  :Trả tham chiếu tài liệu đã có;
+else (Không)
+  :Lưu metadata và tệp;
+  :Tạo tác vụ xử lý;
+endif
+
+|Worker / AI|
+:Trích xuất văn bản\nhoặc phiên âm video;
+if (Trích xuất thành công?) then (Có)
+  :Làm sạch và chia đoạn;
+  :Sinh embedding;
+  :Lập chỉ mục ChromaDB;
+  :Chạy xác minh chất lượng;
+else (Không)
+  :Ghi lỗi và trạng thái failed;
+  |Frontend|
+  :Thông báo thất bại, cho phép thử lại;
+  stop
+endif
+
+|Backend API|
+:Cập nhật trạng thái ready\nvà kết quả xác minh;
+
+|Frontend|
+:Hiển thị tài liệu và cảnh báo;
+
+|Người dùng|
+if (Chọn tác vụ tiếp theo?) then (Hỏi đáp)
+  :Đặt câu hỏi;
+  |Worker / AI|
+  :Truy hồi đoạn liên quan\nvà sinh câu trả lời có nguồn;
+  |Người dùng|
+  :Xem / phản hồi câu trả lời;
+elseif (Sinh câu hỏi)
+  :Chọn số lượng và độ khó;
+  |Worker / AI|
+  :Sinh, chuẩn hóa và lưu bộ câu hỏi;
+  |Người dùng|
+  :Duyệt hoặc làm bài luyện tập;
+else (Kết thúc)
+endif
+stop
+@enduml
+

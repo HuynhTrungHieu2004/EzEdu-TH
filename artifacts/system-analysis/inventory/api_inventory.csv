@@ -1,0 +1,200 @@
+﻿method,path,subsystem,actor,handler,purpose,source
+GET,/api/v1/admin/activity-logs,Activity Logs,Admin theo permission,get_admin_activity_logs,get admin activity logs,backend/app/routers/admin_activity_logs.py:25
+GET,/api/v1/admin/activity-logs/statistics,Activity Logs,Admin theo permission,get_admin_activity_log_statistics,get admin activity log statistics,backend/app/routers/admin_activity_logs.py:57
+GET,/api/v1/admin/ai/pricing,Admin AI,Admin theo permission,get_ai_pricing,get ai pricing,backend/app/routers/admin_ai.py:473
+GET,/api/v1/admin/ai/quota/defaults,Admin AI,Admin theo permission,get_ai_quota_defaults,get ai quota defaults,backend/app/routers/admin_ai.py:336
+PATCH,/api/v1/admin/ai/quota/defaults/{role},Admin AI,Admin theo permission,update_ai_quota_defaults,"Change the role-level default AI quota at runtime (DB-backed), instead of",backend/app/routers/admin_ai.py:343
+GET,/api/v1/admin/ai/quota/users/{user_id},Admin AI,Admin theo permission,get_user_ai_quota,get user ai quota,backend/app/routers/admin_ai.py:371
+PATCH,/api/v1/admin/ai/quota/users/{user_id},Admin AI,Admin theo permission,update_user_ai_quota,update user ai quota,backend/app/routers/admin_ai.py:379
+GET,/api/v1/admin/ai/quota/users/{user_id}/history,Admin AI,Admin theo permission,get_user_ai_quota_history,get user ai quota history,backend/app/routers/admin_ai.py:441
+POST,/api/v1/admin/ai/quota/users/{user_id}/reset,Admin AI,Admin theo permission,reset_user_ai_quota,reset user ai quota,backend/app/routers/admin_ai.py:410
+GET,/api/v1/admin/ai/usage,Admin AI,Admin theo permission,get_admin_ai_usage,get admin ai usage,backend/app/routers/admin_ai.py:201
+GET,/api/v1/admin/content/documents,Admin Content,Admin theo permission,list_admin_documents,list admin documents,backend/app/routers/admin_content.py:161
+DELETE,/api/v1/admin/content/documents/{document_id},Admin Content,Admin theo permission,delete_admin_document,delete admin document,backend/app/routers/admin_content.py:368
+GET,/api/v1/admin/content/documents/{document_id},Admin Content,Admin theo permission,get_admin_document,get admin document,backend/app/routers/admin_content.py:229
+POST,/api/v1/admin/content/documents/{document_id}/quarantine,Admin Content,Admin theo permission,quarantine_admin_document,quarantine admin document,backend/app/routers/admin_content.py:334
+POST,/api/v1/admin/content/documents/{document_id}/reprocess,Admin Content,Admin theo permission,reprocess_admin_document,"Actually re-runs the document pipeline (re-extract for non-video documents,",backend/app/routers/admin_content.py:282
+POST,/api/v1/admin/content/documents/{document_id}/restore,Admin Content,Admin theo permission,restore_admin_document,restore admin document,backend/app/routers/admin_content.py:386
+POST,/api/v1/admin/content/documents/{document_id}/unquarantine,Admin Content,Admin theo permission,unquarantine_admin_document,unquarantine admin document,backend/app/routers/admin_content.py:352
+GET,/api/v1/admin/content/exams,Admin Content,Admin theo permission,list_admin_exams,list admin exams,backend/app/routers/admin_content.py:694
+GET,/api/v1/admin/content/questions,Admin Content,Admin theo permission,list_admin_questions,list admin questions,backend/app/routers/admin_content.py:461
+DELETE,/api/v1/admin/content/questions/{question_id},Admin Content,Admin theo permission,delete_admin_question,delete admin question,backend/app/routers/admin_content.py:610
+GET,/api/v1/admin/content/questions/{question_id},Admin Content,Admin theo permission,get_admin_question,get admin question,backend/app/routers/admin_content.py:527
+PATCH,/api/v1/admin/content/questions/{question_id},Admin Content,Admin theo permission,update_admin_question,update admin question,backend/app/routers/admin_content.py:573
+POST,/api/v1/admin/content/questions/{question_id}/moderate,Admin Content,Admin theo permission,moderate_admin_question,moderate admin question,backend/app/routers/admin_content.py:593
+POST,/api/v1/admin/content/questions/{question_id}/regenerate,Admin Content,Admin theo permission,regenerate_admin_question,Regenerate one question from its source document using a single AI,backend/app/routers/admin_content.py:644
+POST,/api/v1/admin/content/questions/{question_id}/restore,Admin Content,Admin theo permission,restore_admin_question,restore admin question,backend/app/routers/admin_content.py:628
+GET,/api/v1/admin/dashboard/audit-logs,Admin Dashboard,Admin/Analyst,admin_audit_logs,admin audit logs,backend/app/routers/admin.py:476
+GET,/api/v1/admin/dashboard/backend-health,Admin Dashboard,Admin/Analyst,admin_backend_health,Protected backend readiness snapshot for the admin dashboard.,backend/app/routers/admin.py:596
+GET,/api/v1/admin/dashboard/error-monitoring,Admin Dashboard,Admin/Analyst,admin_error_monitoring,admin error monitoring,backend/app/routers/admin.py:605
+GET,/api/v1/admin/dashboard/errors-latency,Admin Dashboard,Admin/Analyst,admin_errors_latency,admin errors latency,backend/app/routers/admin.py:307
+GET,/api/v1/admin/dashboard/evaluation,Admin Dashboard,Admin/Analyst,admin_evaluation,admin evaluation,backend/app/routers/admin.py:327
+GET,/api/v1/admin/dashboard/overview,Admin Dashboard,Admin/Analyst,admin_overview,admin overview,backend/app/routers/admin.py:251
+GET,/api/v1/admin/dashboard/quality,Admin Dashboard,Admin/Analyst,admin_quality,admin quality,backend/app/routers/admin.py:289
+GET,/api/v1/admin/dashboard/usage,Admin Dashboard,Admin/Analyst,admin_usage,admin usage,backend/app/routers/admin.py:269
+GET,/api/v1/admin/dashboard/users,Admin Dashboard,Admin/Analyst,admin_list_users,admin list users,backend/app/routers/admin.py:335
+PATCH,/api/v1/admin/dashboard/users/{user_id}/role,Admin Dashboard,Admin/Analyst,admin_update_user_role,admin update user role,backend/app/routers/admin.py:381
+PATCH,/api/v1/admin/dashboard/users/{user_id}/status,Admin Dashboard,Admin/Analyst,admin_update_user_status,admin update user status,backend/app/routers/admin.py:429
+GET,/api/v1/admin/users,Admin Users,Admin theo permission,list_admin_users,list admin users,backend/app/routers/admin_users.py:273
+POST,/api/v1/admin/users,Admin Users,Admin theo permission,create_admin_user,create admin user,backend/app/routers/admin_users.py:370
+GET,/api/v1/admin/users/statistics,Admin Users,Admin theo permission,admin_user_statistics,admin user statistics,backend/app/routers/admin_users.py:333
+DELETE,/api/v1/admin/users/{user_id},Admin Users,Admin theo permission,delete_admin_user,delete admin user,backend/app/routers/admin_users.py:580
+GET,/api/v1/admin/users/{user_id},Admin Users,Admin theo permission,get_admin_user,get admin user,backend/app/routers/admin_users.py:362
+PATCH,/api/v1/admin/users/{user_id},Admin Users,Admin theo permission,update_admin_user,update admin user,backend/app/routers/admin_users.py:425
+GET,/api/v1/admin/users/{user_id}/activity,Admin Users,Admin theo permission,get_admin_user_activity,get admin user activity,backend/app/routers/admin_activity_logs.py:67
+POST,/api/v1/admin/users/{user_id}/force-logout,Admin Users,Admin theo permission,force_logout_admin_user,force logout admin user,backend/app/routers/admin_users.py:677
+POST,/api/v1/admin/users/{user_id}/lock,Admin Users,Admin theo permission,lock_admin_user,lock admin user,backend/app/routers/admin_users.py:527
+POST,/api/v1/admin/users/{user_id}/password-reset,Admin Users,Admin theo permission,reset_admin_user_password,reset admin user password,backend/app/routers/admin_users.py:714
+PATCH,/api/v1/admin/users/{user_id}/quota,Admin Users,Admin theo permission,update_admin_user_quota,update admin user quota,backend/app/routers/admin_users.py:639
+POST,/api/v1/admin/users/{user_id}/restore,Admin Users,Admin theo permission,restore_admin_user,restore admin user,backend/app/routers/admin_users.py:564
+PATCH,/api/v1/admin/users/{user_id}/role,Admin Users,Admin theo permission,change_admin_user_role,change admin user role,backend/app/routers/admin_users.py:601
+POST,/api/v1/admin/users/{user_id}/unlock,Admin Users,Admin theo permission,unlock_admin_user,unlock admin user,backend/app/routers/admin_users.py:548
+GET,/api/v1/personalization/events/admin/users/{user_id},Admin Users,Admin theo permission,admin_list_user_learning_events,admin list user learning events,backend/app/personalization/api/learning_events.py:50
+GET,/api/v1/admin/audit-logs,Audit Logs,Admin theo permission,get_admin_audit_logs,get admin audit logs,backend/app/routers/admin_audit_logs.py:27
+GET,/api/v1/admin/audit-logs/statistics,Audit Logs,Admin theo permission,get_admin_audit_log_statistics,get admin audit log statistics,backend/app/routers/admin_audit_logs.py:55
+GET,/api/v1/admin/audit-logs/{audit_id},Audit Logs,Admin theo permission,get_admin_audit_log_detail,get admin audit log detail,backend/app/routers/admin_audit_logs.py:64
+GET,/api/v1/admin/website-content,CMS,Admin theo permission,get_admin_website_content,get admin website content,backend/app/routers/website_content.py:132
+POST,/api/v1/admin/website-content/sections/reorder,CMS,Admin theo permission,reorder_sections,reorder sections,backend/app/routers/website_content.py:291
+GET,/api/v1/admin/website-content/{section_key},CMS,Admin theo permission,get_admin_website_section,get admin website section,backend/app/routers/website_content.py:142
+PATCH,/api/v1/admin/website-content/{section_key},CMS,Admin theo permission,update_website_draft,update website draft,backend/app/routers/website_content.py:150
+POST,/api/v1/admin/website-content/{section_key}/publish,CMS,Admin theo permission,publish_website_section,publish website section,backend/app/routers/website_content.py:194
+POST,/api/v1/admin/website-content/{section_key}/rollback,CMS,Admin theo permission,rollback_website_section,rollback website section,backend/app/routers/website_content.py:240
+GET,/api/v1/admin/website-content/{section_key}/versions,CMS,Admin theo permission,list_website_versions,list website versions,backend/app/routers/website_content.py:317
+GET,/api/v1/website-content,CMS,Khách/Hệ thống,get_public_website_content,get public website content,backend/app/routers/website_content.py:112
+POST,/api/v1/chat/ask,Chat & RAG,Người dùng đã đăng nhập,ask_question_api,Ask a question grounded only in the indexed content of one owned document.,backend/app/routers/chat.py:74
+POST,/api/v1/chat/ask-advanced,Chat & RAG,Người dùng đã đăng nhập,ask_advanced_question_api,Advanced learning Q&A with document RAG context and Internet Search Grounding.,backend/app/routers/chat.py:190
+GET,/api/v1/chat/conversations,Chat & RAG,Người dùng đã đăng nhập,list_conversations_api,List conversation threads with Vietnamese normalized contains-search and signed cursor pagination.,backend/app/routers/chat.py:254
+DELETE,/api/v1/chat/conversations/{conversation_id},Chat & RAG,Người dùng đã đăng nhập,delete_conversation_api,Soft-delete a conversation thread. Checks active chat locks first.,backend/app/routers/chat.py:394
+PATCH,/api/v1/chat/conversations/{conversation_id},Chat & RAG,Người dùng đã đăng nhập,patch_conversation_api,Update a conversation's title and/or pin status.,backend/app/routers/chat.py:325
+GET,/api/v1/chat/conversations/{conversation_id}/messages,Chat & RAG,Người dùng đã đăng nhập,get_conversation_history_api,Get message history for a specific conversation thread using cursor pagination.,backend/app/routers/chat.py:286
+GET,/api/v1/chat/history/{document_id},Chat & RAG,Người dùng đã đăng nhập,get_history_api,Return Q&A history for one owned document.,backend/app/routers/chat.py:169
+PUT,/api/v1/chat/messages/{message_id}/feedback,Chat & RAG,Người dùng đã đăng nhập,submit_message_feedback_api,Submit or update feedback for an assistant message.,backend/app/routers/chat.py:438
+GET,/api/v1/classes,Classes,Giảng viên/Học sinh theo endpoint,list_my_classes,Lecturer/admin: list classes I own.,backend/app/routers/classes.py:103
+POST,/api/v1/classes,Classes,Giảng viên/Học sinh theo endpoint,create_class,Lecturer creates a class/student-group used later to target exam publishing.,backend/app/routers/classes.py:68
+GET,/api/v1/classes/mine,Classes,Giảng viên/Học sinh theo endpoint,list_classes_i_belong_to,Student: list classes I'm a member of (no full roster exposed).,backend/app/routers/classes.py:115
+GET,/api/v1/classes/search-students,Classes,Giảng viên/Học sinh theo endpoint,search_students,Lecturer/admin: find student accounts by name/email to add to a class.,backend/app/routers/classes.py:133
+DELETE,/api/v1/classes/{class_id},Classes,Giảng viên/Học sinh theo endpoint,delete_class,delete class,backend/app/routers/classes.py:220
+GET,/api/v1/classes/{class_id},Classes,Giảng viên/Học sinh theo endpoint,get_class_detail,get class detail,backend/app/routers/classes.py:160
+PATCH,/api/v1/classes/{class_id},Classes,Giảng viên/Học sinh theo endpoint,update_class,update class,backend/app/routers/classes.py:186
+POST,/api/v1/classes/{class_id}/students,Classes,Giảng viên/Học sinh theo endpoint,add_students_to_class,add students to class,backend/app/routers/classes.py:241
+DELETE,/api/v1/classes/{class_id}/students/{student_id},Classes,Giảng viên/Học sinh theo endpoint,remove_student_from_class,remove student from class,backend/app/routers/classes.py:277
+GET,/api/v1/curriculum-kb/search,Curriculum KB,Người dùng đã đăng nhập,search,search,backend/app/curriculum_kb/api/search.py:18
+GET,/api/v1/curriculum-kb/sources,Curriculum KB,Người dùng đã đăng nhập,list_my_sources,list my sources,backend/app/curriculum_kb/api/registry.py:35
+POST,/api/v1/curriculum-kb/sources,Curriculum KB,Người dùng đã đăng nhập,create_source,create source,backend/app/curriculum_kb/api/registry.py:21
+POST,/api/v1/curriculum-kb/sources/from-web-knowledge/{web_source_id},Curriculum KB,Người dùng đã đăng nhập,create_source_from_web_knowledge,create source from web knowledge,backend/app/curriculum_kb/api/registry.py:27
+GET,/api/v1/curriculum-kb/sources/published,Curriculum KB,Người dùng đã đăng nhập,list_published,list published,backend/app/curriculum_kb/api/search.py:31
+POST,/api/v1/curriculum-kb/sources/{source_id}/ingest,Curriculum KB,Người dùng đã đăng nhập,ingest_source,ingest source,backend/app/curriculum_kb/api/registry.py:63
+POST,/api/v1/curriculum-kb/sources/{source_id}/review,Curriculum KB,Người dùng đã đăng nhập,review_source,review source,backend/app/curriculum_kb/api/registry.py:48
+GET,/api/v1/db/ping,Database,Theo dependency của endpoint,ping_db,Endpoint kiểm tra kết nối tới cơ sở dữ liệu MongoDB,backend/app/routers/db_test.py:7
+GET,/api/v1/documents,Documents & Verification,Giảng viên/Học sinh theo endpoint,list_documents,List all documents belonging to the current authenticated user.,backend/app/routers/documents.py:769
+GET,/api/v1/documents/analysis/clusters,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_document_clusters,Phân cụm tài liệu tự động bằng thuật toán K-Means dựa trên vector embeddings.,backend/app/routers/documents.py:1618
+POST,/api/v1/documents/upload,Documents & Verification,Giảng viên/Học sinh theo endpoint,upload_document,"Upload a learning material (document or video), store metadata, and extract text if it is a document.",backend/app/routers/documents.py:487
+POST,/api/v1/documents/webhooks/cloudinary,Documents & Verification,Giảng viên/Học sinh theo endpoint,cloudinary_webhook,Nhận notification từ Cloudinary (ví dụ: xử lý eager transformation,backend/app/routers/documents.py:463
+DELETE,/api/v1/documents/{document_id},Documents & Verification,Giảng viên/Học sinh theo endpoint,delete_document,"Delete a document and all associated data (content, chunks, vectors, cloud file).",backend/app/routers/documents.py:1492
+GET,/api/v1/documents/{document_id},Documents & Verification,Giảng viên/Học sinh theo endpoint,get_document,Retrieve metadata of a document owned by the authenticated user.,backend/app/routers/documents.py:790
+GET,/api/v1/documents/{document_id}/chunks,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_document_chunks,Retrieve raw text chunks stored in the database for the given document.,backend/app/routers/documents.py:1230
+GET,/api/v1/documents/{document_id}/content,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_document_content,Retrieve extracted content for a document. Returns preview by default to avoid huge payloads.,backend/app/routers/documents.py:986
+POST,/api/v1/documents/{document_id}/extract,Documents & Verification,Giảng viên/Học sinh theo endpoint,extract_document_content,Download the uploaded file from Cloudinary when needed and extract text for the owner.,backend/app/routers/documents.py:802
+POST,/api/v1/documents/{document_id}/index,Documents & Verification,Giảng viên/Học sinh theo endpoint,index_document_api,"Split extracted text into chunks, index them into vector storage, and mark the document as indexed.",backend/app/routers/documents.py:1014
+POST,/api/v1/documents/{document_id}/search,Documents & Verification,Giảng viên/Học sinh theo endpoint,search_document_chunks,Search relevant semantic chunks within the target document using vector similarity.,backend/app/routers/documents.py:1257
+GET,/api/v1/documents/{document_id}/similar,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_similar_documents,Tìm tài liệu tương tự dựa trên Cosine Similarity của vector embeddings.,backend/app/routers/documents.py:1678
+POST,/api/v1/documents/{document_id}/transcribe,Documents & Verification,Giảng viên/Học sinh theo endpoint,transcribe_video_api,Start transcription for a video document in the background.,backend/app/routers/documents.py:1376
+GET,/api/v1/documents/{document_id}/transcript,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_video_transcript,Retrieve the transcript of a video document.,backend/app/routers/documents.py:1459
+POST,/api/v1/documents/{document_id}/verify,Documents & Verification,Giảng viên/Học sinh theo endpoint,trigger_verification,Bắt đầu kiểm tra chất lượng nội dung học liệu,backend/app/routers/verification.py:67
+POST,/api/v1/documents/{document_id}/verify/apply,Documents & Verification,Giảng viên/Học sinh theo endpoint,apply_fixes,Áp dụng các sửa đã chấp nhận vào nội dung và re-index,backend/app/routers/verification.py:346
+GET,/api/v1/documents/{document_id}/verify/issues,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_verification_issues,Lấy danh sách vấn đề phát hiện trong tài liệu,backend/app/routers/verification.py:232
+POST,/api/v1/documents/{document_id}/verify/resolve,Documents & Verification,Giảng viên/Học sinh theo endpoint,resolve_verification_issues,Duyệt/từ chối/sửa các vấn đề phát hiện,backend/app/routers/verification.py:310
+GET,/api/v1/documents/{document_id}/verify/status,Documents & Verification,Giảng viên/Học sinh theo endpoint,get_verification_status,Kiểm tra tiến trình kiểm tra chất lượng,backend/app/routers/verification.py:180
+POST,/api/v1/personalization/documents/{document_id}/knowledge-graph/extract,Documents & Verification,Học sinh/Giảng viên/Admin theo endpoint,extract_document_knowledge_graph,extract document knowledge graph,backend/app/personalization/api/knowledge_graph.py:45
+GET,/api/v1/personalization/documents/{document_id}/knowledge-graph/review,Documents & Verification,Học sinh/Giảng viên/Admin theo endpoint,list_knowledge_graph_review_items,list knowledge graph review items,backend/app/personalization/api/knowledge_graph.py:62
+GET,/api/v1/exams,Exam Bank,Theo dependency của endpoint,list_exams,list exams,backend/app/exam_bank/api/exams.py:62
+POST,/api/v1/exams/generate,Exam Bank,Giảng viên/Học sinh theo endpoint,generate_exams,generate exams,backend/app/exam_bank/api/exams.py:31
+GET,/api/v1/exams/{exam_id},Exam Bank,Giảng viên/Học sinh theo endpoint,get_exam,get exam,backend/app/exam_bank/api/exams.py:76
+POST,/api/v1/exams/{exam_id}/archive,Exam Bank,Giảng viên/Học sinh theo endpoint,archive_exam,archive exam,backend/app/exam_bank/api/exams.py:145
+GET,/api/v1/exams/{exam_id}/attempts,Exam Bank,Giảng viên/Học sinh theo endpoint,list_attempts,list attempts,backend/app/exam_bank/api/attempts.py:59
+POST,/api/v1/exams/{exam_id}/attempts/start,Exam Bank,Học sinh hoặc Giảng viên chấm,start_attempt,start attempt,backend/app/exam_bank/api/attempts.py:21
+POST,/api/v1/exams/{exam_id}/clone,Exam Bank,Giảng viên/Học sinh theo endpoint,clone_exam,clone exam,backend/app/exam_bank/api/exams.py:136
+GET,/api/v1/exams/{exam_id}/preview,Exam Bank,Giảng viên/Học sinh theo endpoint,preview_exam,preview exam,backend/app/exam_bank/api/exams.py:85
+POST,/api/v1/exams/{exam_id}/publish,Exam Bank,Giảng viên/Học sinh theo endpoint,publish_exam,publish exam,backend/app/exam_bank/api/exams.py:118
+POST,/api/v1/exams/{exam_id}/regenerate-section,Exam Bank,Giảng viên/Học sinh theo endpoint,regenerate_section,regenerate section,backend/app/exam_bank/api/exams.py:97
+GET,/api/v1/exam-blueprints,Exam Blueprints,Giảng viên/Admin,list_blueprints,list blueprints,backend/app/exam_bank/api/blueprints.py:27
+POST,/api/v1/exam-blueprints,Exam Blueprints,Giảng viên/Admin,create_blueprint,create blueprint,backend/app/exam_bank/api/blueprints.py:18
+GET,/api/v1/exam-blueprints/{blueprint_id},Exam Blueprints,Giảng viên/Admin,get_blueprint,get blueprint,backend/app/exam_bank/api/blueprints.py:38
+PATCH,/api/v1/exam-blueprints/{blueprint_id},Exam Blueprints,Giảng viên/Admin,update_blueprint,update blueprint,backend/app/exam_bank/api/blueprints.py:49
+POST,/api/v1/exam-blueprints/{blueprint_id}/archive,Exam Blueprints,Giảng viên/Admin,archive_blueprint,archive blueprint,backend/app/exam_bank/api/blueprints.py:83
+POST,/api/v1/exam-blueprints/{blueprint_id}/clone,Exam Blueprints,Giảng viên/Admin,clone_blueprint,clone blueprint,backend/app/exam_bank/api/blueprints.py:72
+POST,/api/v1/exam-blueprints/{blueprint_id}/validate,Exam Blueprints,Giảng viên/Admin,validate_blueprint,validate blueprint,backend/app/exam_bank/api/blueprints.py:61
+GET,/api/v1/exams/{exam_id}/questions,Generated Question Sets,Giảng viên/Học sinh theo endpoint,get_exam_questions,get exam questions,backend/app/exam_bank/api/attempts.py:27
+GET,/api/v1/question-bank/questions,Generated Question Sets,Giảng viên/Admin,list_questions,list questions,backend/app/exam_bank/api/questions.py:41
+POST,/api/v1/question-bank/questions,Generated Question Sets,Giảng viên/Admin,create_question,create question,backend/app/exam_bank/api/questions.py:23
+POST,/api/v1/question-bank/questions/bulk-approve,Generated Question Sets,Giảng viên/Admin,bulk_approve_questions,bulk approve questions,backend/app/exam_bank/api/questions.py:116
+POST,/api/v1/question-bank/questions/bulk-archive,Generated Question Sets,Giảng viên/Admin,bulk_archive_questions,bulk archive questions,backend/app/exam_bank/api/questions.py:132
+POST,/api/v1/question-bank/questions/import,Generated Question Sets,Giảng viên/Admin,import_questions,import questions,backend/app/exam_bank/api/questions.py:32
+GET,/api/v1/question-bank/questions/{question_id},Generated Question Sets,Giảng viên/Admin,get_question,get question,backend/app/exam_bank/api/questions.py:76
+PATCH,/api/v1/question-bank/questions/{question_id},Generated Question Sets,Giảng viên/Admin,update_question,update question,backend/app/exam_bank/api/questions.py:87
+POST,/api/v1/question-bank/questions/{question_id}/review,Generated Question Sets,Giảng viên/Admin,review_question,review question,backend/app/exam_bank/api/questions.py:99
+GET,/api/v1/questions/attempts/my-history,Generated Question Sets,Giảng viên/Học sinh theo endpoint,list_my_attempt_history,Return the signed-in student's recent exam and practice history.,backend/app/routers/questions.py:1078
+GET,/api/v1/questions/document/{document_id},Generated Question Sets,Giảng viên/Học sinh theo endpoint,get_questions_by_document,List all question sets generated from a specific document.,backend/app/routers/questions.py:651
+POST,/api/v1/questions/generate,Generated Question Sets,Giảng viên/Học sinh theo endpoint,generate_questions_api,Generate assessment questions using the configured AI providers based,backend/app/routers/questions.py:287
+GET,/api/v1/questions/my-history,Generated Question Sets,Giảng viên/Học sinh theo endpoint,list_my_history,List all question sets of the current user with pagination and filters.,backend/app/routers/questions.py:510
+GET,/api/v1/questions/published,Generated Question Sets,Giảng viên/Học sinh theo endpoint,list_published_question_sets,List question sets that contain at least one published question and are,backend/app/routers/questions.py:720
+GET,/api/v1/questions/published/pending-count,Generated Question Sets,Giảng viên/Học sinh theo endpoint,count_pending_published_question_sets,Server-side count of published sets visible to the current student that,backend/app/routers/questions.py:752
+DELETE,/api/v1/questions/{question_set_id},Generated Question Sets,Giảng viên/Học sinh theo endpoint,delete_question_set,Soft-delete a question set. Sets deleted_at timestamp.,backend/app/routers/questions.py:1129
+GET,/api/v1/questions/{question_set_id},Generated Question Sets,Giảng viên/Học sinh theo endpoint,get_question_set,Retrieve details of a single question set.,backend/app/routers/questions.py:1115
+POST,/api/v1/questions/{question_set_id}/attempts,Generated Question Sets,Giảng viên/Học sinh theo endpoint,submit_question_attempt,Save a learner attempt and score it against published/owned questions.,backend/app/routers/questions.py:981
+GET,/api/v1/questions/{question_set_id}/attempts/my,Generated Question Sets,Giảng viên/Học sinh theo endpoint,list_my_question_attempts,Return the current user's saved attempts for a question set.,backend/app/routers/questions.py:1046
+GET,/api/v1/questions/{question_set_id}/export/docx,Generated Question Sets,Giảng viên/Học sinh theo endpoint,export_docx_api,Export question set to Microsoft Word (.docx) file download.,backend/app/routers/questions.py:1186
+GET,/api/v1/questions/{question_set_id}/export/pdf,Generated Question Sets,Giảng viên/Học sinh theo endpoint,export_pdf_api,Export question set to PDF (.pdf) file download.,backend/app/routers/questions.py:1231
+PATCH,/api/v1/questions/{question_set_id}/items/{question_index},Generated Question Sets,Giảng viên/Học sinh theo endpoint,update_question_item,Edit one generated question and its tags.,backend/app/routers/questions.py:772
+POST,/api/v1/questions/{question_set_id}/items/{question_index}/workflow,Generated Question Sets,Giảng viên/Học sinh theo endpoint,update_question_workflow,Move one question through draft -> review_pending -> approved -> published.,backend/app/routers/questions.py:842
+POST,/api/v1/questions/{question_set_id}/publish,Generated Question Sets,Giảng viên/Học sinh theo endpoint,publish_entire_question_set,"Review and publish every question in a set for student access, either to",backend/app/routers/questions.py:909
+POST,/api/v1/auth/login,Identity & Access,Khách/Người dùng,login,Endpoint đăng nhập chính thức sử dụng JSON Body (UserLogin schema),backend/app/routers/auth.py:188
+POST,/api/v1/auth/login-swagger,Identity & Access,Khách/Người dùng,login_swagger,Endpoint phụ trợ giúp Swagger UI tương thích với nút Authorize dùng Form Data,backend/app/routers/auth.py:259
+POST,/api/v1/auth/logout,Identity & Access,Khách/Người dùng,logout,logout,backend/app/routers/auth.py:337
+GET,/api/v1/auth/me,Identity & Access,Khách/Người dùng,read_users_me,read users me,backend/app/routers/auth.py:332
+POST,/api/v1/auth/register,Identity & Access,Khách/Người dùng,register,register,backend/app/routers/auth.py:122
+GET,/api/v1/admin/notifications,Notifications,Admin theo permission,list_notifications,list notifications,backend/app/routers/admin_notifications.py:143
+POST,/api/v1/admin/notifications,Notifications,Admin theo permission,create_notification,create notification,backend/app/routers/admin_notifications.py:213
+GET,/api/v1/admin/notifications/statistics,Notifications,Admin theo permission,notification_statistics,notification statistics,backend/app/routers/admin_notifications.py:189
+GET,/api/v1/admin/notifications/{notification_id},Notifications,Admin theo permission,get_notification,get notification,backend/app/routers/admin_notifications.py:204
+PATCH,/api/v1/admin/notifications/{notification_id},Notifications,Admin theo permission,update_notification,update notification,backend/app/routers/admin_notifications.py:245
+POST,/api/v1/admin/notifications/{notification_id}/cancel,Notifications,Admin theo permission,cancel_notification,cancel notification,backend/app/routers/admin_notifications.py:311
+POST,/api/v1/admin/notifications/{notification_id}/publish,Notifications,Admin theo permission,publish_notification,publish notification,backend/app/routers/admin_notifications.py:279
+POST,/api/v1/personalization/events,Personalization,Học sinh/Giảng viên/Admin theo endpoint,create_learning_event,create learning event,backend/app/personalization/api/learning_events.py:28
+GET,/api/v1/personalization/events/my,Personalization,Học sinh/Giảng viên/Admin theo endpoint,list_current_user_learning_events,list current user learning events,backend/app/personalization/api/learning_events.py:41
+POST,/api/v1/personalization/knowledge-components/{component_id}/review,Personalization,Học sinh/Giảng viên/Admin theo endpoint,review_knowledge_component,review knowledge component,backend/app/personalization/api/knowledge_graph.py:75
+POST,/api/v1/personalization/knowledge-graph-edges/{edge_id}/review,Personalization,Học sinh/Giảng viên/Admin theo endpoint,review_knowledge_graph_edge,review knowledge graph edge,backend/app/personalization/api/knowledge_graph.py:100
+GET,/api/v1/personalization/learner/mastery,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_current_learner_mastery,get current learner mastery,backend/app/personalization/api/learner_state.py:31
+GET,/api/v1/personalization/learner/profile,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_current_learner_profile,get current learner profile,backend/app/personalization/api/learner_state.py:25
+GET,/api/v1/personalization/learner/strengths,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_current_learner_strengths,get current learner strengths,backend/app/personalization/api/learner_state.py:43
+GET,/api/v1/personalization/learner/summary,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_current_learner_summary,get current learner summary,backend/app/personalization/api/learner_state.py:37
+GET,/api/v1/personalization/learner/weaknesses,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_current_learner_weaknesses,get current learner weaknesses,backend/app/personalization/api/learner_state.py:49
+GET,/api/v1/personalization/me,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_digital_twin,get my digital twin,backend/app/personalization/api/digital_twin.py:50
+PATCH,/api/v1/personalization/me/goals,Personalization,Học sinh/Giảng viên/Admin theo endpoint,update_my_learning_goals,update my learning goals,backend/app/personalization/api/digital_twin.py:136
+GET,/api/v1/personalization/me/knowledge,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_digital_twin_knowledge,get my digital twin knowledge,backend/app/personalization/api/digital_twin.py:122
+GET,/api/v1/personalization/me/progress,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_digital_twin_progress,get my digital twin progress,backend/app/personalization/api/digital_twin.py:129
+GET,/api/v1/personalization/recommendations,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_recommendations,get my recommendations,backend/app/personalization/api/recommendations.py:32
+GET,/api/v1/personalization/recommendations/candidates,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_recommendation_candidates,get my recommendation candidates,backend/app/personalization/api/candidates.py:21
+GET,/api/v1/personalization/recommendations/me,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_recommendation_feed,get my recommendation feed,backend/app/personalization/api/recommendations.py:41
+POST,/api/v1/personalization/recommendations/me/feedback,Personalization,Học sinh/Giảng viên/Admin theo endpoint,submit_my_recommendation_feedback,submit my recommendation feedback,backend/app/personalization/api/recommendations.py:55
+GET,/api/v1/personalization/recommendations/me/history,Personalization,Học sinh/Giảng viên/Admin theo endpoint,get_my_recommendation_history,get my recommendation history,backend/app/personalization/api/recommendations.py:64
+GET,/,Platform,Khách/Hệ thống,read_root,read root,backend/app/main.py:272
+GET,/api/v1/runtime-config,Platform,Khách/Hệ thống,get_public_runtime_config,get public runtime config,backend/app/routers/system_settings.py:62
+GET,/api/v1/taxonomy,Platform,Theo dependency của endpoint,list_taxonomy_nodes,list taxonomy nodes,backend/app/exam_bank/api/taxonomy.py:24
+POST,/api/v1/taxonomy,Platform,Theo dependency của endpoint,create_taxonomy_node,create taxonomy node,backend/app/exam_bank/api/taxonomy.py:15
+GET,/api/v1/admin/reports/export,Reports,Admin/Analyst,export_report,export report,backend/app/routers/admin_reports.py:306
+GET,/api/v1/admin/reports/types,Reports,Admin/Analyst,report_types,report types,backend/app/routers/admin_reports.py:292
+GET,/api/v1/admin/feature-flags,Runtime Settings,Admin theo permission,list_feature_flags,list feature flags,backend/app/routers/system_settings.py:103
+PATCH,/api/v1/admin/feature-flags/{key},Runtime Settings,Admin theo permission,patch_feature_flag,patch feature flag,backend/app/routers/system_settings.py:114
+GET,/api/v1/admin/settings,Runtime Settings,Admin theo permission,list_system_settings,list system settings,backend/app/routers/system_settings.py:67
+PATCH,/api/v1/admin/settings/{key},Runtime Settings,Admin theo permission,patch_system_setting,patch system setting,backend/app/routers/system_settings.py:78
+GET,/health,System Health,Khách/Hệ thống,health_check,health check,backend/app/main.py:281
+GET,/health/ready,System Health,Khách/Hệ thống,readiness_check,readiness check,backend/app/main.py:285
+GET,/api/v1/exam-attempts/{attempt_id},Timed Exam,Học sinh hoặc Giảng viên chấm,get_attempt,get attempt,backend/app/exam_bank/api/attempts.py:33
+PATCH,/api/v1/exam-attempts/{attempt_id}/autosave,Timed Exam,Học sinh hoặc Giảng viên chấm,autosave_attempt,autosave attempt,backend/app/exam_bank/api/attempts.py:39
+POST,/api/v1/exam-attempts/{attempt_id}/override,Timed Exam,Học sinh hoặc Giảng viên chấm,override_score,override score,backend/app/exam_bank/api/attempts.py:68
+POST,/api/v1/exam-attempts/{attempt_id}/submit,Timed Exam,Học sinh hoặc Giảng viên chấm,submit_attempt,submit attempt,backend/app/exam_bank/api/attempts.py:49
+POST,/api/v1/web-knowledge/explore,Web Knowledge,Người dùng đã đăng nhập,explore,explore,backend/app/web_knowledge/api/explore.py:13
+GET,/api/v1/web-knowledge/sources,Web Knowledge,Người dùng đã đăng nhập,list_sources,list sources,backend/app/web_knowledge/api/sources.py:27
+POST,/api/v1/web-knowledge/sources,Web Knowledge,Người dùng đã đăng nhập,save_source,save source,backend/app/web_knowledge/api/sources.py:21
+POST,/api/v1/web-knowledge/sources/{source_id}/review,Web Knowledge,Người dùng đã đăng nhập,review_source,review source,backend/app/web_knowledge/api/sources.py:42

@@ -1,0 +1,187 @@
+@startuml
+title EzEdu AI – Class Diagram mức miền nghiệp vụ
+hide empty members
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+package "Identity & Classroom" {
+  class User {
+    +id: ObjectId
+    +email: string
+    +role: Role
+    +status: UserStatus
+    +authenticate()
+    +hasPermission(permission)
+  }
+  class Classroom {
+    +id: ObjectId
+    +name: string
+    +inviteCode: string
+    +addStudent()
+    +publishAssignment()
+  }
+}
+
+package "Content & RAG" {
+  class Document {
+    +id: ObjectId
+    +title: string
+    +fileType: string
+    +processingStatus: string
+    +extract()
+    +index()
+  }
+  class DocumentContent {
+    +rawText: text
+    +normalizedText: text
+    +language: string
+  }
+  class DocumentChunk {
+    +chunkIndex: int
+    +content: text
+    +vectorId: string
+  }
+  class VerificationSession {
+    +status: string
+    +qualityScore: decimal
+    +verify()
+  }
+  class VerificationIssue {
+    +severity: string
+    +category: string
+    +resolutionStatus: string
+  }
+  class Conversation {
+    +title: string
+    +scope: string
+    +ask()
+  }
+  class Message {
+    +role: string
+    +content: text
+    +citations: Citation[]
+  }
+}
+
+package "Practice" {
+  class QuestionSet {
+    +title: string
+    +difficulty: string
+    +status: string
+    +generate()
+    +publish()
+  }
+  class QuestionSetItem {
+    +type: string
+    +prompt: text
+    +correctAnswer: text
+    +review()
+  }
+  class PracticeAttempt {
+    +score: decimal
+    +startedAt: datetime
+    +submit()
+  }
+}
+
+package "Exam Bank" {
+  class TaxonomyNode {
+    +level: string
+    +code: string
+    +name: string
+  }
+  class BankQuestion {
+    +type: string
+    +difficulty: string
+    +cognitiveLevel: string
+    +approve()
+  }
+  class ExamBlueprint {
+    +name: string
+    +durationMinutes: int
+    +totalQuestions: int
+    +validateConstraints()
+  }
+  class Exam {
+    +title: string
+    +status: string
+    +publish()
+  }
+  class ExamAttempt {
+    +status: string
+    +score: decimal
+    +start()
+    +submit()
+    +grade()
+  }
+}
+
+package "Knowledge & Personalization" {
+  class KnowledgeComponent {
+    +code: string
+    +name: string
+    +difficulty: decimal
+  }
+  class KnowledgeEdge {
+    +relationType: string
+    +weight: decimal
+  }
+  class LearningItem {
+    +itemType: string
+    +difficulty: decimal
+  }
+  class LearningEvent {
+    +eventType: string
+    +score: decimal
+  }
+  class LearnerProfile {
+    +level: string
+    +learningStyle: string
+  }
+  class LearnerKnowledgeState {
+    +masteryProbability: decimal
+    +update()
+  }
+  class Recommendation {
+    +rank: int
+    +score: decimal
+    +reason: string
+  }
+}
+
+User "1" -- "0..*" Classroom : owns >
+Classroom "0..*" -- "0..*" User : enrolls >
+User "1" -- "0..*" Document : owns >
+Document "1" *-- "0..1" DocumentContent
+Document "1" *-- "0..*" DocumentChunk
+Document "1" *-- "0..*" VerificationSession
+VerificationSession "1" *-- "0..*" VerificationIssue
+User "1" -- "0..*" Conversation
+Conversation "1" *-- "1..*" Message
+Document "0..*" -- "0..*" Conversation : context >
+
+Document "1" -- "0..*" QuestionSet
+QuestionSet "1" *-- "1..*" QuestionSetItem
+QuestionSet "1" -- "0..*" PracticeAttempt
+User "1" -- "0..*" PracticeAttempt
+
+TaxonomyNode "0..1" -- "0..*" TaxonomyNode : parent >
+TaxonomyNode "1" -- "0..*" BankQuestion
+ExamBlueprint "1" -- "1..*" BankQuestion : constrains >
+ExamBlueprint "1" -- "0..*" Exam
+Exam "1" *-- "1..*" BankQuestion
+Exam "1" -- "0..*" ExamAttempt
+User "1" -- "0..*" ExamAttempt
+
+KnowledgeComponent "1" -- "0..*" KnowledgeEdge : source >
+KnowledgeComponent "1" -- "0..*" KnowledgeEdge : target >
+KnowledgeComponent "0..*" -- "0..*" LearningItem
+User "1" -- "0..*" LearningEvent
+LearningItem "1" -- "0..*" LearningEvent
+User "1" -- "0..1" LearnerProfile
+User "1" -- "0..*" LearnerKnowledgeState
+KnowledgeComponent "1" -- "0..*" LearnerKnowledgeState
+User "1" -- "0..*" Recommendation
+LearningItem "1" -- "0..*" Recommendation
+@enduml
+

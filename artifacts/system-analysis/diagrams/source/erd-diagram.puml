@@ -1,0 +1,167 @@
+@startuml
+title EzEdu AI – ERD logic rút gọn
+hide circle
+hide methods
+skinparam shadowing false
+
+entity users {
+  * id : varchar(24) <<PK>>
+  --
+  email : varchar(255) <<UK>>
+  role : varchar(32)
+  status : varchar(32)
+}
+entity classes {
+  * id : varchar(24) <<PK>>
+  --
+  owner_id : varchar(24) <<FK>>
+  name : varchar(255)
+}
+entity class_students {
+  * class_id : varchar(24) <<PK,FK>>
+  * student_id : varchar(24) <<PK,FK>>
+}
+entity documents {
+  * id : varchar(24) <<PK>>
+  --
+  user_id : varchar(24) <<FK>>
+  title : varchar(500)
+  processing_status : varchar(32)
+}
+entity document_chunks {
+  * id : varchar(24) <<PK>>
+  --
+  document_id : varchar(24) <<FK>>
+  vector_id : varchar(255)
+}
+entity verification_sessions {
+  * id : varchar(24) <<PK>>
+  --
+  document_id : varchar(24) <<FK>>
+  user_id : varchar(24) <<FK>>
+}
+entity verification_issues {
+  * id : varchar(24) <<PK>>
+  --
+  session_id : varchar(24) <<FK>>
+}
+entity question_sets {
+  * id : varchar(24) <<PK>>
+  --
+  document_id : varchar(24) <<FK>>
+  user_id : varchar(24) <<FK>>
+}
+entity question_set_items {
+  * id : varchar(24) <<PK>>
+  --
+  question_set_id : varchar(24) <<FK>>
+}
+entity question_attempts {
+  * id : varchar(24) <<PK>>
+  --
+  question_set_id : varchar(24) <<FK>>
+  user_id : varchar(24) <<FK>>
+}
+entity curriculum_taxonomy {
+  * id : varchar(24) <<PK>>
+  --
+  parent_id : varchar(24) <<FK>>
+  level : varchar(32)
+}
+entity question_bank {
+  * id : varchar(24) <<PK>>
+  --
+  topic_id : varchar(24) <<FK>>
+  owner_id : varchar(24) <<FK>>
+}
+entity exam_blueprints {
+  * id : varchar(24) <<PK>>
+  --
+  subject_id : varchar(24) <<FK>>
+  owner_id : varchar(24) <<FK>>
+}
+entity exams {
+  * id : varchar(24) <<PK>>
+  --
+  blueprint_id : varchar(24) <<FK>>
+}
+entity exam_questions {
+  * exam_id : varchar(24) <<PK,FK>>
+  * question_id : varchar(24) <<PK,FK>>
+}
+entity exam_attempts {
+  * id : varchar(24) <<PK>>
+  --
+  exam_id : varchar(24) <<FK>>
+  student_id : varchar(24) <<FK>>
+}
+entity conversations {
+  * id : varchar(24) <<PK>>
+  --
+  user_id : varchar(24) <<FK>>
+}
+entity conversation_messages {
+  * id : varchar(24) <<PK>>
+  --
+  conversation_id : varchar(24) <<FK>>
+}
+entity knowledge_components {
+  * id : varchar(24) <<PK>>
+  --
+  parent_id : varchar(24) <<FK>>
+}
+entity learning_items {
+  * id : varchar(24) <<PK>>
+  --
+  document_id : varchar(24) <<FK>>
+  primary_knowledge_component_id : varchar(24) <<FK>>
+}
+entity learning_events {
+  * id : varchar(24) <<PK>>
+  --
+  user_id : varchar(24) <<FK>>
+  item_id : varchar(24) <<FK>>
+}
+entity learner_knowledge_states {
+  * id : varchar(24) <<PK>>
+  --
+  user_id : varchar(24) <<FK>>
+  knowledge_component_id : varchar(24) <<FK>>
+}
+entity recommendation_logs {
+  * id : varchar(24) <<PK>>
+  --
+  user_id : varchar(24) <<FK>>
+  item_id : varchar(24) <<FK>>
+}
+
+users ||--o{ classes : owns
+users ||--o{ class_students : joins
+classes ||--o{ class_students : contains
+users ||--o{ documents : owns
+documents ||--o{ document_chunks : chunks
+documents ||--o{ verification_sessions : verifies
+verification_sessions ||--o{ verification_issues : reports
+documents ||--o{ question_sets : generates
+question_sets ||--o{ question_set_items : contains
+question_sets ||--o{ question_attempts : practiced
+users ||--o{ question_attempts : performs
+curriculum_taxonomy ||--o{ curriculum_taxonomy : parent
+curriculum_taxonomy ||--o{ question_bank : classifies
+users ||--o{ question_bank : authors
+exam_blueprints ||--o{ exams : builds
+exams ||--o{ exam_questions : contains
+question_bank ||--o{ exam_questions : selected
+exams ||--o{ exam_attempts : attempted
+users ||--o{ exam_attempts : takes
+users ||--o{ conversations : owns
+conversations ||--o{ conversation_messages : contains
+knowledge_components ||--o{ learning_items : maps
+users ||--o{ learning_events : produces
+learning_items ||--o{ learning_events : records
+users ||--o{ learner_knowledge_states : owns
+knowledge_components ||--o{ learner_knowledge_states : mastered
+users ||--o{ recommendation_logs : receives
+learning_items ||--o{ recommendation_logs : recommends
+@enduml
+
