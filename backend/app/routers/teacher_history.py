@@ -4,6 +4,7 @@ lượt làm bài. Không dùng event-log tập trung (xem
 docs/superpowers/specs/2026-08-02-history-feature-design.md) — merge trực
 tiếp ở đây vì cả hai nguồn đã có sẵn field owner/deleted_at cần thiết."""
 
+import re
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -20,7 +21,7 @@ ContentType = Literal["all", "document", "exam"]
 async def _document_items(db, *, user_id: str, search: Optional[str]) -> List[Dict[str, Any]]:
     query: Dict[str, Any] = {"user_id": user_id, "deleted_at": None}
     if search:
-        query["original_filename"] = {"$regex": search, "$options": "i"}
+        query["original_filename"] = {"$regex": re.escape(search.strip()), "$options": "i"}
     items = []
     async for doc in db["documents"].find(query):
         items.append({
@@ -37,7 +38,7 @@ async def _document_items(db, *, user_id: str, search: Optional[str]) -> List[Di
 async def _exam_items(db, *, owner_id: str, search: Optional[str]) -> List[Dict[str, Any]]:
     query: Dict[str, Any] = {"owner_id": owner_id, "deleted_at": None}
     if search:
-        query["code"] = {"$regex": search, "$options": "i"}
+        query["code"] = {"$regex": re.escape(search.strip()), "$options": "i"}
     items = []
     async for doc in db["exams"].find(query):
         items.append({

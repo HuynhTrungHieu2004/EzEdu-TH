@@ -183,3 +183,13 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
         finally:
             # Restore original
             mongomock_exam_attempts.aggregate = original_aggregate
+
+    async def test_search_with_regex_metacharacter_does_not_raise(self):
+        """A search string containing a regex metacharacter must be treated as a
+        literal substring, not a regex pattern (previously raised OperationFailure)."""
+        await self._seed_document(created_at=datetime.now(timezone.utc))
+
+        result = await teacher_history.get_content_history(
+            type="all", search="(", skip=0, limit=50, current_user=self.teacher
+        )
+        self.assertEqual(result["total"], 0)

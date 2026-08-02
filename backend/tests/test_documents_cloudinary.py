@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from bson import ObjectId
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from mongomock_motor import AsyncMongoMockClient
 
 from app.routers import documents as documents_router
@@ -291,6 +291,18 @@ class DocumentSoftDeleteTests(unittest.IsolatedAsyncioTestCase):
 
         listed = await documents_router.list_documents(current_user=self.user)
         self.assertEqual(listed, [])
+
+    async def test_deleted_document_get_returns_404(self):
+        """get_owned_document must filter out soft-deleted documents so GET
+        /documents/{id} 404s instead of returning a document whose Cloudinary
+        asset and derived data were already purged."""
+        doc_id = await self._seed_document_with_question_set()
+        with patch("app.routers.documents.enqueue_cloudinary_cleanup", new=AsyncMock()):
+            await documents_router.delete_document(str(doc_id), None, None, self.user)
+
+        with self.assertRaises(HTTPException) as ctx:
+            await documents_router.get_document(str(doc_id), current_user=self.user)
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 
