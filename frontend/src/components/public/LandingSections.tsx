@@ -24,6 +24,7 @@ import { Alert, Button } from '../ui';
 import { useAuth } from '../../hooks/useAuth';
 import SparkleStar from './SparkleStar';
 import CharacterIllustration from './CharacterIllustration';
+import GradedPaperMockup from './GradedPaperMockup';
 import { toolsForRole } from '../../data/toolRegistry';
 import type { HeroContent } from '../../types/websiteContent';
 
@@ -87,7 +88,7 @@ export function Hero({ content }: { content: HeroContent }) {
         </div>
 
         <div className="ezp-hero-art-wrap">
-          <CharacterIllustration variant="hero" className="ezp-hero-character" />
+          <GradedPaperMockup />
         </div>
       </div>
     </section>
