@@ -943,11 +943,13 @@ class VerificationBackendTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(stale_task, 5)
 
         self.assertEqual(deleted["status"], "deleted")
-        self.assertIsNone(
-            await self.db["documents"].find_one(
-                {"_id": ObjectId(self.document_id)}
-            )
+        # Document is soft-deleted (row persists with deleted_at set)
+        deleted_doc = await self.db["documents"].find_one(
+            {"_id": ObjectId(self.document_id)}
         )
+        self.assertIsNotNone(deleted_doc)
+        self.assertIsNotNone(deleted_doc["deleted_at"])
+        # document_contents is hard-deleted
         self.assertIsNone(
             await self.db["document_contents"].find_one(
                 {"document_id": self.document_id, "user_id": self.user_id}
@@ -994,9 +996,10 @@ class VerificationBackendTests(unittest.IsolatedAsyncioTestCase):
             ),
             0,
         )
-        self.assertIsNone(
-            await self.db["documents"].find_one({"_id": ObjectId(self.document_id)})
-        )
+        # Document is soft-deleted (row persists with deleted_at set)
+        deleted_doc = await self.db["documents"].find_one({"_id": ObjectId(self.document_id)})
+        self.assertIsNotNone(deleted_doc)
+        self.assertIsNotNone(deleted_doc["deleted_at"])
 
     async def test_question_generation_is_blocked_during_reindex(self):
         await self._insert_document(status="indexing")
