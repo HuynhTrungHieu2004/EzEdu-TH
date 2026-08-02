@@ -54,6 +54,7 @@ const QuestionBankPage = lazy(() => import('./pages/teacher/QuestionBankPage'));
 const ExamBlueprintListPage = lazy(() => import('./pages/teacher/ExamBlueprintListPage'));
 const ExamBlueprintDetailPage = lazy(() => import('./pages/teacher/ExamBlueprintDetailPage'));
 const ExamGradingPage = lazy(() => import('./pages/teacher/ExamGradingPage'));
+const ContentHistoryPage = lazy(() => import('./pages/teacher/ContentHistoryPage'));
 const ExamAttemptPage = lazy(() => import('./pages/student/ExamAttemptPage'));
 const WebKnowledgePage = lazy(() => import('./pages/WebKnowledgePage'));
 const CurriculumKbPage = lazy(() => import('./pages/CurriculumKbPage'));
@@ -203,6 +204,10 @@ function App() {
         <Route
           path="/exams/:examId/grading"
           element={<AppLayout><RoleRoute allow={TEACHER_ONLY}><ExamGradingPage /></RoleRoute></AppLayout>}
+        />
+        <Route
+          path="/teacher/content-history"
+          element={<AppLayout><RoleRoute allow={TEACHER_ONLY}><ContentHistoryPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/take-exam/:examId"

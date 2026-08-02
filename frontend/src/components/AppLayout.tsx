@@ -164,6 +164,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             { to: '/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
             { to: '/tools', label: 'Công cụ AI', icon: <Sparkles size={ICON} /> },
             { to: '/documents', label: 'Học liệu', icon: <Library size={ICON} /> },
+            { to: '/teacher/content-history', label: 'Lịch sử', icon: <ClipboardList size={ICON} /> },
             { to: '/question-history', label: 'Đề & câu hỏi', icon: <FileQuestion size={ICON} /> },
             { to: '/question-bank', label: 'Ngân hàng câu hỏi', icon: <Database size={ICON} /> },
             { to: '/exam-blueprints', label: 'Ma trận đề', icon: <ClipboardList size={ICON} /> },
