@@ -10,6 +10,7 @@ import {
   Alert,
   ConfirmDialog,
   DataTable,
+  EmptyState,
   FilterBar,
   Input,
   Pagination,
@@ -186,21 +187,30 @@ export default function ContentHistoryPage() {
 
         {error && <Alert tone="error">{error}</Alert>}
 
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(row) => row.id}
-          loading={loading}
-          emptyMessage="Chưa có học liệu hoặc đề thi nào."
-        />
+        {!loading && items.length === 0 && (
+          <EmptyState
+            title="Không có học liệu hoặc đề thi nào"
+            description="Thử tìm kiếm hoặc thay đổi bộ lọc."
+          />
+        )}
 
-        <Pagination
-          page={page}
-          totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
-          total={total}
-          onPageChange={setPage}
-          label="mục"
-        />
+        {items.length > 0 && (
+          <>
+            <DataTable
+              columns={columns}
+              data={items}
+              rowKey={(row) => row.id}
+            />
+
+            <Pagination
+              page={page}
+              totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+              total={total}
+              onPageChange={setPage}
+              label="mục"
+            />
+          </>
+        )}
 
         <ConfirmDialog
           open={pendingDelete !== null}
