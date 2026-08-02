@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import PublicHeader from '../components/public/PublicHeader';
 import PublicFooter from '../components/public/PublicFooter';
+import { ChalkUnderline } from '../components/ui';
 import {
   Faq,
   FeaturesByRole,
@@ -77,6 +78,7 @@ function PublicInfoShell({
             <h1 className="ezp-title" style={{ fontSize: 'var(--ez-text-h1)' }}>
               {title}
             </h1>
+            <ChalkUnderline />
             <p className="ezp-lede">{description}</p>
           </div>
         </section>
