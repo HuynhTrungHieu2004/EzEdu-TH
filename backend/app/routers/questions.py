@@ -1084,6 +1084,7 @@ async def list_my_attempt_history(
 
     db = get_database()
     rows = []
+
     cursor_db = (
         db["question_attempts"]
         .find({"user_id": current_user.id})
@@ -1098,15 +1099,50 @@ async def list_my_attempt_history(
             pass
         rows.append({
             "id": str(item["_id"]),
+            "item_type": "practice",
             "question_set_id": item["question_set_id"],
             "document_id": item["document_id"],
-            "document_name": (question_set or {}).get("document_name", "Bộ câu hỏi"),
+            "title": (question_set or {}).get("document_name", "Bộ câu hỏi"),
             "score": item["score"],
             "max_score": item["max_score"],
             "percent": item["percent"],
             "created_at": item["created_at"],
+            "source_deleted": False,
+            "can_retake": True,
         })
-    return rows
+
+    exam_cursor = (
+        db["exam_attempts"]
+        .find({"student_id": current_user.id})
+        .sort("created_at", -1)
+        .limit(100)
+    )
+    async for item in exam_cursor:
+        exam = None
+        try:
+            exam = await db["exams"].find_one({"_id": ObjectId(item["exam_id"])})
+        except Exception:
+            pass
+        source_deleted = bool(exam and exam.get("deleted_at") is not None) or exam is None
+        finished = item["status"] in ("submitted", "graded")
+        can_retake = bool(exam and exam.get("allow_retake", False) and not source_deleted and finished)
+        max_score = item.get("max_score", 0.0)
+        total_score = item.get("total_score", 0.0)
+        rows.append({
+            "id": str(item["_id"]),
+            "item_type": "exam",
+            "exam_id": item["exam_id"],
+            "title": f"Đề {item.get('exam_code', '')}",
+            "score": total_score,
+            "max_score": max_score,
+            "percent": round(total_score / max_score * 100, 1) if max_score else 0.0,
+            "created_at": item["created_at"],
+            "source_deleted": source_deleted,
+            "can_retake": can_retake,
+        })
+
+    rows.sort(key=lambda row: row["created_at"], reverse=True)
+    return rows[:100]
 
 
 # ─── 7. Question set detail ──────────────────────────────────────────────────
