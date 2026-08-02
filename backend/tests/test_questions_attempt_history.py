@@ -79,3 +79,25 @@ class AttemptHistoryTests(unittest.IsolatedAsyncioTestCase):
         rows = await questions_router.list_my_attempt_history(current_user=self.student)
         self.assertTrue(rows[0]["can_retake"])
         self.assertFalse(rows[0]["source_deleted"])
+
+    async def test_exam_item_in_progress_cannot_retake(self):
+        exam_id = ObjectId()
+        await self.db["exams"].insert_one({
+            "_id": exam_id, "code": "101", "allow_retake": True, "deleted_at": None,
+        })
+        await self.db["exam_attempts"].insert_one({
+            "_id": ObjectId(), "exam_id": str(exam_id), "exam_code": "101", "student_id": self.student.id,
+            "status": "in_progress", "total_score": 0.0, "max_score": 10.0, "created_at": datetime.now(timezone.utc),
+        })
+        rows = await questions_router.list_my_attempt_history(current_user=self.student)
+        self.assertFalse(rows[0]["can_retake"])
+
+    async def test_exam_item_missing_exam_document_treated_as_deleted(self):
+        nonexistent_exam_id = ObjectId()
+        await self.db["exam_attempts"].insert_one({
+            "_id": ObjectId(), "exam_id": str(nonexistent_exam_id), "exam_code": "999", "student_id": self.student.id,
+            "status": "graded", "total_score": 7.0, "max_score": 10.0, "created_at": datetime.now(timezone.utc),
+        })
+        rows = await questions_router.list_my_attempt_history(current_user=self.student)
+        self.assertTrue(rows[0]["source_deleted"])
+        self.assertFalse(rows[0]["can_retake"])
