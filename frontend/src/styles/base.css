@@ -38,6 +38,7 @@ body {
    ─────────────────────────────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
+  font-family: var(--ez-font-heading);
   color: var(--ez-text);
   font-weight: var(--ez-weight-bold);
   line-height: var(--ez-leading-heading);

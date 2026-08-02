@@ -142,8 +142,10 @@
    Thang chữ nhảy bậc dứt khoát: 64 / 40 / 32 / 24 / 20 / 16 / 14 / 13.
    ─────────────────────────────────────────────────────────────────────── */
 :root {
-  --ez-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+  --ez-font-sans: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI',
                   Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ez-font-heading: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                     Roboto, 'Helvetica Neue', Arial, sans-serif;
   --ez-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
                   'Liberation Mono', monospace;
 
