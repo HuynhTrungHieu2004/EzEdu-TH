@@ -406,3 +406,17 @@ async def set_allow_retake(
     except VersionConflict:
         raise version_conflict_http_error()
     return _to_response(updated)
+
+
+async def delete_exam(db, exam_id: str, *, version: int, actor_id: str, is_admin: bool) -> ExamResponse:
+    existing = await _load_owned_exam(db, exam_id, actor_id=actor_id, is_admin=is_admin)
+    try:
+        updated = await compare_and_set(
+            db[EXAMS],
+            filter_query={"_id": existing["_id"]},
+            expected_version=version,
+            update={"$set": {"deleted_at": _now(), "updated_by": actor_id, "updated_at": _now()}},
+        )
+    except VersionConflict:
+        raise version_conflict_http_error()
+    return _to_response(updated)

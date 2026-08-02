@@ -347,6 +347,11 @@ export const examBankApi = {
     return response.data;
   },
 
+  deleteExam: async (id: string, version: number): Promise<ExamItem> => {
+    const response = await client.delete<ExamItem>(`/exams/${id}`, { params: { version } });
+    return response.data;
+  },
+
   // ── Làm bài (học sinh) ─────────────────────────────────────────────
   startAttempt: async (examId: string): Promise<AttemptStart> => {
     const response = await client.post<AttemptStart>(`/exams/${examId}/attempts/start`);
