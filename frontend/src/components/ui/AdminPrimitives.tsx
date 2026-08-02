@@ -39,6 +39,8 @@ export function DataTable<T>({
   rowKey,
   minWidth = 980,
   className,
+  loading = false,
+  emptyMessage,
 }: DataTableProps<T>) {
   return (
     <div className={cx('ez-datatable-wrap', className)}>
@@ -56,15 +58,29 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((col) => (
-                <td key={col.key} data-label={col.headerMobile ?? col.label}>
-                  {col.render(row)}
-                </td>
-              ))}
+          {loading ? (
+            <tr>
+              <td colSpan={columns.length} className="ez-datatable-status">
+                Đang tải...
+              </td>
             </tr>
-          ))}
+          ) : data.length === 0 && emptyMessage ? (
+            <tr>
+              <td colSpan={columns.length} className="ez-datatable-status">
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            data.map((row) => (
+              <tr key={rowKey(row)}>
+                {columns.map((col) => (
+                  <td key={col.key} data-label={col.headerMobile ?? col.label}>
+                    {col.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

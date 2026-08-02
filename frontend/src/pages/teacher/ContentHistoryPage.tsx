@@ -55,7 +55,10 @@ export default function ContentHistoryPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [type, search, page]);
+  useEffect(() => {
+    const timer = window.setTimeout(load, 250);
+    return () => window.clearTimeout(timer);
+  }, [type, search, page]);
 
   const handleDelete = async () => {
     if (!pendingDelete) return;

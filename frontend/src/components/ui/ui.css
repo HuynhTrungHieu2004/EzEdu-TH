@@ -1578,6 +1578,12 @@
   color: var(--ez-text);
 }
 
+.ez-datatable-status {
+  text-align: center;
+  padding: var(--ez-space-6) var(--ez-space-4);
+  color: var(--ez-text-muted);
+}
+
 .ez-datatable td small {
   display: block;
   max-width: 190px;

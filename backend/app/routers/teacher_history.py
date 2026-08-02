@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
+from app.routers.documents import ensure_lecturer_or_admin
 from app.schemas.auth import UserResponse
 
 router = APIRouter()
@@ -89,6 +90,7 @@ async def get_content_history(
     limit: int = Query(50, ge=1, le=200),
     current_user: UserResponse = Depends(get_current_user),
 ):
+    ensure_lecturer_or_admin(current_user)
     db = get_database()
     items: List[Dict[str, Any]] = []
     if type in ("all", "document"):
