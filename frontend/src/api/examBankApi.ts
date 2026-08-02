@@ -147,6 +147,7 @@ export interface ExamItem {
   published_at: string | null;
   audience_type: 'all' | 'classes';
   target_class_ids: string[];
+  allow_retake: boolean;
   version: number;
   owner_id: string;
   created_at: string;
@@ -335,6 +336,19 @@ export const examBankApi = {
       audience_type: 'all',
       target_class_ids: [],
     });
+    return response.data;
+  },
+
+  setAllowRetake: async (id: string, version: number, allowRetake: boolean): Promise<ExamItem> => {
+    const response = await client.patch<ExamItem>(`/exams/${id}/retake-policy`, {
+      version,
+      allow_retake: allowRetake,
+    });
+    return response.data;
+  },
+
+  deleteExam: async (id: string, version: number): Promise<ExamItem> => {
+    const response = await client.delete<ExamItem>(`/exams/${id}`, { params: { version } });
     return response.data;
   },
 

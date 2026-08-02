@@ -40,6 +40,11 @@ class ExamPublishRequest(BaseModel):
     target_class_ids: List[str] = Field(default_factory=list)
 
 
+class ExamRetakePolicyRequest(BaseModel):
+    version: int = Field(ge=1)
+    allow_retake: bool
+
+
 class ExamResponse(BaseModel):
     id: str
     blueprint_id: str
@@ -54,6 +59,7 @@ class ExamResponse(BaseModel):
     published_at: Optional[datetime] = None
     audience_type: Literal["all", "classes"] = "all"
     target_class_ids: List[str] = Field(default_factory=list)
+    allow_retake: bool = False
     version: int
     owner_id: str
     created_by: str

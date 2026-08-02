@@ -236,7 +236,7 @@ async def _detail(doc: dict[str, Any]) -> AdminUserDetail:
     user_id = str(doc["_id"])
     base = _summary(doc).model_dump()
 
-    document_count = await db["documents"].count_documents({"user_id": user_id})
+    document_count = await db["documents"].count_documents({"user_id": user_id, "deleted_at": None})
     question_count = await db["question_sets"].count_documents({"user_id": user_id})
     conversation_count = await db["conversations"].count_documents({"user_id": user_id, "deleted_at": None})
     ai_request_count = await db[analytics_service.COLLECTION].count_documents({

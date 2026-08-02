@@ -15,19 +15,29 @@ import {
   Skeleton,
   StatGrid,
   StatTile,
+  Tabs,
+  Tooltip,
 } from '../../components/ui';
+import type { TabItem } from '../../components/ui';
 import { questionApi } from '../../api/questionApi';
 import type { LearningHistoryItem } from '../../api/questionApi';
 import '../dashboard.css';
 
 type LoadState = 'loading' | 'ready' | 'error';
 type RangeKey = 'all' | '7' | '30' | '90';
+type ItemFilter = 'all' | 'exam' | 'practice';
 
 const RANGE_OPTIONS: Array<{ value: RangeKey; label: string }> = [
   { value: 'all', label: 'Toàn bộ thời gian' },
   { value: '7', label: '7 ngày qua' },
   { value: '30', label: '30 ngày qua' },
   { value: '90', label: '90 ngày qua' },
+];
+
+const ITEM_FILTER_TABS: TabItem[] = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'exam', label: 'Đề thi GV giao' },
+  { id: 'practice', label: 'Ôn tập' },
 ];
 
 function formatDateTime(value: string): string {
@@ -49,6 +59,13 @@ function verdictOf(percent: number): { label: string; variant: 'success' | 'warn
   return { label: 'Cần ôn tập', variant: 'error' };
 }
 
+/** Đích điều hướng khi bấm vào 1 dòng lịch sử — khác nhau theo loại. */
+function retakePathOf(item: LearningHistoryItem): string {
+  return item.item_type === 'practice'
+    ? `/question-sets/${item.question_set_id}`
+    : `/take-exam/${item.exam_id}`;
+}
+
 /**
  * Tiến độ học tập — gộp từ hai trang cũ.
  *
@@ -57,12 +74,18 @@ function verdictOf(percent: number): { label: string; variant: 'success' | 'warn
  * liệu. Đó là hai góc nhìn của một tập dữ liệu, không phải hai chức năng, nên
  * gộp thành một trang: phần tổng quan ở trên, phần chi tiết ở dưới.
  * Xem docs/ui-redesign/01-audit-report.md §6.3 (lỗi M4).
+ *
+ * Phần tổng quan (StatGrid) chỉ tính trên item ôn tập (`item_type==='practice'`)
+ * — các số này gắn với "bài luyện tập đã giao" (`assignedCount`), không liên
+ * quan đề thi giảng viên giao. Phần danh sách chi tiết bên dưới gộp cả 2 loại,
+ * có tab lọc + khoá nút làm lại theo `can_retake`/`source_deleted`.
  */
 export default function ProgressPage() {
   const [state, setState] = useState<LoadState>('loading');
   const [attempts, setAttempts] = useState<LearningHistoryItem[]>([]);
   const [assignedCount, setAssignedCount] = useState(0);
   const [range, setRange] = useState<RangeKey>('all');
+  const [itemFilter, setItemFilter] = useState<ItemFilter>('all');
   // Thời điểm "bây giờ" cho bộ lọc khoảng ngày. Đọc đồng hồ đúng một lần bằng
   // hàm khởi tạo lười của useState — cách duy nhất gọi Date.now() mà không bị
   // coi là gọi hàm không thuần khiết ngay trong thân render. "Vài ngày" không
@@ -87,28 +110,42 @@ export default function ProgressPage() {
     };
   }, []);
 
+  const practiceAttempts = useMemo(
+    () => attempts.filter((item) => item.item_type === 'practice'),
+    [attempts],
+  );
+
   const filtered = useMemo(() => {
-    if (range === 'all') return attempts;
-    const days = Number(range);
-    const cutoff = now - days * 24 * 60 * 60 * 1000;
-    return attempts.filter((item) => {
-      const t = new Date(item.created_at).getTime();
-      return Number.isFinite(t) && t >= cutoff;
-    });
-  }, [attempts, range, now]);
+    let list = attempts;
+    if (itemFilter !== 'all') {
+      list = list.filter((item) => item.item_type === itemFilter);
+    }
+    if (range !== 'all') {
+      const days = Number(range);
+      const cutoff = now - days * 24 * 60 * 60 * 1000;
+      list = list.filter((item) => {
+        const t = new Date(item.created_at).getTime();
+        return Number.isFinite(t) && t >= cutoff;
+      });
+    }
+    return list;
+  }, [attempts, itemFilter, range, now]);
 
   const stats = useMemo(() => {
-    const completedIds = new Set(attempts.map((item) => item.question_set_id));
+    // Chỉ tính trên item ôn tập — xem quyết định thiết kế ở docstring trên.
+    const completedIds = new Set(practiceAttempts.map((item) => item.question_set_id));
     const average =
-      attempts.length > 0
-        ? attempts.reduce((sum, item) => sum + item.percent, 0) / attempts.length
+      practiceAttempts.length > 0
+        ? practiceAttempts.reduce((sum, item) => sum + item.percent, 0) / practiceAttempts.length
         : null;
-    const best = attempts.length > 0 ? Math.max(...attempts.map((item) => item.percent)) : null;
+    const best = practiceAttempts.length > 0 ? Math.max(...practiceAttempts.map((item) => item.percent)) : null;
 
     // Bài yếu nhất để gợi ý ôn lại: lấy lần làm gần nhất của mỗi bộ đề rồi chọn điểm thấp nhất.
     const latestBySet = new Map<string, LearningHistoryItem>();
-    for (const attempt of attempts) {
-      if (!latestBySet.has(attempt.question_set_id)) latestBySet.set(attempt.question_set_id, attempt);
+    for (const attempt of practiceAttempts) {
+      if (attempt.question_set_id && !latestBySet.has(attempt.question_set_id)) {
+        latestBySet.set(attempt.question_set_id, attempt);
+      }
     }
     const weakest = [...latestBySet.values()].sort((a, b) => a.percent - b.percent)[0] ?? null;
 
@@ -119,7 +156,7 @@ export default function ProgressPage() {
       best,
       weakest,
     };
-  }, [attempts, assignedCount]);
+  }, [practiceAttempts, assignedCount]);
 
   const hasData = attempts.length > 0;
 
@@ -174,14 +211,14 @@ export default function ProgressPage() {
 
       {state === 'ready' && hasData && (
         <>
-          {/* Phần tổng quan — trước đây là cả một trang riêng */}
+          {/* Phần tổng quan — trước đây là cả một trang riêng, chỉ tính trên ôn tập */}
           <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
             <StatTile label="Bài đã hoàn thành" value={stats.completed} />
             <StatTile label="Bài chưa làm" value={stats.pending} />
             <StatTile
               label="Điểm trung bình"
               value={stats.average === null ? '—' : `${stats.average.toFixed(1)}%`}
-              hint={`Từ ${attempts.length} lượt làm`}
+              hint={`Từ ${practiceAttempts.length} lượt làm`}
             />
             <StatTile
               label="Kết quả cao nhất"
@@ -189,7 +226,7 @@ export default function ProgressPage() {
             />
           </StatGrid>
 
-          {/* Phần chi tiết — trước đây là trang Lịch sử */}
+          {/* Phần chi tiết — trước đây là trang Lịch sử, giờ gộp cả đề thi GV giao */}
           <Card>
             <CardHeader>
               <div>
@@ -209,15 +246,28 @@ export default function ProgressPage() {
               </Select>
             </CardHeader>
             <CardBody>
+              <Tabs
+                items={ITEM_FILTER_TABS}
+                value={itemFilter}
+                onChange={(id) => setItemFilter(id as ItemFilter)}
+                ariaLabel="Lọc theo loại"
+              />
               {filtered.length === 0 ? (
                 <EmptyState
                   compact
                   icon={<TrendingUp size={24} />}
                   title="Không có lần làm bài nào trong khoảng này"
-                  description="Hãy chọn khoảng thời gian rộng hơn."
+                  description="Hãy chọn khoảng thời gian hoặc loại rộng hơn."
                   actions={
-                    <Button variant="outline" size="sm" onClick={() => setRange('all')}>
-                      Xem toàn bộ thời gian
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setRange('all');
+                        setItemFilter('all');
+                      }}
+                    >
+                      Xem toàn bộ
                     </Button>
                   }
                 />
@@ -225,14 +275,11 @@ export default function ProgressPage() {
                 <div>
                   {filtered.map((item) => {
                     const verdict = verdictOf(item.percent);
-                    return (
-                      <Link
-                        key={item.id}
-                        to={`/question-sets/${item.question_set_id}`}
-                        className="dash-row"
-                      >
+                    const canOpen = !item.source_deleted && item.can_retake;
+                    const rowContent = (
+                      <>
                         <span className="dash-row-main">
-                          <span className="dash-row-title">{item.document_name}</span>
+                          <span className="dash-row-title">{item.title}</span>
                           <span className="dash-row-meta">
                             <span>{formatDateTime(item.created_at)}</span>
                             <span>
@@ -241,9 +288,31 @@ export default function ProgressPage() {
                           </span>
                         </span>
                         <span className="dash-row-trail">
+                          <Badge variant={item.item_type === 'exam' ? 'info' : 'neutral'}>
+                            {item.item_type === 'exam' ? 'Đề thi' : 'Ôn tập'}
+                          </Badge>
                           <Badge variant={verdict.variant}>{verdict.label}</Badge>
                           <span className="dash-score">{item.percent.toFixed(1)}%</span>
                         </span>
+                      </>
+                    );
+                    if (!canOpen) {
+                      const disabledRow = (
+                        <span key={item.id} className="dash-row dash-row-disabled" aria-disabled="true">
+                          {rowContent}
+                        </span>
+                      );
+                      return item.source_deleted ? (
+                        <Tooltip key={item.id} label="Tài liệu/đề thi gốc đã bị xóa">
+                          {disabledRow}
+                        </Tooltip>
+                      ) : (
+                        disabledRow
+                      );
+                    }
+                    return (
+                      <Link key={item.id} to={retakePathOf(item)} className="dash-row">
+                        {rowContent}
                       </Link>
                     );
                   })}

@@ -243,6 +243,104 @@ class ExamServiceTests(unittest.IsolatedAsyncioTestCase):
         # Tổng số câu không đổi.
         self.assertEqual(len(regenerated.question_ids), len(exam.question_ids))
 
+    # ---- allow_retake ------
+    async def test_generate_exams_defaults_allow_retake_false(self):
+        await _seed_approved_question(self.db, self.owner_id)
+        blueprint = await blueprint_service.create_blueprint(
+            self.db,
+            ExamBlueprintCreate(
+                name="KT-retake", subject_id="math", grade=10, curriculum_version="2018",
+                total_points=1.0, duration_minutes=10, constraints=BlueprintConstraints(),
+            ),
+            owner_id=self.owner_id,
+        )
+        await blueprint_service.validate_blueprint(self.db, blueprint.id, actor_id=self.owner_id, is_admin=False)
+        _, exams = await exam_service.generate_exams(
+            self.db, blueprint_id=blueprint.id, code_count=1, seed=1, actor_id=self.owner_id, is_admin=False
+        )
+        self.assertFalse(exams[0].allow_retake)
+
+    async def test_set_allow_retake_updates_flag(self):
+        await _seed_approved_question(self.db, self.owner_id)
+        blueprint = await blueprint_service.create_blueprint(
+            self.db,
+            ExamBlueprintCreate(
+                name="KT-retake2", subject_id="math", grade=10, curriculum_version="2018",
+                total_points=1.0, duration_minutes=10, constraints=BlueprintConstraints(),
+            ),
+            owner_id=self.owner_id,
+        )
+        await blueprint_service.validate_blueprint(self.db, blueprint.id, actor_id=self.owner_id, is_admin=False)
+        _, exams = await exam_service.generate_exams(
+            self.db, blueprint_id=blueprint.id, code_count=1, seed=1, actor_id=self.owner_id, is_admin=False
+        )
+        exam = exams[0]
+        updated = await exam_service.set_allow_retake(
+            self.db, exam.id, version=exam.version, allow_retake=True, actor_id=self.owner_id, is_admin=False
+        )
+        self.assertTrue(updated.allow_retake)
+
+    async def test_set_allow_retake_rejects_non_owner(self):
+        await _seed_approved_question(self.db, self.owner_id)
+        blueprint = await blueprint_service.create_blueprint(
+            self.db,
+            ExamBlueprintCreate(
+                name="KT-retake3", subject_id="math", grade=10, curriculum_version="2018",
+                total_points=1.0, duration_minutes=10, constraints=BlueprintConstraints(),
+            ),
+            owner_id=self.owner_id,
+        )
+        await blueprint_service.validate_blueprint(self.db, blueprint.id, actor_id=self.owner_id, is_admin=False)
+        _, exams = await exam_service.generate_exams(
+            self.db, blueprint_id=blueprint.id, code_count=1, seed=1, actor_id=self.owner_id, is_admin=False
+        )
+        exam = exams[0]
+        with self.assertRaises(HTTPException) as ctx:
+            await exam_service.set_allow_retake(
+                self.db, exam.id, version=exam.version, allow_retake=True, actor_id="someone-else", is_admin=False
+            )
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_delete_exam_sets_deleted_at(self):
+        await _seed_approved_question(self.db, self.owner_id)
+        blueprint = await blueprint_service.create_blueprint(
+            self.db,
+            ExamBlueprintCreate(
+                name="KT-del", subject_id="math", grade=10, curriculum_version="2018",
+                total_points=1.0, duration_minutes=10, constraints=BlueprintConstraints(),
+            ),
+            owner_id=self.owner_id,
+        )
+        await blueprint_service.validate_blueprint(self.db, blueprint.id, actor_id=self.owner_id, is_admin=False)
+        _, exams = await exam_service.generate_exams(
+            self.db, blueprint_id=blueprint.id, code_count=1, seed=1, actor_id=self.owner_id, is_admin=False
+        )
+        exam = exams[0]
+        await exam_service.delete_exam(self.db, exam.id, version=exam.version, actor_id=self.owner_id, is_admin=False)
+
+        with self.assertRaises(HTTPException) as ctx:
+            await exam_service.get_exam(self.db, exam.id, actor_id=self.owner_id, is_admin=False)
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_delete_exam_rejects_non_owner(self):
+        await _seed_approved_question(self.db, self.owner_id)
+        blueprint = await blueprint_service.create_blueprint(
+            self.db,
+            ExamBlueprintCreate(
+                name="KT-del2", subject_id="math", grade=10, curriculum_version="2018",
+                total_points=1.0, duration_minutes=10, constraints=BlueprintConstraints(),
+            ),
+            owner_id=self.owner_id,
+        )
+        await blueprint_service.validate_blueprint(self.db, blueprint.id, actor_id=self.owner_id, is_admin=False)
+        _, exams = await exam_service.generate_exams(
+            self.db, blueprint_id=blueprint.id, code_count=1, seed=1, actor_id=self.owner_id, is_admin=False
+        )
+        exam = exams[0]
+        with self.assertRaises(HTTPException) as ctx:
+            await exam_service.delete_exam(self.db, exam.id, version=exam.version, actor_id="someone-else", is_admin=False)
+        self.assertEqual(ctx.exception.status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,7 +63,7 @@ async def ensure_exam_bank_indexes(db) -> None:
         try:
             await db[collection].drop_index(index_name)
         except Exception as e:  # noqa: BLE001 - index có thể chưa từng tồn tại, không chặn startup
-            logger.error("exam_bank.legacy_index_drop_failed", extra={"index": index_name, "error": str(e)})
+            logger.debug("exam_bank.legacy_index_drop_failed", extra={"index": index_name, "error": str(e)})
     for spec in EXAM_BANK_INDEXES:
         try:
             await db[spec.collection].create_index(spec.keys, name=spec.name, unique=spec.unique)

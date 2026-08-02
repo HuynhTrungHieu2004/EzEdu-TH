@@ -191,6 +191,11 @@
   gap: var(--ez-space-2);
 }
 
+.dash-row-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Điểm số dạng số lớn, dùng chữ số cùng bề rộng để không nhảy */
 .dash-score {
   font-size: var(--ez-text-body);

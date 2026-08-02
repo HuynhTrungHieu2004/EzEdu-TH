@@ -211,15 +211,9 @@ def ensure_not_quarantined(document: dict) -> None:
 async def get_owned_document(document_id: str, current_user: UserResponse) -> dict:
     object_id = ensure_valid_document_id(document_id)
     db = get_database()
-    document = await db["documents"].find_one({"_id": object_id})
+    document = await db["documents"].find_one({"_id": object_id, "deleted_at": None})
 
     if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found.",
-        )
-
-    if document.get("deleted_at") is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
@@ -1558,21 +1552,25 @@ async def delete_document(
     await db["document_contents"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
-    await db["question_sets"].delete_many(
-        {"document_id": document_id, "user_id": current_user.id}
-    )
     await db["verification_issues"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
     await db["verification_sessions"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
-    await db["documents"].delete_one(
+    await db["documents"].update_one(
         {
             "_id": document["_id"],
             "user_id": current_user.id,
             "status": "deleting",
-        }
+        },
+        {
+            "$set": {
+                "status": "deleted",
+                "deleted_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
     )
     if _is_admin_actor(current_user):
         await record_admin_audit(

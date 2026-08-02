@@ -534,10 +534,12 @@ git commit -m "fix: soft-delete documents instead of hard-delete to preserve stu
 - Modify: `backend/app/exam_bank/services/exam_service.py` (thêm `delete_exam`)
 - Modify: `backend/app/exam_bank/api/exams.py` (thêm route DELETE)
 - Test: `backend/tests/test_exam_bank_exam.py`
+- Modify: `frontend/src/api/examBankApi.ts` (thêm hàm `deleteExam`)
 
 **Interfaces:**
 - Produces: `exam_service.delete_exam(db, exam_id, *, version: int, actor_id: str, is_admin: bool) -> ExamResponse` — set `deleted_at`.
 - Produces route: `DELETE /exams/{exam_id}?version=` — Task 8 (frontend teacher content-history) gọi khi bấm Xóa.
+- Produces: `examBankApi.deleteExam(id: string, version: number): Promise<ExamItem>` — Task 8 gọi trực tiếp hàm này, KHÔNG phải chỉ điều hướng sang trang khác.
 
 - [ ] **Step 1: Viết test (thất bại trước)**
 
@@ -626,15 +628,26 @@ async def delete_exam(
     )
 ```
 
-- [ ] **Step 5: Chạy test, xác nhận PASS**
+- [ ] **Step 5: Thêm hàm frontend `deleteExam`**
+
+`frontend/src/api/examBankApi.ts` — thêm vào `examBankApi` object, ngay sau `setAllowRetake` (đã thêm ở Task 1):
+
+```typescript
+  deleteExam: async (id: string, version: number): Promise<ExamItem> => {
+    const response = await client.delete<ExamItem>(`/exams/${id}`, { params: { version } });
+    return response.data;
+  },
+```
+
+- [ ] **Step 6: Chạy test, xác nhận PASS**
 
 Run: `cd backend && python -m pytest tests/test_exam_bank_exam.py -v`
 Expected: PASS toàn bộ file
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/exam_bank/services/exam_service.py backend/app/exam_bank/api/exams.py backend/tests/test_exam_bank_exam.py
+git add backend/app/exam_bank/services/exam_service.py backend/app/exam_bank/api/exams.py backend/tests/test_exam_bank_exam.py frontend/src/api/examBankApi.ts
 git commit -m "feat: add soft-delete endpoint for exam_bank exams"
 ```
 
@@ -695,7 +708,7 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
         exam_id = ObjectId()
         await self.db["exams"].insert_one({
             "_id": exam_id, "owner_id": self.teacher.id, "code": "101", "blueprint_id": "bp-1",
-            "created_at": created_at, "deleted_at": deleted_at,
+            "created_at": created_at, "deleted_at": deleted_at, "allow_retake": True, "version": 3,
         })
         return exam_id
 
@@ -711,6 +724,9 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["total"], 2)
         self.assertEqual(result["items"][0]["item_type"], "exam")
         self.assertEqual(result["items"][1]["item_type"], "document")
+        self.assertTrue(result["items"][0]["allow_retake"])
+        self.assertEqual(result["items"][0]["version"], 3)
+        self.assertIsNone(result["items"][1]["allow_retake"])
 
     async def test_filters_by_type(self):
         await self._seed_document(created_at=datetime.now(timezone.utc))
@@ -813,6 +829,8 @@ async def _exam_items(db, *, owner_id: str, search: Optional[str]) -> List[Dict[
             "created_at": doc["created_at"],
             "cloudinary_url": None,
             "blueprint_id": doc.get("blueprint_id"),
+            "allow_retake": doc.get("allow_retake", False),
+            "version": doc.get("version", 1),
         })
     return items
 
@@ -867,6 +885,8 @@ async def get_content_history(
         item.setdefault("attempt_count", None)
         item.setdefault("avg_score", None)
         item.setdefault("last_attempt_at", None)
+        item.setdefault("allow_retake", None)
+        item.setdefault("version", None)
 
     return {"items": page, "total": total, "skip": skip, "limit": limit}
 ```
@@ -1145,6 +1165,8 @@ export interface ContentHistoryItem {
   attempt_count: number | null;
   avg_score: number | null;
   last_attempt_at: string | null;
+  allow_retake: boolean | null;
+  version: number | null;
 }
 
 export interface ContentHistoryResponse {
@@ -1189,7 +1211,8 @@ git commit -m "feat: add teacherHistoryApi and update LearningHistoryItem shape"
 - Modify: `frontend/src/components/AppLayout.tsx` (nav item)
 
 **Interfaces:**
-- Consumes: `teacherHistoryApi.list` (Task 7), `documentApi.delete` (đã có), `examBankApi.setAllowRetake`/`listExams` (Task 1), `ConfirmDialog`/`DataTable`/`FilterBar`/`Pagination`/`Tabs` từ `components/ui`.
+- Consumes: `teacherHistoryApi.list` (Task 7), `documentApi.delete` (đã có), `examBankApi.setAllowRetake`/`examBankApi.deleteExam` (Task 1/Task 4), `ConfirmDialog`/`DataTable`/`FilterBar`/`Pagination`/`Tabs` từ `components/ui`.
+- Bảng có cột checkbox "Cho làm lại" cho item loại `exam` — gọi `examBankApi.setAllowRetake` khi tick/bỏ tick; nút Xóa gọi `examBankApi.deleteExam` cho item loại `exam` (KHÔNG chỉ điều hướng sang trang khác).
 
 - [ ] **Step 1: Tạo trang**
 
@@ -1202,6 +1225,7 @@ import { Trash2, ExternalLink, Pencil } from 'lucide-react';
 import { teacherHistoryApi } from '../../api/teacherHistoryApi';
 import type { ContentHistoryItem, ContentHistoryType } from '../../api/teacherHistoryApi';
 import { documentApi } from '../../api/documentApi';
+import { examBankApi } from '../../api/examBankApi';
 import { getApiErrorDetail } from '../../api/errors';
 import {
   Alert,
@@ -1236,6 +1260,7 @@ export default function ContentHistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ContentHistoryItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -1259,10 +1284,7 @@ export default function ContentHistoryPage() {
       if (pendingDelete.item_type === 'document') {
         await documentApi.delete(pendingDelete.id);
       } else {
-        toast({ tone: 'error', title: 'Xóa đề thi: vào trang chi tiết ma trận đề để xóa.' });
-        setPendingDelete(null);
-        setDeleting(false);
-        return;
+        await examBankApi.deleteExam(pendingDelete.id, pendingDelete.version ?? 1);
       }
       toast({ tone: 'success', title: 'Đã xóa khỏi lịch sử.' });
       setPendingDelete(null);
@@ -1271,6 +1293,19 @@ export default function ContentHistoryPage() {
       toast({ tone: 'error', title: getApiErrorDetail(err) ?? 'Xóa thất bại.' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleToggleRetake = async (row: ContentHistoryItem) => {
+    if (row.item_type !== 'exam' || row.version === null) return;
+    setTogglingId(row.id);
+    try {
+      await examBankApi.setAllowRetake(row.id, row.version, !row.allow_retake);
+      load();
+    } catch (err) {
+      toast({ tone: 'error', title: getApiErrorDetail(err) ?? 'Cập nhật thất bại.' });
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -1295,6 +1330,23 @@ export default function ContentHistoryPage() {
       key: 'avg_score',
       label: 'Điểm TB',
       render: (row) => (row.item_type === 'exam' ? row.avg_score ?? '—' : '—'),
+    },
+    {
+      key: 'allow_retake',
+      label: 'Cho làm lại',
+      render: (row) =>
+        row.item_type === 'exam' ? (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={row.allow_retake ?? false}
+              disabled={togglingId === row.id}
+              onChange={() => handleToggleRetake(row)}
+            />
+          </label>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'actions',
@@ -1433,142 +1485,503 @@ git commit -m "feat: add teacher content history page"
 
 ### Task 9: Frontend — cập nhật trang lịch sử học sinh (filter + retake gating)
 
+**⚠️ Sửa lại lúc review (phát hiện sau khi Task 9 làm lần đầu):** Bản thiết kế ban đầu nhắm vào `frontend/src/pages/LearningHistoryPage.tsx`, nhưng file đó **là dead code** — không route nào trong `App.tsx` trỏ tới. Route `/learning-history` thật sự render `frontend/src/pages/student/ProgressPage.tsx` (đã gộp từ `LearningHistoryPage` + `StudentStatisticsPage` cũ ở một đợt redesign trước, xem docstring đầu file `ProgressPage.tsx`). Task này phải sửa `ProgressPage.tsx`, và xóa hẳn `LearningHistoryPage.tsx` (đã xác nhận với người dùng — dead code, xóa cho gọn).
+
 **Files:**
-- Modify: `frontend/src/pages/LearningHistoryPage.tsx`
+- Modify: `frontend/src/pages/student/ProgressPage.tsx`
+- Delete: `frontend/src/pages/LearningHistoryPage.tsx`
 
 **Interfaces:**
-- Consumes: `LearningHistoryItem` mới (Task 7), `Tabs`/`Tooltip` từ `components/ui`.
+- Consumes: `LearningHistoryItem` mới (Task 7: `item_type`, `title`, `source_deleted`, `can_retake`, `exam_id?`, `question_set_id?`), `Tabs`/`Tooltip` từ `components/ui`.
 
-- [ ] **Step 1: Sửa `LearningHistoryPage.tsx`**
+**Quyết định thiết kế:** phần thống kê tổng quan ở trên (`StatGrid`: đã hoàn thành/chưa làm/điểm TB/điểm cao nhất) CHỈ tính trên item `item_type==='practice'` — giữ nguyên đúng hành vi cũ, vì các số này gắn với khái niệm "bài luyện tập đã giao" (`assignedCount` từ `listPublished()`, vốn chỉ về question_sets), không liên quan đề thi giảng viên giao có hẹn giờ. Phần danh sách "Các lần làm bài" bên dưới mới là nơi thêm tab lọc (Tất cả/Đề thi GV giao/Ôn tập) + khoá nút làm lại — đây là tính năng chính task này thêm.
+
+- [ ] **Step 1: Xóa file dead code**
+
+```bash
+git rm frontend/src/pages/LearningHistoryPage.tsx
+```
+
+- [ ] **Step 2: Sửa `ProgressPage.tsx`**
 
 Thay toàn bộ nội dung file bằng:
 
 ```tsx
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { questionApi } from '../api/questionApi';
-import type { LearningHistoryItem } from '../api/questionApi';
-import { getApiErrorDetail } from '../api/errors';
-import { Tabs, Tooltip } from '../components/ui';
-import type { TabItem } from '../components/ui';
+import { Link } from 'react-router-dom';
+import { History, RotateCcw, TrendingUp } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Select,
+  Skeleton,
+  StatGrid,
+  StatTile,
+  Tabs,
+  Tooltip,
+} from '../../components/ui';
+import type { TabItem } from '../../components/ui';
+import { questionApi } from '../../api/questionApi';
+import type { LearningHistoryItem } from '../../api/questionApi';
+import '../dashboard.css';
 
-type FilterType = 'all' | 'exam' | 'practice';
+type LoadState = 'loading' | 'ready' | 'error';
+type RangeKey = 'all' | '7' | '30' | '90';
+type ItemFilter = 'all' | 'exam' | 'practice';
 
-const TABS: TabItem[] = [
+const RANGE_OPTIONS: Array<{ value: RangeKey; label: string }> = [
+  { value: 'all', label: 'Toàn bộ thời gian' },
+  { value: '7', label: '7 ngày qua' },
+  { value: '30', label: '30 ngày qua' },
+  { value: '90', label: '90 ngày qua' },
+];
+
+const ITEM_FILTER_TABS: TabItem[] = [
   { id: 'all', label: 'Tất cả' },
   { id: 'exam', label: 'Đề thi GV giao' },
   { id: 'practice', label: 'Ôn tập' },
 ];
 
-export default function LearningHistoryPage() {
-  const [items, setItems] = useState<LearningHistoryItem[]>([]);
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Nhãn đánh giá kèm màu — luôn có chữ, không chỉ dựa vào màu để truyền đạt. */
+function verdictOf(percent: number): { label: string; variant: 'success' | 'warning' | 'error' } {
+  if (percent >= 80) return { label: 'Tốt', variant: 'success' };
+  if (percent >= 50) return { label: 'Đạt', variant: 'warning' };
+  return { label: 'Cần ôn tập', variant: 'error' };
+}
+
+/** Đích điều hướng khi bấm vào 1 dòng lịch sử — khác nhau theo loại. */
+function retakePathOf(item: LearningHistoryItem): string {
+  return item.item_type === 'practice'
+    ? `/question-sets/${item.question_set_id}`
+    : `/take-exam/${item.exam_id}`;
+}
+
+/**
+ * Tiến độ học tập — gộp từ hai trang cũ.
+ *
+ * `LearningHistoryPage` và `StudentStatisticsPage` trước đây gọi đúng cùng hai
+ * API (`listMyLearningHistory` + `listPublished`) rồi mỗi trang tự tính lại số
+ * liệu. Đó là hai góc nhìn của một tập dữ liệu, không phải hai chức năng, nên
+ * gộp thành một trang: phần tổng quan ở trên, phần chi tiết ở dưới.
+ * Xem docs/ui-redesign/01-audit-report.md §6.3 (lỗi M4).
+ *
+ * Phần tổng quan (StatGrid) chỉ tính trên item ôn tập (`item_type==='practice'`)
+ * — các số này gắn với "bài luyện tập đã giao" (`assignedCount`), không liên
+ * quan đề thi giảng viên giao. Phần danh sách chi tiết bên dưới gộp cả 2 loại,
+ * có tab lọc + khoá nút làm lại theo `can_retake`/`source_deleted`.
+ */
+export default function ProgressPage() {
+  const [state, setState] = useState<LoadState>('loading');
+  const [attempts, setAttempts] = useState<LearningHistoryItem[]>([]);
+  const [assignedCount, setAssignedCount] = useState(0);
+  const [range, setRange] = useState<RangeKey>('all');
+  const [itemFilter, setItemFilter] = useState<ItemFilter>('all');
+  // Thời điểm "bây giờ" cho bộ lọc khoảng ngày. Đọc đồng hồ đúng một lần bằng
+  // hàm khởi tạo lười của useState — cách duy nhất gọi Date.now() mà không bị
+  // coi là gọi hàm không thuần khiết ngay trong thân render. "Vài ngày" không
+  // cần chính xác tới từng giây nên giá trị cố định trong vòng đời trang là đủ.
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
-    questionApi.listMyLearningHistory()
-      .then(setItems)
-      .catch((err) => setError(getApiErrorDetail(err) ?? 'Không tải được lịch sử học tập.'))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    // Một lần tải cho cả phần tổng quan và phần chi tiết.
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        if (cancelled) return;
+        setAttempts(history ?? []);
+        setAssignedCount(published.items?.length ?? 0);
+        setState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const filteredItems = useMemo(
-    () => (filter === 'all' ? items : items.filter((item) => item.item_type === filter)),
-    [items, filter],
+  const practiceAttempts = useMemo(
+    () => attempts.filter((item) => item.item_type === 'practice'),
+    [attempts],
   );
 
-  const handleRetake = (item: LearningHistoryItem) => {
-    if (item.item_type === 'practice') {
-      navigate(`/question-sets/${item.question_set_id}`);
-    } else {
-      navigate(`/take-exam/${item.exam_id}`);
+  const filtered = useMemo(() => {
+    let list = attempts;
+    if (itemFilter !== 'all') {
+      list = list.filter((item) => item.item_type === itemFilter);
     }
-  };
+    if (range !== 'all') {
+      const days = Number(range);
+      const cutoff = now - days * 24 * 60 * 60 * 1000;
+      list = list.filter((item) => {
+        const t = new Date(item.created_at).getTime();
+        return Number.isFinite(t) && t >= cutoff;
+      });
+    }
+    return list;
+  }, [attempts, itemFilter, range, now]);
+
+  const stats = useMemo(() => {
+    // Chỉ tính trên item ôn tập — xem quyết định thiết kế ở docstring trên.
+    const completedIds = new Set(practiceAttempts.map((item) => item.question_set_id));
+    const average =
+      practiceAttempts.length > 0
+        ? practiceAttempts.reduce((sum, item) => sum + item.percent, 0) / practiceAttempts.length
+        : null;
+    const best = practiceAttempts.length > 0 ? Math.max(...practiceAttempts.map((item) => item.percent)) : null;
+
+    // Bài yếu nhất để gợi ý ôn lại: lấy lần làm gần nhất của mỗi bộ đề rồi chọn điểm thấp nhất.
+    const latestBySet = new Map<string, LearningHistoryItem>();
+    for (const attempt of practiceAttempts) {
+      if (attempt.question_set_id && !latestBySet.has(attempt.question_set_id)) {
+        latestBySet.set(attempt.question_set_id, attempt);
+      }
+    }
+    const weakest = [...latestBySet.values()].sort((a, b) => a.percent - b.percent)[0] ?? null;
+
+    return {
+      completed: completedIds.size,
+      pending: Math.max(0, assignedCount - completedIds.size),
+      average,
+      best,
+      weakest,
+    };
+  }, [practiceAttempts, assignedCount]);
+
+  const hasData = attempts.length > 0;
 
   return (
-    <div className="page">
-      <div className="page-wide">
-        <div className="page-header">
-          <div>
-            <p className="eyebrow">Hồ sơ học sinh</p>
-            <h1 className="section-title">Lịch sử bài thi và ôn tập</h1>
-            <p className="section-subtitle">Theo dõi kết quả các lần làm bài và tiếp tục ôn tập.</p>
-          </div>
-          <button type="button" className="btn-primary" onClick={() => navigate('/published-questions')}>
-            Bắt đầu bài thi mới
-          </button>
+    <>
+      <PageHeader
+        eyebrow="Học tập"
+        title="Tiến độ"
+        description="Kết quả từng lần làm bài và mức tiến bộ của bạn theo thời gian."
+        actions={
+          stats.weakest ? (
+            <Link to={`/question-sets/${stats.weakest.question_set_id}`}>
+              <Button leadingIcon={<RotateCcw size={16} aria-hidden="true" />}>
+                Ôn lại bài yếu nhất
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/published-questions">
+              <Button>Tới bài luyện tập</Button>
+            </Link>
+          )
+        }
+      />
+
+      {state === 'loading' && (
+        <div className="ez-stack">
+          <Skeleton height="6rem" />
+          <Skeleton height="16rem" />
         </div>
+      )}
 
-        <Tabs items={TABS} value={filter} onChange={(id) => setFilter(id as FilterType)} ariaLabel="Lọc lịch sử" />
+      {state === 'error' && (
+        <ErrorState
+          title="Không tải được tiến độ học tập"
+          description="Kết nối tới hệ thống đang gặp sự cố. Bạn có thể thử lại."
+          onRetry={() => window.location.reload()}
+        />
+      )}
 
-        {loading && <div className="loading-state"><p>Đang tải lịch sử...</p></div>}
-        {error && <div className="alert alert-error">{error}</div>}
-        {!loading && !error && filteredItems.length === 0 && (
-          <div className="empty-state">Bạn chưa có lần làm bài nào.</div>
-        )}
-        {filteredItems.length > 0 && (
-          <section className="table-card">
-            <div className="table-card-header">
-              <h3 className="table-title">Các lần làm bài gần đây</h3>
-              <span className="tag">{filteredItems.length} lượt</span>
-            </div>
-            <div className="table-wrapper">
-              <table className="data-table">
-                <thead><tr><th>Tên</th><th>Loại</th><th>Kết quả</th><th>Tỷ lệ</th><th>Thời gian</th><th>Hành động</th></tr></thead>
-                <tbody>
-                  {filteredItems.map((item) => {
-                    const retakeDisabled = item.source_deleted || !item.can_retake;
-                    const retakeButton = (
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        disabled={retakeDisabled}
-                        onClick={() => handleRetake(item)}
-                      >
-                        {item.item_type === 'practice' ? 'Xem lại / Làm lại' : (item.can_retake ? 'Xem lại / Làm lại' : 'Xem lại')}
-                      </button>
+      {state === 'ready' && !hasData && (
+        <EmptyState
+          icon={<History size={28} />}
+          title="Bạn chưa có lần làm bài nào"
+          description="Hoàn thành một bài luyện tập, kết quả và mức tiến bộ sẽ hiện ở đây."
+          actions={
+            <Link to="/published-questions">
+              <Button>Bắt đầu bài luyện tập đầu tiên</Button>
+            </Link>
+          }
+        />
+      )}
+
+      {state === 'ready' && hasData && (
+        <>
+          {/* Phần tổng quan — trước đây là cả một trang riêng, chỉ tính trên ôn tập */}
+          <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
+            <StatTile label="Bài đã hoàn thành" value={stats.completed} />
+            <StatTile label="Bài chưa làm" value={stats.pending} />
+            <StatTile
+              label="Điểm trung bình"
+              value={stats.average === null ? '—' : `${stats.average.toFixed(1)}%`}
+              hint={`Từ ${practiceAttempts.length} lượt làm`}
+            />
+            <StatTile
+              label="Kết quả cao nhất"
+              value={stats.best === null ? '—' : `${stats.best.toFixed(1)}%`}
+            />
+          </StatGrid>
+
+          {/* Phần chi tiết — trước đây là trang Lịch sử, giờ gộp cả đề thi GV giao */}
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle as="h2">Các lần làm bài</CardTitle>
+              </div>
+              <Select
+                aria-label="Lọc theo khoảng thời gian"
+                value={range}
+                onChange={(event) => setRange(event.target.value as RangeKey)}
+                style={{ width: 'auto' }}
+              >
+                {RANGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </CardHeader>
+            <CardBody>
+              <Tabs
+                items={ITEM_FILTER_TABS}
+                value={itemFilter}
+                onChange={(id) => setItemFilter(id as ItemFilter)}
+                ariaLabel="Lọc theo loại"
+              />
+              {filtered.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={<TrendingUp size={24} />}
+                  title="Không có lần làm bài nào trong khoảng này"
+                  description="Hãy chọn khoảng thời gian hoặc loại rộng hơn."
+                  actions={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setRange('all');
+                        setItemFilter('all');
+                      }}
+                    >
+                      Xem toàn bộ
+                    </Button>
+                  }
+                />
+              ) : (
+                <div>
+                  {filtered.map((item) => {
+                    const verdict = verdictOf(item.percent);
+                    const canOpen = !item.source_deleted && item.can_retake;
+                    const rowContent = (
+                      <>
+                        <span className="dash-row-main">
+                          <span className="dash-row-title">{item.title}</span>
+                          <span className="dash-row-meta">
+                            <span>{formatDateTime(item.created_at)}</span>
+                            <span>
+                              {item.score}/{item.max_score} câu đúng
+                            </span>
+                          </span>
+                        </span>
+                        <span className="dash-row-trail">
+                          <Badge variant={item.item_type === 'exam' ? 'info' : 'neutral'}>
+                            {item.item_type === 'exam' ? 'Đề thi' : 'Ôn tập'}
+                          </Badge>
+                          <Badge variant={verdict.variant}>{verdict.label}</Badge>
+                          <span className="dash-score">{item.percent.toFixed(1)}%</span>
+                        </span>
+                      </>
                     );
+                    if (!canOpen) {
+                      const disabledRow = (
+                        <span key={item.id} className="dash-row dash-row-disabled" aria-disabled="true">
+                          {rowContent}
+                        </span>
+                      );
+                      return item.source_deleted ? (
+                        <Tooltip key={item.id} label="Tài liệu/đề thi gốc đã bị xóa">
+                          {disabledRow}
+                        </Tooltip>
+                      ) : (
+                        disabledRow
+                      );
+                    }
                     return (
-                      <tr key={item.id}>
-                        <td>{item.title}</td>
-                        <td><span className="tag">{item.item_type === 'exam' ? 'Đề thi' : 'Ôn tập'}</span></td>
-                        <td>{item.score}/{item.max_score}</td>
-                        <td><span className="tag">{item.percent.toFixed(1)}%</span></td>
-                        <td>{new Date(item.created_at).toLocaleString('vi-VN')}</td>
-                        <td>
-                          {item.source_deleted ? (
-                            <Tooltip label="Tài liệu/đề thi gốc đã bị xóa">{retakeButton}</Tooltip>
-                          ) : retakeButton}
-                        </td>
-                      </tr>
+                      <Link key={item.id} to={retakePathOf(item)} className="dash-row">
+                        {rowContent}
+                      </Link>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-      </div>
-    </div>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </>
+      )}
+    </>
   );
 }
 ```
 
-- [ ] **Step 2: Verify bằng browser preview**
+- [ ] **Step 3: Kiểm tra `Badge` component có variant `neutral`/`info`**
 
-Đăng nhập tài khoản role `student`, vào `/learning-history`:
-- Tab Tất cả/Đề thi GV giao/Ôn tập lọc đúng số dòng
-- Item ôn tập luôn có nút "Xem lại / Làm lại" hoạt động
-- Item đề thi có `can_retake=false` chỉ hiện "Xem lại", không bấm làm lại được
-- Item `source_deleted=true` có tooltip giải thích, nút bị disable
+Run: `grep -n "BadgeVariant" frontend/src/components/ui/Badge.tsx`
+Expected: xác nhận `neutral`/`info` nằm trong danh sách variant hợp lệ. Nếu tên khác (ví dụ chỉ có `default`/`success`/`warning`/`error`), đổi 2 chỗ dùng `Badge variant={...}` cho loại item ở trên cho khớp đúng tên variant thật.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Thêm CSS cho `.dash-row-disabled` nếu chưa có**
+
+Run: `grep -n "dash-row" frontend/src/pages/dashboard.css`
+Nếu chưa có class `.dash-row-disabled`, thêm vào cuối `frontend/src/pages/dashboard.css`:
+```css
+.dash-row-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+```
+
+- [ ] **Step 5: Kiểm tra frontend build không lỗi type**
+
+Run: `cd frontend && npx tsc -b --noEmit`
+Expected: không lỗi mới trong `ProgressPage.tsx` (lỗi ở 3 file còn lại của Task 10 — `PublishedQuestionSetsPage.tsx`, `StudentStatisticsPage.tsx`, `StudentDashboardPage.tsx` — là dự kiến, Task 10 xử lý).
+
+- [ ] **Step 6: Verify bằng browser preview**
+
+Đăng nhập tài khoản role `student`, vào `/learning-history` (route thật render `ProgressPage`):
+- Phần tổng quan (StatGrid) vẫn đúng như trước, không đổi vì chỉ tính trên ôn tập
+- Tab Tất cả/Đề thi GV giao/Ôn tập trong phần "Các lần làm bài" lọc đúng số dòng
+- Item ôn tập luôn bấm vào được (điều hướng `/question-sets/:id`)
+- Item đề thi `can_retake=false` không bấm vào được (dòng mờ, `cursor: not-allowed`), `can_retake=true` bấm vào được, điều hướng `/take-exam/:examId`
+- Item `source_deleted=true` có tooltip giải thích khi hover, dòng disabled
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add frontend/src/pages/LearningHistoryPage.tsx
-git commit -m "feat: add exam/practice filter and retake gating to student learning history"
+git add frontend/src/pages/student/ProgressPage.tsx frontend/src/pages/dashboard.css
+git commit -m "feat: add exam/practice filter and retake gating to student progress page"
+```
+
+---
+
+### Task 10: Frontend — sửa 4 trang khác đang dùng chung endpoint bị đổi ở Task 6
+
+**Bối cảnh (phát hiện lúc review Task 6, không có trong bản thiết kế ban đầu):** `GET /questions/attempts/my-history` (Task 6) đổi field `document_name`→`title` và giờ trả về CẢ dòng `item_type=exam` lẫn `practice`. Trước Task 6, endpoint này chỉ trả về dòng ôn tập (practice). 4 trang dưới đây gọi `questionApi.listMyLearningHistory()` và giả định 100% dữ liệu là ôn tập (dùng `question_set_id` làm key, đọc `document_name`) — nếu không sửa, sau khi Task 6 lên production: hiện title rỗng, và ở `PublishedQuestionSetsPage.tsx` dòng `exam` (không có `question_set_id`) sẽ làm `Map` dedupe sai.
+
+**⚠️ Cập nhật lúc review Task 9:** `ProgressPage.tsx` KHÔNG còn thuộc phạm vi task này nữa — Task 9 (đã sửa lại) đã trực tiếp cập nhật file đó với đầy đủ tab lọc + gating (vì đó chính là trang `/learning-history` thật, không phải file dead code ban đầu tưởng nhầm). Task 10 giờ chỉ còn đúng 3 file phụ dưới đây.
+
+**Nguyên tắc sửa (giống nhau cho cả 3 file):** các trang này CHỈ quan tâm tiến độ ôn tập (question_set), không cần biết về đề thi giảng viên giao (đã có `ProgressPage.tsx`/Task 9 lo phần đó) — nên cách an toàn nhất, đúng đúng phạm vi gốc của 3 trang này, là lọc `item_type === 'practice'` ngay sau khi nhận dữ liệu (giữ nguyên hành vi cũ 100%), rồi đổi `.document_name` → `.title`.
+
+**Files:**
+- Modify: `frontend/src/pages/PublishedQuestionSetsPage.tsx`
+- Modify: `frontend/src/pages/StudentStatisticsPage.tsx`
+- Modify: `frontend/src/pages/student/StudentDashboardPage.tsx`
+
+**Interfaces:**
+- Consumes: `LearningHistoryItem` từ Task 7 (đã có `item_type`/`title`).
+
+- [ ] **Step 1: Sửa `PublishedQuestionSetsPage.tsx`**
+
+Dòng 22-26 hiện tại:
+```typescript
+        const [result, history] = await Promise.all([
+          questionApi.listPublished(search.trim(), controller.signal),
+          questionApi.listMyLearningHistory(),
+        ]);
+        setItems(result.items);
+        setAttempts(history);
+```
+Đổi thành:
+```typescript
+        const [result, history] = await Promise.all([
+          questionApi.listPublished(search.trim(), controller.signal),
+          questionApi.listMyLearningHistory(),
+        ]);
+        setItems(result.items);
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
+```
+
+Dòng 121 hiện tại: `<h3 style={styles.cardTitle}>{item.document_name}</h3>` → đổi thành `<h3 style={styles.cardTitle}>{item.title}</h3>`
+
+- [ ] **Step 2: Sửa `StudentStatisticsPage.tsx`**
+
+Dòng 14-19 hiện tại:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        setAttempts(history);
+        setAssignedCount(published.items.length);
+      })
+```
+Đổi thành:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
+        setAssignedCount(published.items.length);
+      })
+```
+
+Dòng 79 hiện tại: `<td>{item.document_name}</td>` → đổi thành `<td>{item.title}</td>`
+
+- [ ] **Step 3: Sửa `StudentDashboardPage.tsx`**
+
+Dòng 48-53 hiện tại:
+```typescript
+    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
+      .then(([publishedRes, historyRes]) => {
+        if (cancelled) return;
+        setPublished(publishedRes.items ?? []);
+        setHistory(historyRes ?? []);
+        setState('ready');
+      })
+```
+Đổi thành:
+```typescript
+    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
+      .then(([publishedRes, historyRes]) => {
+        if (cancelled) return;
+        setPublished(publishedRes.items ?? []);
+        setHistory((historyRes ?? []).filter((item) => item.item_type === 'practice'));
+        setState('ready');
+      })
+```
+
+Đổi cả 3 chỗ đọc `document_name` sang `title`:
+- Dòng 151: `{nextSet.document_name || 'Bài luyện tập'}` → `{nextSet.title || 'Bài luyện tập'}`
+- Dòng 274: `{set.document_name || 'Bài luyện tập'}` → `{set.title || 'Bài luyện tập'}`
+- Dòng 328: `<span className="dash-row-title">{item.document_name}</span>` → `<span className="dash-row-title">{item.title}</span>`
+
+- [ ] **Step 4: Kiểm tra không còn chỗ nào đọc `document_name` từ `LearningHistoryItem` ngoài các chỗ đã sửa (và ngoài `ProgressPage.tsx` đã tự xử lý ở Task 9)**
+
+Run: `grep -rn "\.document_name" frontend/src --include="*.tsx" --include="*.ts"`
+Expected: không còn kết quả nào. Nếu còn sót (ngoài các chỗ đã liệt kê ở Task 9), sửa nốt theo đúng pattern trên.
+
+- [ ] **Step 5: Kiểm tra frontend build không lỗi type**
+
+Run: `cd frontend && npx tsc -b --noEmit`
+Expected: không lỗi
+
+- [ ] **Step 6: Verify bằng browser preview**
+
+Đăng nhập tài khoản role `student`, vào lần lượt `/published-questions`, `/student-statistics` (hoặc route đang trỏ tới `StudentStatisticsPage`), dashboard học sinh — xác nhận tên bài luyện tập hiện đúng (không rỗng), số liệu tiến độ không lẫn dữ liệu đề thi.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add frontend/src/pages/PublishedQuestionSetsPage.tsx frontend/src/pages/StudentStatisticsPage.tsx frontend/src/pages/student/StudentDashboardPage.tsx
+git commit -m "fix: update remaining learning-history consumers for title rename and mixed item types"
 ```
 
 ---

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from bson import ObjectId
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from mongomock_motor import AsyncMongoMockClient
 
 from app.routers import documents as documents_router
@@ -225,6 +225,85 @@ class CloudinaryWebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r1, r2)
         records = [j async for j in self.db["idempotency_records"].find({"scope": "cloudinary_webhook"})]
         self.assertEqual(len(records), 1)
+
+
+class DocumentSoftDeleteTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.client = AsyncMongoMockClient()
+        self.db = self.client["test_document_soft_delete"]
+        self.patches = [
+            patch("app.routers.documents.get_database", return_value=self.db),
+            patch("app.services.system_settings_service.get_database", return_value=self.db),
+        ]
+        for p in self.patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.user = _actor("lecturer")
+
+    async def _seed_document_with_question_set(self):
+        now = datetime.now(timezone.utc)
+        doc_id = ObjectId()
+        await self.db["documents"].insert_one({
+            "_id": doc_id,
+            "user_id": self.user.id,
+            "original_filename": "note.pdf",
+            "file_type": "pdf",
+            "file_size": 10,
+            "cloudinary_url": "https://res.cloudinary.com/demo/raw/upload/v1/documents/note",
+            "cloudinary_public_id": "documents/note_abc",
+            "cloudinary_resource_type": "raw",
+            "media_kind": "document",
+            "status": "completed",
+            "error_message": None,
+            "checksum": "abc",
+            "reuse_count": 0,
+            "version": 1,
+            "created_by": self.user.id,
+            "updated_by": self.user.id,
+            "created_at": now,
+            "updated_at": now,
+            "deleted_at": None,
+        })
+        await self.db["question_sets"].insert_one({
+            "document_id": str(doc_id),
+            "document_name": "note.pdf",
+            "user_id": self.user.id,
+            "created_at": now,
+        })
+        return doc_id
+
+    async def test_delete_document_soft_deletes_and_keeps_question_sets(self):
+        doc_id = await self._seed_document_with_question_set()
+        with patch("app.routers.documents.enqueue_cloudinary_cleanup", new=AsyncMock()):
+            await documents_router.delete_document(str(doc_id), None, None, self.user)
+
+        deleted_doc = await self.db["documents"].find_one({"_id": doc_id})
+        self.assertIsNotNone(deleted_doc, "document phải vẫn còn trong DB (xóa mềm)")
+        self.assertIsNotNone(deleted_doc["deleted_at"])
+
+        remaining_qs = await self.db["question_sets"].count_documents({"document_id": str(doc_id)})
+        self.assertEqual(remaining_qs, 1, "question_sets phải KHÔNG bị xóa cascade")
+
+    async def test_deleted_document_no_longer_listed(self):
+        doc_id = await self._seed_document_with_question_set()
+        with patch("app.routers.documents.enqueue_cloudinary_cleanup", new=AsyncMock()):
+            await documents_router.delete_document(str(doc_id), None, None, self.user)
+
+        listed = await documents_router.list_documents(current_user=self.user)
+        self.assertEqual(listed, [])
+
+    async def test_deleted_document_get_returns_404(self):
+        """get_owned_document must filter out soft-deleted documents so GET
+        /documents/{id} 404s instead of returning a document whose Cloudinary
+        asset and derived data were already purged."""
+        doc_id = await self._seed_document_with_question_set()
+        with patch("app.routers.documents.enqueue_cloudinary_cleanup", new=AsyncMock()):
+            await documents_router.delete_document(str(doc_id), None, None, self.user)
+
+        with self.assertRaises(HTTPException) as ctx:
+            await documents_router.get_document(str(doc_id), current_user=self.user)
+        self.assertEqual(ctx.exception.status_code, 404)
+
 
 
 if __name__ == "__main__":

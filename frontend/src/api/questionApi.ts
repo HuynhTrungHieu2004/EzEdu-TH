@@ -101,13 +101,17 @@ export interface QuestionAttemptResponse {
 
 export interface LearningHistoryItem {
   id: string;
-  question_set_id: string;
-  document_id: string;
-  document_name: string;
+  item_type: 'practice' | 'exam';
+  question_set_id?: string;
+  document_id?: string;
+  exam_id?: string;
+  title: string;
   score: number;
   max_score: number;
   percent: number;
   created_at: string;
+  source_deleted: boolean;
+  can_retake: boolean;
 }
 
 export interface HistoryListResponse {

@@ -25,7 +25,7 @@ const PublishedQuestionSetsPage = () => {
           questionApi.listMyLearningHistory(),
         ]);
         setItems(result.items);
-        setAttempts(history);
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
       } catch (err: unknown) {
         if (isUnauthorizedError(err)) {
           localStorage.removeItem('access_token');
@@ -50,7 +50,7 @@ const PublishedQuestionSetsPage = () => {
 
   const attemptsBySet = new Map<string, LearningHistoryItem>();
   for (const attempt of attempts) {
-    if (!attemptsBySet.has(attempt.question_set_id)) attemptsBySet.set(attempt.question_set_id, attempt);
+    if (attempt.question_set_id && !attemptsBySet.has(attempt.question_set_id)) attemptsBySet.set(attempt.question_set_id, attempt);
   }
   const pendingItems = items.filter((item) => !attemptsBySet.has(item.id));
   const completedItems = items.filter((item) => attemptsBySet.has(item.id));
