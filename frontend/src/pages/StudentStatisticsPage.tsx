@@ -14,7 +14,7 @@ export default function StudentStatisticsPage() {
   useEffect(() => {
     Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
       .then(([history, published]) => {
-        setAttempts(history);
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
         setAssignedCount(published.items.length);
       })
       .catch((err) => setError(getApiErrorDetail(err) ?? 'Không tải được thống kê kết quả.'))
@@ -22,14 +22,14 @@ export default function StudentStatisticsPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const completedIds = new Set(attempts.map((item) => item.question_set_id));
+    const completedIds = new Set(attempts.map((item) => item.question_set_id).filter(Boolean));
     const average = attempts.length
       ? attempts.reduce((sum, item) => sum + item.percent, 0) / attempts.length
       : 0;
     const best = attempts.length ? Math.max(...attempts.map((item) => item.percent)) : 0;
     const latestByExam = new Map<string, LearningHistoryItem>();
     for (const attempt of attempts) {
-      if (!latestByExam.has(attempt.question_set_id)) latestByExam.set(attempt.question_set_id, attempt);
+      if (attempt.question_set_id && !latestByExam.has(attempt.question_set_id)) latestByExam.set(attempt.question_set_id, attempt);
     }
     return {
       completed: completedIds.size,
@@ -76,7 +76,7 @@ export default function StudentStatisticsPage() {
                     <tbody>
                       {stats.latest.map((item) => (
                         <tr key={item.id}>
-                          <td>{item.document_name}</td>
+                          <td>{item.title}</td>
                           <td>{item.score}/{item.max_score}</td>
                           <td><strong>{item.percent.toFixed(1)}%</strong></td>
                           <td><span className="tag">{item.percent >= 80 ? 'Tốt' : item.percent >= 50 ? 'Đạt' : 'Cần ôn tập'}</span></td>

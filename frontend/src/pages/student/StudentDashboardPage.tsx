@@ -50,7 +50,7 @@ export default function StudentDashboardPage() {
       .then(([publishedRes, historyRes]) => {
         if (cancelled) return;
         setPublished(publishedRes.items ?? []);
-        setHistory(historyRes ?? []);
+        setHistory((historyRes ?? []).filter((item) => item.item_type === 'practice'));
         setState('ready');
       })
       .catch(() => {
@@ -325,7 +325,7 @@ export default function StudentDashboardPage() {
                             className="dash-row"
                           >
                             <span className="dash-row-main">
-                              <span className="dash-row-title">{item.document_name}</span>
+                              <span className="dash-row-title">{item.title}</span>
                               <span className="dash-row-meta">
                                 <span>{formatDate(item.created_at)}</span>
                                 <span>
