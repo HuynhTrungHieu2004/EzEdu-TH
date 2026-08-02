@@ -15,7 +15,7 @@
      <body> in index.css) shows through, instead of being hidden behind a
      flat opaque color like before. */
   background: transparent;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--ez-font-sans);
 }
 
 /* ── Header ───────────────────────────────────────────────── */
@@ -28,7 +28,7 @@
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(139, 124, 248, 0.10);
+  border-bottom: 1px solid var(--ez-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -53,7 +53,7 @@
   width: 34px;
   height: 34px;
   border-radius: var(--ez-radius-md);
-  background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
+  background: var(--ez-gradient-cta);
   color: #fff;
   font-size: 13px;
   font-weight: 800;
@@ -64,7 +64,7 @@
 .pub-logo-text {
   font-size: 16px;
   font-weight: 700;
-  color: #1e1b4b;
+  color: var(--ez-text);
   letter-spacing: -0.3px;
 }
 
@@ -81,19 +81,19 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #4c4878;
+  color: var(--ez-text-secondary);
   padding: 6px 14px;
   border-radius: var(--ez-radius-md);
   transition: background 0.15s, color 0.15s;
 }
 
 .pub-nav-link:hover {
-  background: rgba(139, 124, 248, 0.08);
-  color: #6c3fd1;
+  background: var(--ez-primary-subtle);
+  color: var(--ez-primary-hover);
 }
 
 .pub-nav-cta {
-  background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
+  background: var(--ez-gradient-cta);
   border: none;
   cursor: pointer;
   font-size: 14px;
@@ -130,7 +130,6 @@
   opacity: 0.5;
   pointer-events: none;
   z-index: 0;
-  animation: pub-blob-float 16s ease-in-out infinite;
 }
 
 .pub-blob-1 {
@@ -138,8 +137,7 @@
   height: 380px;
   top: -100px;
   left: -140px;
-  background: radial-gradient(circle, rgba(139, 124, 248, 0.30) 0%, transparent 70%);
-  animation-delay: 0s;
+  background: radial-gradient(circle, rgba(29, 59, 44, 0.22) 0%, transparent 70%);
 }
 
 .pub-blob-2 {
@@ -147,8 +145,7 @@
   height: 340px;
   bottom: -120px;
   right: -110px;
-  background: radial-gradient(circle, rgba(247, 74, 138, 0.22) 0%, transparent 70%);
-  animation-delay: 2.5s;
+  background: radial-gradient(circle, rgba(214, 69, 69, 0.16) 0%, transparent 70%);
 }
 
 .pub-blob-3 {
@@ -156,14 +153,7 @@
   height: 280px;
   top: 40%;
   right: 8%;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.20) 0%, transparent 70%);
-  animation-delay: 5s;
-}
-
-@keyframes pub-blob-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(18px, -14px) scale(1.05); }
-  66% { transform: translate(-12px, 10px) scale(0.96); }
+  background: radial-gradient(circle, rgba(29, 59, 44, 0.14) 0%, transparent 70%);
 }
 
 /* ── Cute floating study stickers ─────────────────────────── */
@@ -278,13 +268,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
-  border-top: 1px solid rgba(139, 124, 248, 0.10);
+  border-top: 1px solid var(--ez-border);
   background: rgba(255, 255, 255, 0.70);
 }
 
 .pub-footer-copy {
   font-size: 12px;
-  color: #8985a8;
+  color: var(--ez-text-secondary);
   margin: 0;
 }
 
@@ -293,14 +283,14 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
-  color: #8b7cf8;
+  color: var(--ez-text-link);
   font-weight: 500;
   transition: color 0.15s;
   padding: 0;
 }
 
 .pub-footer-home:hover {
-  color: #6c3fd1;
+  color: var(--ez-primary-hover);
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
