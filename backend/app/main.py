@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
-from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, admin_audit_logs, admin_content, admin_ai, admin_notifications, admin_reports, website_content, system_settings, classes
+from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, admin_audit_logs, admin_content, admin_ai, admin_notifications, admin_reports, website_content, system_settings, classes, teacher_history
 from app.personalization.api import router as personalization_router, onboarding_router as personalization_onboarding_router
 from app.exam_bank.api import router as exam_bank_router
 from app.web_knowledge.api import router as web_knowledge_router
@@ -237,6 +237,7 @@ app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 app.include_router(db_test.router, prefix=f"{settings.API_V1_STR}/db", tags=["Database"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_STR}/documents", tags=["Documents"])
+app.include_router(teacher_history.router, prefix=f"{settings.API_V1_STR}/teacher", tags=["Teacher History"])
 app.include_router(questions.router, prefix=f"{settings.API_V1_STR}/questions", tags=["Questions"])
 app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["Chat & Q&A"])
 app.include_router(verification.router, prefix=f"{settings.API_V1_STR}/documents", tags=["Verification"])
