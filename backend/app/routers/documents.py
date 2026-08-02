@@ -1558,21 +1558,25 @@ async def delete_document(
     await db["document_contents"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
-    await db["question_sets"].delete_many(
-        {"document_id": document_id, "user_id": current_user.id}
-    )
     await db["verification_issues"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
     await db["verification_sessions"].delete_many(
         {"document_id": document_id, "user_id": current_user.id}
     )
-    await db["documents"].delete_one(
+    await db["documents"].update_one(
         {
             "_id": document["_id"],
             "user_id": current_user.id,
             "status": "deleting",
-        }
+        },
+        {
+            "$set": {
+                "status": "deleted",
+                "deleted_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
     )
     if _is_admin_actor(current_user):
         await record_admin_audit(
