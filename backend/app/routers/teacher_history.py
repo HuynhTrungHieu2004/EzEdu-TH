@@ -7,7 +7,6 @@ tiếp ở đây vì cả hai nguồn đã có sẵn field owner/deleted_at cầ
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
-from bson import ObjectId
 
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
@@ -60,7 +59,7 @@ async def _attach_stats(db, items: List[Dict[str, Any]]) -> None:
         return
     try:
         cursor = db["exam_attempts"].aggregate([
-            {"$match": {"exam_id": {"$in": exam_ids}}},
+            {"$match": {"exam_id": {"$in": exam_ids}, "status": {"$in": ["submitted", "graded"]}}},
             {"$group": {
                 "_id": "$exam_id",
                 "attempt_count": {"$sum": 1},

@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from bson import ObjectId
 from mongomock_motor import AsyncMongoMockClient
@@ -98,3 +98,88 @@ class TeacherContentHistoryTests(unittest.IsolatedAsyncioTestCase):
             type="all", search=None, skip=0, limit=50, current_user=self.teacher
         )
         self.assertEqual(result["total"], 1)
+
+    async def test_excludes_unfinished_attempts_from_stats(self):
+        """Verify that in_progress attempts don't dilute average score or count"""
+        exam_id = await self._seed_exam(created_at=datetime.now(timezone.utc))
+        await self.db["exam_attempts"].insert_many([
+            {"exam_id": str(exam_id), "student_id": "s1", "status": "graded", "total_score": 8.0, "created_at": datetime.now(timezone.utc)},
+            {"exam_id": str(exam_id), "student_id": "s2", "status": "in_progress", "total_score": 0.0, "created_at": datetime.now(timezone.utc)},
+        ])
+        result = await teacher_history.get_content_history(
+            type="exam", search=None, skip=0, limit=50, current_user=self.teacher
+        )
+        item = result["items"][0]
+        self.assertEqual(item["attempt_count"], 1, "Should only count graded attempt, not in_progress")
+        self.assertEqual(item["avg_score"], 8.0, "Should not be diluted by in_progress 0.0 score")
+
+    async def test_pagination_stats_computed_only_for_current_page(self):
+        """Stats should be computed only for the items returned, not the full merged set before pagination"""
+        older = datetime.now(timezone.utc) - timedelta(days=2)
+        newer = datetime.now(timezone.utc) - timedelta(days=1)
+        exam1_id = await self._seed_exam(created_at=newer)
+        exam2_id = await self._seed_exam(created_at=older)
+
+        # Add stats to both exams
+        await self.db["exam_attempts"].insert_many([
+            {"exam_id": str(exam1_id), "student_id": "s1", "status": "graded", "total_score": 9.0, "created_at": datetime.now(timezone.utc)},
+            {"exam_id": str(exam2_id), "student_id": "s2", "status": "graded", "total_score": 7.0, "created_at": datetime.now(timezone.utc)},
+        ])
+
+        # Get only first page (limit=1, skip=0)
+        result = await teacher_history.get_content_history(
+            type="exam", search=None, skip=0, limit=1, current_user=self.teacher
+        )
+        self.assertEqual(result["total"], 2, "Total should reflect all exams")
+        self.assertEqual(len(result["items"]), 1, "But page should only have 1 item")
+        self.assertEqual(result["items"][0]["id"], str(exam1_id), "First page should have the newer exam")
+        self.assertEqual(result["items"][0]["attempt_count"], 1)
+        self.assertEqual(result["items"][0]["avg_score"], 9.0)
+
+        # Get second page (limit=1, skip=1)
+        result = await teacher_history.get_content_history(
+            type="exam", search=None, skip=1, limit=1, current_user=self.teacher
+        )
+        self.assertEqual(result["total"], 2)
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["id"], str(exam2_id), "Second page should have the older exam")
+        self.assertEqual(result["items"][0]["attempt_count"], 1)
+        self.assertEqual(result["items"][0]["avg_score"], 7.0)
+
+    async def test_stats_degradation_on_aggregation_failure(self):
+        """When aggregation fails, endpoint should still succeed with None values instead of 500 error"""
+        exam_id = await self._seed_exam(created_at=datetime.now(timezone.utc))
+        await self.db["exam_attempts"].insert_one({
+            "exam_id": str(exam_id), "student_id": "s1", "status": "graded", "total_score": 8.0, "created_at": datetime.now(timezone.utc),
+        })
+
+        # Get the underlying mongomock collection and patch its aggregate method
+        mongomock_db = self.db._client["test_teacher_history"]
+        mongomock_exam_attempts = mongomock_db["exam_attempts"]
+
+        # Create a function that raises an exception
+        def broken_aggregate(*args, **kwargs):
+            raise RuntimeError("Aggregation pipeline error")
+
+        # Replace the aggregate method
+        original_aggregate = mongomock_exam_attempts.aggregate
+        mongomock_exam_attempts.aggregate = broken_aggregate
+
+        try:
+            # Call _attach_stats directly to test the exception handling
+            items = [{
+                "id": str(exam_id),
+                "item_type": "exam",
+                "title": "Test",
+                "created_at": datetime.now(timezone.utc),
+                "cloudinary_url": None,
+                "blueprint_id": None,
+            }]
+            await teacher_history._attach_stats(self.db, items)
+            # Stats should be None due to exception being caught
+            self.assertIsNone(items[0]["attempt_count"])
+            self.assertIsNone(items[0]["avg_score"])
+            self.assertIsNone(items[0]["last_attempt_at"])
+        finally:
+            # Restore original
+            mongomock_exam_attempts.aggregate = original_aggregate
