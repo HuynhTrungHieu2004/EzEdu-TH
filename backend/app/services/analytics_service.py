@@ -165,7 +165,7 @@ async def get_overview(from_date: datetime, to_date: datetime) -> dict[str, Any]
     ))
 
     # Documents
-    total_docs = await _run(db["documents"].count_documents({}))
+    total_docs = await _run(db["documents"].count_documents({"deleted_at": None}))
     indexed_docs = await _run(db["documents"].count_documents({"status": "indexed"}))
     failed_docs = await _run(db["documents"].count_documents({"status": "index_failed"}))
 
