@@ -452,7 +452,7 @@
        trên error (#f2726f)     → 6.57:1
      Đây cũng là quy ước quen thuộc của giao diện tối: nền nhấn sáng, nhãn tối. */
   --ez-text-on-brand:  var(--ez-neutral-950);
-  --ez-text-link:      var(--ez-indigo-300);
+  --ez-text-link:      var(--ez-forest-300);
 
   --ez-border:        #313850;
   --ez-border-subtle: #262c40;
