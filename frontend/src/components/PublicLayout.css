@@ -25,7 +25,7 @@
   justify-content: space-between;
   padding: 0 24px;
   height: 60px;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--ez-surface) 92%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ez-border);
@@ -269,7 +269,7 @@
   justify-content: space-between;
   padding: 16px 24px;
   border-top: 1px solid var(--ez-border);
-  background: rgba(255, 255, 255, 0.70);
+  background: color-mix(in srgb, var(--ez-surface) 70%, transparent);
 }
 
 .pub-footer-copy {
