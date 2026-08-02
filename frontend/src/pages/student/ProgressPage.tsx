@@ -283,7 +283,7 @@ export default function ProgressPage() {
                           <span className="dash-row-meta">
                             <span>{formatDateTime(item.created_at)}</span>
                             <span>
-                              {item.score}/{item.max_score} câu đúng
+                              {item.score}/{item.max_score} {item.item_type === 'exam' ? 'điểm' : 'câu đúng'}
                             </span>
                           </span>
                         </span>
