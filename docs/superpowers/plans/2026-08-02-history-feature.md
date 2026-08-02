@@ -1625,6 +1625,141 @@ git commit -m "feat: add exam/practice filter and retake gating to student learn
 
 ---
 
+### Task 10: Frontend — sửa 4 trang khác đang dùng chung endpoint bị đổi ở Task 6
+
+**Bối cảnh (phát hiện lúc review Task 6, không có trong bản thiết kế ban đầu):** `GET /questions/attempts/my-history` (Task 6) đổi field `document_name`→`title` và giờ trả về CẢ dòng `item_type=exam` lẫn `practice`. Trước Task 6, endpoint này chỉ trả về dòng ôn tập (practice). 4 trang dưới đây gọi `questionApi.listMyLearningHistory()` và giả định 100% dữ liệu là ôn tập (dùng `question_set_id` làm key, đọc `document_name`) — nếu không sửa, sau khi Task 6 lên production: hiện title rỗng, và ở `PublishedQuestionSetsPage.tsx` dòng `exam` (không có `question_set_id`) sẽ làm `Map` dedupe sai.
+
+**Nguyên tắc sửa (giống nhau cho cả 4 file):** các trang này CHỈ quan tâm tiến độ ôn tập (question_set), không cần biết về đề thi giảng viên giao (đã có `LearningHistoryPage.tsx`/Task 9 lo phần đó) — nên cách an toàn nhất, đúng đúng phạm vi gốc của 4 trang này, là lọc `item_type === 'practice'` ngay sau khi nhận dữ liệu (giữ nguyên hành vi cũ 100%), rồi đổi `.document_name` → `.title`.
+
+**Files:**
+- Modify: `frontend/src/pages/PublishedQuestionSetsPage.tsx`
+- Modify: `frontend/src/pages/StudentStatisticsPage.tsx`
+- Modify: `frontend/src/pages/student/StudentDashboardPage.tsx`
+- Modify: `frontend/src/pages/student/ProgressPage.tsx`
+
+**Interfaces:**
+- Consumes: `LearningHistoryItem` từ Task 7 (đã có `item_type`/`title`).
+
+- [ ] **Step 1: Sửa `PublishedQuestionSetsPage.tsx`**
+
+Dòng 22-26 hiện tại:
+```typescript
+        const [result, history] = await Promise.all([
+          questionApi.listPublished(search.trim(), controller.signal),
+          questionApi.listMyLearningHistory(),
+        ]);
+        setItems(result.items);
+        setAttempts(history);
+```
+Đổi thành:
+```typescript
+        const [result, history] = await Promise.all([
+          questionApi.listPublished(search.trim(), controller.signal),
+          questionApi.listMyLearningHistory(),
+        ]);
+        setItems(result.items);
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
+```
+
+Dòng 121 hiện tại: `<h3 style={styles.cardTitle}>{item.document_name}</h3>` → đổi thành `<h3 style={styles.cardTitle}>{item.title}</h3>`
+
+- [ ] **Step 2: Sửa `StudentStatisticsPage.tsx`**
+
+Dòng 14-19 hiện tại:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        setAttempts(history);
+        setAssignedCount(published.items.length);
+      })
+```
+Đổi thành:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        setAttempts(history.filter((item) => item.item_type === 'practice'));
+        setAssignedCount(published.items.length);
+      })
+```
+
+Dòng 79 hiện tại: `<td>{item.document_name}</td>` → đổi thành `<td>{item.title}</td>`
+
+- [ ] **Step 3: Sửa `StudentDashboardPage.tsx`**
+
+Dòng 48-53 hiện tại:
+```typescript
+    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
+      .then(([publishedRes, historyRes]) => {
+        if (cancelled) return;
+        setPublished(publishedRes.items ?? []);
+        setHistory(historyRes ?? []);
+        setState('ready');
+      })
+```
+Đổi thành:
+```typescript
+    Promise.all([questionApi.listPublished(), questionApi.listMyLearningHistory()])
+      .then(([publishedRes, historyRes]) => {
+        if (cancelled) return;
+        setPublished(publishedRes.items ?? []);
+        setHistory((historyRes ?? []).filter((item) => item.item_type === 'practice'));
+        setState('ready');
+      })
+```
+
+Đổi cả 3 chỗ đọc `document_name` sang `title`:
+- Dòng 151: `{nextSet.document_name || 'Bài luyện tập'}` → `{nextSet.title || 'Bài luyện tập'}`
+- Dòng 274: `{set.document_name || 'Bài luyện tập'}` → `{set.title || 'Bài luyện tập'}`
+- Dòng 328: `<span className="dash-row-title">{item.document_name}</span>` → `<span className="dash-row-title">{item.title}</span>`
+
+- [ ] **Step 4: Sửa `ProgressPage.tsx`**
+
+Dòng 75-80 hiện tại:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        if (cancelled) return;
+        setAttempts(history ?? []);
+        setAssignedCount(published.items?.length ?? 0);
+        setState('ready');
+      })
+```
+Đổi thành:
+```typescript
+    Promise.all([questionApi.listMyLearningHistory(), questionApi.listPublished()])
+      .then(([history, published]) => {
+        if (cancelled) return;
+        setAttempts((history ?? []).filter((item) => item.item_type === 'practice'));
+        setAssignedCount(published.items?.length ?? 0);
+        setState('ready');
+      })
+```
+
+Dòng 235 hiện tại: `<span className="dash-row-title">{item.document_name}</span>` → `<span className="dash-row-title">{item.title}</span>`
+
+- [ ] **Step 5: Kiểm tra không còn chỗ nào đọc `document_name` từ `LearningHistoryItem` ngoài các chỗ đã sửa**
+
+Run: `grep -rn "\.document_name" frontend/src --include="*.tsx" --include="*.ts"`
+Expected: không còn kết quả nào (field đã đổi tên hoàn toàn sang `title` ở mọi nơi dùng `LearningHistoryItem`). Nếu còn sót, sửa nốt theo đúng pattern trên.
+
+- [ ] **Step 6: Kiểm tra frontend build không lỗi type**
+
+Run: `cd frontend && npx tsc -b --noEmit`
+Expected: không lỗi
+
+- [ ] **Step 7: Verify bằng browser preview**
+
+Đăng nhập tài khoản role `student`, vào lần lượt `/published-questions`, `/student-statistics` (hoặc route đang trỏ tới `StudentStatisticsPage`), dashboard học sinh, `/learning-history` (ProgressPage) — xác nhận tên bài luyện tập hiện đúng (không rỗng), số liệu tiến độ không lẫn dữ liệu đề thi.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add frontend/src/pages/PublishedQuestionSetsPage.tsx frontend/src/pages/StudentStatisticsPage.tsx frontend/src/pages/student/StudentDashboardPage.tsx frontend/src/pages/student/ProgressPage.tsx
+git commit -m "fix: update remaining learning-history consumers for title rename and mixed item types"
+```
+
+---
+
 ## Sau khi hoàn thành tất cả task
 
 Chạy toàn bộ test suite backend 1 lần cuối để xác nhận không có regression giữa các task:
