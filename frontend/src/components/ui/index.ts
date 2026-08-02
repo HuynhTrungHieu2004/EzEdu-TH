@@ -33,6 +33,8 @@ export { Alert } from './Alert';
 export type { AlertProps, AlertTone } from './Alert';
 export { PageHeader, SectionHeader } from './Headers';
 export { StatGrid, StatTile } from './StatTile';
+export { ChalkUnderline } from './ChalkUnderline';
+export type { ChalkUnderlineProps } from './ChalkUnderline';
 export { ToolCard } from './ToolCard';
 export type { ToolCardProps } from './ToolCard';
 export { SearchCommand } from './SearchCommand';

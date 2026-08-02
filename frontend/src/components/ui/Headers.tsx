@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
+import { ChalkUnderline } from './ChalkUnderline';
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -45,7 +46,10 @@ export function PageHeader({
           {loading ? (
             <div className="ez-skeleton ez-skeleton-title" />
           ) : (
-            <TitleTag className="ez-page-title">{title}</TitleTag>
+            <>
+              <TitleTag className="ez-page-title">{title}</TitleTag>
+              <ChalkUnderline />
+            </>
           )}
 
           {loading ? (

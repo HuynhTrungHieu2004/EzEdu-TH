@@ -1799,3 +1799,29 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ChalkUnderline — gạch chân tay vẽ dưới tiêu đề trang
+   ═══════════════════════════════════════════════════════════════════════ */
+.ez-chalk-underline {
+  display: block;
+  width: 96px;
+  height: 8px;
+  margin-top: var(--ez-space-2);
+  stroke: var(--ez-accent);
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ez-chalk-underline path {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: ez-chalk-draw 700ms var(--ez-ease-out) 150ms forwards;
+  }
+
+  @keyframes ez-chalk-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
