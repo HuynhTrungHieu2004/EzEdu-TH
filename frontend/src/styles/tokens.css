@@ -73,6 +73,33 @@
   --ez-amber-700: #a56d0d;
   --ez-amber-800: #81560e;
 
+  /* Forest green — primary mới cho redesign "Bảng đen & Bút đỏ"
+     (docs/superpowers/specs/2026-08-03-chalkboard-redesign-design.md).
+     Neo đúng #1D3B2C. */
+  --ez-forest-50:  #eef5f1;
+  --ez-forest-100: #d6e5dc;
+  --ez-forest-200: #afcabe;
+  --ez-forest-300: #7da893;
+  --ez-forest-400: #4c7d63;
+  --ez-forest-500: #2e5a44;
+  --ez-forest-600: #1d3b2c;
+  --ez-forest-700: #12261c;
+  --ez-forest-800: #0b1912;
+
+  /* Coral red — accent "bút đỏ" mới. Neo đúng #D64545. Cố ý khác tông
+     --ez-red-* (dùng cho error/destructive) để 2 vai trò không lẫn nhau
+     dù cùng họ đỏ: coral ấm hơn, dùng làm điểm nhấn tích cực (dấu tick,
+     điểm số), red giữ nguyên vai trò lỗi/xoá. */
+  --ez-coral-50:  #fdebea;
+  --ez-coral-100: #fbd2d0;
+  --ez-coral-200: #f5a7a3;
+  --ez-coral-300: #ec7b76;
+  --ez-coral-400: #e15f58;
+  --ez-coral-500: #d64545;
+  --ez-coral-600: #b93636;
+  --ez-coral-700: #962a2a;
+  --ez-coral-800: #6e1f1f;
+
   /* Neutral — hơi lệch xanh để hoà với indigo, không phải xám chết */
   --ez-neutral-0:   #ffffff;
   --ez-neutral-25:  #fbfcfe;
@@ -214,20 +241,20 @@
   /* Vòng focus — dùng chung toàn hệ thống */
   --ez-ring-width: 2px;
   --ez-ring-offset: 2px;
-  --ez-ring-color: var(--ez-indigo-500);
+  --ez-ring-color: var(--ez-forest-500);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
    5b. GRADIENT — dùng cho hero/CTA nổi bật, tinh thần MagicSchool
    ─────────────────────────────────────────────────────────────────────── */
 :root {
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-amber-400) 0%, var(--ez-indigo-500) 55%, var(--ez-indigo-700) 100%);
-  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-indigo-600) 0%, var(--ez-indigo-700) 100%);
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-coral-400) 0%, var(--ez-forest-500) 55%, var(--ez-forest-700) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-forest-600) 0%, var(--ez-forest-700) 100%);
 }
 
 [data-theme='dark'] {
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-amber-500) 0%, var(--ez-indigo-600) 55%, var(--ez-indigo-900) 100%);
-  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-indigo-500) 0%, var(--ez-indigo-700) 100%);
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-coral-400) 0%, var(--ez-forest-400) 55%, var(--ez-forest-800) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-forest-400) 0%, var(--ez-forest-600) 100%);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -308,40 +335,40 @@
    Đây là tầng component được phép dùng. Không dùng trực tiếp primitive.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Nền: nền app hơi xám để surface trắng nổi lên mà không cần bóng */
-  --ez-bg:            var(--ez-neutral-50);
+  /* Nền: trắng phấn ấm (redesign "Bảng đen & Bút đỏ") */
+  --ez-bg:            #faf9f6;
   --ez-bg-subtle:     var(--ez-neutral-100);
   --ez-bg-inverse:    var(--ez-neutral-900);
 
   /* Surface */
   --ez-surface:          var(--ez-neutral-0);
   --ez-surface-subtle:   var(--ez-neutral-25);
-  --ez-surface-muted:    var(--ez-neutral-100);
+  --ez-surface-muted:    #eef3ef;
   --ez-surface-hover:    var(--ez-neutral-100);
   --ez-surface-active:   var(--ez-neutral-200);
   --ez-surface-inverse:  var(--ez-neutral-900);
 
   /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên --ez-surface */
-  --ez-text:           var(--ez-neutral-900);
+  --ez-text:           #23262b;
   --ez-text-secondary: var(--ez-neutral-600);
   --ez-text-muted:     var(--ez-neutral-500);
   --ez-text-inverse:   var(--ez-neutral-0);
   --ez-text-on-brand:  var(--ez-neutral-0);
-  --ez-text-link:      var(--ez-indigo-600);
+  --ez-text-link:      var(--ez-forest-700);
 
   /* Viền */
   --ez-border:        var(--ez-neutral-200);
   --ez-border-subtle: var(--ez-neutral-100);
   --ez-border-strong: var(--ez-neutral-300);
-  --ez-border-focus:  var(--ez-indigo-500);
+  --ez-border-focus:  var(--ez-forest-500);
 
-  /* Primary */
-  --ez-primary:         var(--ez-indigo-600);
-  --ez-primary-hover:   var(--ez-indigo-700);
-  --ez-primary-active:  var(--ez-indigo-800);
-  --ez-primary-subtle:  var(--ez-indigo-50);
-  --ez-primary-border:  var(--ez-indigo-200);
-  --ez-primary-text:    var(--ez-indigo-700);
+  /* Primary — Forest green thay Indigo */
+  --ez-primary:         var(--ez-forest-600);
+  --ez-primary-hover:   var(--ez-forest-700);
+  --ez-primary-active:  var(--ez-forest-800);
+  --ez-primary-subtle:  var(--ez-forest-50);
+  --ez-primary-border:  var(--ez-forest-200);
+  --ez-primary-text:    var(--ez-forest-700);
 
   /* Secondary */
   --ez-secondary:        var(--ez-sky-500);
@@ -351,12 +378,13 @@
   --ez-secondary-border: var(--ez-sky-200);
   --ez-secondary-text:   var(--ez-sky-700);
 
-  /* Accent */
-  --ez-accent:        var(--ez-amber-500);
-  --ez-accent-hover:  var(--ez-amber-600);
-  --ez-accent-subtle: var(--ez-amber-50);
-  --ez-accent-border: var(--ez-amber-200);
-  --ez-accent-text:   var(--ez-amber-800);
+  /* Accent — Coral "bút đỏ" thay Amber. Amber vẫn giữ cho --ez-warning
+     (vai trò cảnh báo, không liên quan tới màu nhấn thương hiệu). */
+  --ez-accent:        var(--ez-coral-500);
+  --ez-accent-hover:  var(--ez-coral-600);
+  --ez-accent-subtle: var(--ez-coral-50);
+  --ez-accent-border: var(--ez-coral-200);
+  --ez-accent-text:   var(--ez-coral-700);
 
   /* Success / Warning / Error / Info */
   --ez-success:        var(--ez-green-600);
@@ -427,15 +455,15 @@
   --ez-border:        #313850;
   --ez-border-subtle: #262c40;
   --ez-border-strong: #414a66;
-  --ez-border-focus:  var(--ez-indigo-300);
+  --ez-border-focus:  var(--ez-forest-300);
 
   /* Trên nền tối cần bậc màu sáng hơn để giữ tương phản */
-  --ez-primary:         var(--ez-indigo-400);
-  --ez-primary-hover:   var(--ez-indigo-300);
-  --ez-primary-active:  var(--ez-indigo-200);
-  --ez-primary-subtle:  rgba(134, 121, 252, 0.14);
-  --ez-primary-border:  rgba(134, 121, 252, 0.34);
-  --ez-primary-text:    var(--ez-indigo-200);
+  --ez-primary:         var(--ez-forest-300);
+  --ez-primary-hover:   var(--ez-forest-200);
+  --ez-primary-active:  var(--ez-forest-100);
+  --ez-primary-subtle:  rgba(125, 168, 147, 0.14);
+  --ez-primary-border:  rgba(125, 168, 147, 0.34);
+  --ez-primary-text:    var(--ez-forest-100);
 
   --ez-secondary:        var(--ez-sky-300);
   --ez-secondary-hover:  var(--ez-sky-200);
@@ -444,11 +472,11 @@
   --ez-secondary-border: rgba(123, 172, 249, 0.32);
   --ez-secondary-text:   var(--ez-sky-200);
 
-  --ez-accent:        var(--ez-amber-300);
-  --ez-accent-hover:  var(--ez-amber-200);
-  --ez-accent-subtle: rgba(250, 191, 87, 0.14);
-  --ez-accent-border: rgba(250, 191, 87, 0.32);
-  --ez-accent-text:   var(--ez-amber-200);
+  --ez-accent:        var(--ez-coral-300);
+  --ez-accent-hover:  var(--ez-coral-200);
+  --ez-accent-subtle: rgba(236, 123, 118, 0.14);
+  --ez-accent-border: rgba(236, 123, 118, 0.32);
+  --ez-accent-text:   var(--ez-coral-200);
 
   --ez-success:        #4ec98a;
   --ez-success-subtle: rgba(78, 201, 138, 0.14);
