@@ -1833,3 +1833,44 @@
   stroke: var(--ez-accent);
   flex: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GradeStamp — badge tròn kiểu con dấu chấm điểm
+   ═══════════════════════════════════════════════════════════════════════ */
+.ez-grade-stamp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ez-radius-full);
+  border: 2.5px solid var(--ez-accent);
+  color: var(--ez-accent-text);
+  transform: rotate(-6deg);
+  font-family: var(--ez-font-heading);
+  line-height: 1.1;
+}
+
+.ez-grade-stamp-sm {
+  width: 48px;
+  height: 48px;
+}
+.ez-grade-stamp-sm .ez-grade-stamp-value { font-size: var(--ez-text-body-sm); font-weight: var(--ez-weight-bold); }
+
+.ez-grade-stamp-md {
+  width: 64px;
+  height: 64px;
+}
+.ez-grade-stamp-md .ez-grade-stamp-value { font-size: var(--ez-text-h4); font-weight: var(--ez-weight-bold); }
+
+.ez-grade-stamp-lg {
+  width: 88px;
+  height: 88px;
+}
+.ez-grade-stamp-lg .ez-grade-stamp-value { font-size: var(--ez-text-h2); font-weight: var(--ez-weight-bold); }
+
+.ez-grade-stamp-label {
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ez-tracking-caps);
+}

@@ -37,6 +37,8 @@ export { ChalkUnderline } from './ChalkUnderline';
 export type { ChalkUnderlineProps } from './ChalkUnderline';
 export { RedCheckmark } from './RedCheckmark';
 export type { RedCheckmarkProps } from './RedCheckmark';
+export { GradeStamp } from './GradeStamp';
+export type { GradeStampProps } from './GradeStamp';
 export { ToolCard } from './ToolCard';
 export type { ToolCardProps } from './ToolCard';
 export { SearchCommand } from './SearchCommand';
