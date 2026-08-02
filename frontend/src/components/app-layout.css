@@ -165,10 +165,10 @@
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  border-radius: 0 var(--ez-radius-full) var(--ez-radius-full) 0;
-  background-color: var(--ez-primary);
+  width: 5px;
+  height: 24px;
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+  background-color: var(--ez-accent);
 }
 
 .ez-nav-item-active:hover {
