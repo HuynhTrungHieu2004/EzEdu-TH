@@ -16,19 +16,19 @@
 .admin-content-header h1 {
   margin: 0;
   font-size: 28px;
-  color: var(--text-primary, #172033);
+  color: var(--ez-text);
 }
 
 .admin-content-header p {
   margin: 6px 0 0;
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
 }
 
 .admin-content-toolbar,
 .admin-content-detail,
 .admin-content-panel {
-  background: var(--surface-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--ez-surface);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-md);
   padding: 16px;
 }
@@ -44,18 +44,18 @@
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
 }
 
 .admin-content-field input,
 .admin-content-field select,
 .admin-content-field textarea {
-  border: 1px solid var(--border-color, #d0d5dd);
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
   padding: 10px 12px;
   font: inherit;
-  color: var(--text-primary, #172033);
-  background: var(--surface-primary, #fff);
+  color: var(--ez-text);
+  background: var(--ez-surface);
 }
 
 .admin-content-actions {
@@ -70,27 +70,27 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid var(--border-color, #d0d5dd);
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
   padding: 8px 11px;
-  background: var(--surface-primary, #fff);
-  color: var(--text-primary, #172033);
+  background: var(--ez-surface);
+  color: var(--ez-text);
   cursor: pointer;
   font-weight: 600;
 }
 
 .admin-content-btn:hover {
-  background: var(--surface-muted, #f8fafc);
+  background: var(--ez-surface-muted);
 }
 
 .admin-content-btn--primary {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: #fff;
+  border-color: var(--ez-primary);
+  background: var(--ez-primary);
+  color: var(--ez-text-on-brand);
 }
 
 .admin-content-btn--primary:hover {
-  background: #1d4ed8;
+  background: var(--ez-primary-hover);
 }
 
 .admin-content-btn:disabled {
@@ -99,16 +99,16 @@
 }
 
 .admin-content-btn--danger {
-  border-color: #fecaca;
-  color: #b42318;
-  background: #fff7f7;
+  border-color: var(--ez-error-border);
+  color: var(--ez-error-text);
+  background: var(--ez-error-subtle);
 }
 
 .admin-content-table-wrap {
   overflow-x: auto;
   max-width: 100%;
-  background: var(--surface-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--ez-surface);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-md);
 }
 
@@ -121,18 +121,18 @@
 .admin-content-table th,
 .admin-content-table td {
   padding: 12px;
-  border-bottom: 1px solid var(--border-color, #eef2f7);
+  border-bottom: 1px solid var(--ez-border-subtle);
   text-align: left;
   vertical-align: top;
   font-size: 14px;
 }
 
 .admin-content-table th {
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0;
-  background: var(--surface-muted, #f8fafc);
+  background: var(--ez-surface-muted);
 }
 
 .admin-content-title-cell {
@@ -143,12 +143,12 @@
 }
 
 .admin-content-title-cell strong {
-  color: var(--text-primary, #172033);
+  color: var(--ez-text);
   overflow-wrap: anywhere;
 }
 
 .admin-content-muted {
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
   font-size: 13px;
 }
 
@@ -160,27 +160,27 @@
   padding: 4px 8px;
   font-size: 12px;
   font-weight: 700;
-  background: #eef4ff;
-  color: #3538cd;
+  background: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
 }
 
 .admin-content-badge--danger {
-  background: #fff1f3;
-  color: #c01048;
+  background: var(--ez-error-subtle);
+  color: var(--ez-error-text);
 }
 
 .admin-content-badge--ok {
-  background: #ecfdf3;
-  color: #027a48;
+  background: var(--ez-success-subtle);
+  color: var(--ez-success-text);
 }
 
 .admin-content-state {
-  background: var(--surface-primary, #fff);
-  border: 1px dashed var(--border-color, #d0d5dd);
+  background: var(--ez-surface);
+  border: 1px dashed var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
   padding: 28px;
   text-align: center;
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
 }
 
 .admin-content-pagination {
@@ -201,17 +201,17 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  border: 1px solid var(--border-color, #eef2f7);
+  border: 1px solid var(--ez-border-subtle);
   border-radius: var(--ez-radius-md);
 }
 
 .admin-content-kv span {
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
   font-size: 12px;
 }
 
 .admin-content-kv strong {
-  color: var(--text-primary, #172033);
+  color: var(--ez-text);
   overflow-wrap: anywhere;
 }
 
@@ -223,17 +223,17 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(15, 23, 42, 0.42);
+  background: var(--ez-overlay);
 }
 
 .admin-content-modal {
   width: min(620px, 100%);
   max-height: 86vh;
   overflow: auto;
-  background: var(--surface-primary, #fff);
+  background: var(--ez-surface);
   border-radius: var(--ez-radius-md);
   padding: 20px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+  box-shadow: var(--ez-shadow-xl);
 }
 
 .admin-content-modal h3 {
@@ -250,7 +250,7 @@
   grid-template-columns: 160px 1fr;
   gap: 8px;
   padding: 8px;
-  border: 1px solid var(--border-color, #eef2f7);
+  border: 1px solid var(--ez-border-subtle);
   border-radius: var(--ez-radius-md);
 }
 
@@ -261,19 +261,19 @@
 }
 
 .admin-content-tabs button {
-  border: 1px solid var(--border-color, #d0d5dd);
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
-  background: var(--surface-primary, #fff);
-  color: var(--text-primary, #172033);
+  background: var(--ez-surface);
+  color: var(--ez-text);
   padding: 9px 12px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .admin-content-tabs button.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--ez-primary);
+  background: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
 }
 
 .admin-content-cms-layout {
@@ -310,7 +310,7 @@
 
 .admin-content-row-head h2 {
   margin: 0;
-  color: var(--text-primary, #172033);
+  color: var(--ez-text);
 }
 
 .admin-content-row-head p {
@@ -327,12 +327,12 @@
 .admin-content-section-row input,
 .admin-content-section-row textarea,
 .admin-content-row-head select {
-  border: 1px solid var(--border-color, #d0d5dd);
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
   padding: 9px 10px;
   font: inherit;
-  color: var(--text-primary, #172033);
-  background: var(--surface-primary, #fff);
+  color: var(--ez-text);
+  background: var(--ez-surface);
 }
 
 .admin-content-row-grid--menu {
@@ -355,7 +355,7 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--border-color, #eef2f7);
+  border: 1px solid var(--ez-border-subtle);
   border-radius: var(--ez-radius-md);
 }
 
@@ -363,7 +363,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-secondary, #667085);
+  color: var(--ez-text-muted);
   font-weight: 600;
 }
 
@@ -373,16 +373,16 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-md);
-  background: #fff;
+  background: var(--ez-surface);
 }
 
 .admin-content-preview-header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--ez-border-subtle);
   padding-bottom: 10px;
 }
 
@@ -391,7 +391,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-  color: #667085;
+  color: var(--ez-text-muted);
   font-size: 12px;
 }
 
@@ -402,7 +402,7 @@
 
 .admin-content-preview-hero span,
 .admin-content-preview-sections span {
-  color: #2563eb;
+  color: var(--ez-primary);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -412,11 +412,11 @@
   margin: 0;
   font-size: 24px;
   line-height: 1.18;
-  color: #172033;
+  color: var(--ez-text);
 }
 
 .admin-content-preview-hero em {
-  color: #10b981;
+  color: var(--ez-success);
   font-style: normal;
 }
 
@@ -424,7 +424,7 @@
 .admin-content-preview-sections p,
 .admin-content-preview footer {
   margin: 0;
-  color: #667085;
+  color: var(--ez-text-muted);
   line-height: 1.5;
 }
 
@@ -435,9 +435,9 @@
 }
 
 .admin-content-preview-hero button {
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
-  background: #fff;
+  background: var(--ez-surface);
   padding: 8px 10px;
   font-weight: 700;
 }
@@ -451,12 +451,12 @@
   display: grid;
   gap: 4px;
   padding: 10px;
-  border: 1px solid #eef2f7;
+  border: 1px solid var(--ez-border-subtle);
   border-radius: var(--ez-radius-md);
 }
 
 .admin-content-preview footer {
-  border-top: 1px solid #eef2f7;
+  border-top: 1px solid var(--ez-border-subtle);
   padding-top: 10px;
 }
 
@@ -471,7 +471,7 @@
   gap: 12px;
   align-items: end;
   padding: 12px;
-  border: 1px solid var(--border-color, #eef2f7);
+  border: 1px solid var(--ez-border-subtle);
   border-radius: var(--ez-radius-md);
 }
 
@@ -481,7 +481,7 @@
 
 .admin-settings-row strong {
   display: block;
-  color: var(--text-primary, #172033);
+  color: var(--ez-text);
   overflow-wrap: anywhere;
 }
 
@@ -491,12 +491,12 @@
 
 .admin-settings-row textarea {
   width: 100%;
-  border: 1px solid var(--border-color, #d0d5dd);
+  border: 1px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
   padding: 9px 10px;
   font: inherit;
-  color: var(--text-primary, #172033);
-  background: var(--surface-primary, #fff);
+  color: var(--ez-text);
+  background: var(--ez-surface);
 }
 
 @media (max-width: 900px) {
@@ -552,7 +552,7 @@
 
   .admin-content-table tr {
     padding: 12px;
-    border-bottom: 1px solid var(--border-color, #eef2f7);
+    border-bottom: 1px solid var(--ez-border-subtle);
   }
 
   .admin-content-table td {
@@ -566,7 +566,7 @@
     margin-bottom: 2px;
     font-size: 12px;
     font-weight: 700;
-    color: var(--text-secondary, #667085);
+    color: var(--ez-text-muted);
   }
 
   .admin-content-pretty-row {
