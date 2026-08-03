@@ -1212,7 +1212,7 @@ code, .counter { font-family: var(--mono); }
   width: min(100%, 1060px);
   margin-inline: auto;
   padding: clamp(24px, 4vw, 44px);
-  border: 1px solid rgba(139, 124, 248, 0.12);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-2xl);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow);
@@ -1232,7 +1232,7 @@ code, .counter { font-family: var(--mono); }
   gap: 10px;
   margin-bottom: 22px;
   padding: 8px 12px 8px 8px;
-  border: 1px solid rgba(139, 124, 248, 0.14);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-full);
   background: rgba(255, 255, 255, 0.78);
   color: var(--text-h);
@@ -1245,7 +1245,7 @@ code, .counter { font-family: var(--mono); }
   width: 34px;
   height: 34px;
   border-radius: var(--ez-radius-sm);
-  background: linear-gradient(135deg, #6d5df2 0%, #4f46e5 100%);
+  background: var(--ez-gradient-cta);
   color: #fff;
   font-weight: 900;
 }
