@@ -176,7 +176,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 fontSize: '11px',
                 padding: '3px 10px',
                 borderRadius: '12px',
-                background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'rgba(139, 124, 248, 0.1)',
+                background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'var(--accent-bg)',
                 color: manualReveal ? '#10b981' : 'var(--accent)',
                 fontWeight: 600,
                 border: `1px solid ${manualReveal ? 'rgba(16, 185, 129, 0.3)' : 'var(--accent-border)'}`,
