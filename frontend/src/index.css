@@ -1270,7 +1270,7 @@ code, .counter { font-family: var(--mono); }
   min-width: 0;
   margin: 0 0 24px;
   padding: 22px;
-  border: 1px solid rgba(139, 124, 248, 0.12);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-xl);
   background: rgba(255, 255, 255, 0.72);
 }
@@ -1325,7 +1325,7 @@ code, .counter { font-family: var(--mono); }
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid rgba(139, 124, 248, 0.14);
+  border: 1px solid var(--ez-border);
   border-radius: var(--ez-radius-lg);
   background: rgba(255, 255, 255, 0.72);
   color: var(--text-h);
@@ -1341,8 +1341,8 @@ code, .counter { font-family: var(--mono); }
 .student-choice:hover,
 .student-combination-choice:hover {
   transform: translateY(-1px);
-  border-color: rgba(79, 70, 229, 0.34);
-  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.08);
+  border-color: rgba(29, 59, 44, 0.34);
+  box-shadow: 0 12px 28px rgba(29, 59, 44, 0.08);
 }
 
 .student-choice input,
@@ -1350,14 +1350,14 @@ code, .counter { font-family: var(--mono); }
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: #4f46e5;
+  accent-color: #1d3b2c;
   flex: 0 0 auto;
 }
 
 .student-choice-active {
-  border-color: rgba(79, 70, 229, 0.45);
-  background: linear-gradient(135deg, rgba(240, 238, 255, 0.96), rgba(240, 249, 255, 0.88));
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  border-color: rgba(29, 59, 44, 0.45);
+  background: linear-gradient(135deg, rgba(238, 245, 241, 0.96), rgba(253, 235, 234, 0.88));
+  box-shadow: 0 0 0 3px rgba(29, 59, 44, 0.08);
 }
 
 .student-combination-choice span {
