@@ -385,13 +385,6 @@
   margin-bottom: var(--ez-space-6);
   color: var(--ez-text-on-brand);
 }
-/* Chế độ tối: --ez-gradient-cta mặc định (indigo-500 -> indigo-700) chỉ đạt
-   3.02:1 với chữ gần đen ở điểm dừng indigo-700 — không đủ AA 4.5:1 cho chữ
-   thường. Ghi đè riêng bằng indigo-400 -> indigo-500: 5.42:1 -> 4.67:1, luôn
-   trên ngưỡng AA trong toàn dải gradient. */
-[data-theme='dark'] .ez-dashboard-banner {
-  background: linear-gradient(120deg, var(--ez-indigo-400) 0%, var(--ez-indigo-500) 100%);
-}
 .ez-dashboard-banner h1,
 .ez-dashboard-banner h2,
 .ez-dashboard-banner p {
