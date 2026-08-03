@@ -407,7 +407,7 @@
 }
 
 .admin-log-item--error {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: var(--ez-error-border);
 }
 
 /* ── Stat Grid ──────────────────────────────────────────────── */
@@ -484,7 +484,7 @@
   height: 0.85rem;
   border-radius: var(--ez-radius-full);
   background: var(--muted);
-  box-shadow: 0 0 0 5px rgba(100, 116, 139, 0.12);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--ez-text-muted) 12%, transparent);
   flex-shrink: 0;
 }
 
@@ -739,7 +739,7 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(15, 23, 42, 0.48);
+  background: var(--ez-overlay);
 }
 
 .admin-error-modal {

@@ -150,7 +150,7 @@ function DonutChart({ value, total, color = 'var(--ez-primary)' }: { value: numb
         strokeLinecap="round"
         transform={`rotate(-90 ${cx} ${cy})`}
       />
-      <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11" fill="var(--text-primary)">
+      <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11" fill="var(--ez-text)">
         {Math.round(pct * 100)}%
       </text>
     </svg>
