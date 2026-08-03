@@ -47,10 +47,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const BLOOM_CONFIG: Record<string, { label: string; color: string }> = {
-  remember: { label: 'Nhận biết', color: '#22c55e' },
-  understand: { label: 'Thông hiểu', color: '#3b82f6' },
-  apply: { label: 'Vận dụng', color: '#f59e0b' },
-  analyze: { label: 'VD cao', color: '#ef4444' },
+  remember: { label: 'Nhận biết', color: 'var(--ez-success)' },
+  understand: { label: 'Thông hiểu', color: 'var(--ez-info)' },
+  apply: { label: 'Vận dụng', color: 'var(--ez-warning)' },
+  analyze: { label: 'VD cao', color: 'var(--ez-error)' },
 };
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
@@ -398,7 +398,7 @@ const QuestionHistoryPage: React.FC = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#fff',
+                              color: 'var(--ez-text-on-brand)',
                               fontSize: '9px',
                               fontWeight: 600,
                             }}
@@ -555,7 +555,7 @@ const S: Record<string, React.CSSProperties> = {
   errorBox: {
     padding: '14px 20px',
     backgroundColor: 'var(--danger-bg)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
+    border: '1px solid var(--ez-error-border)',
     color: 'var(--danger)',
     borderRadius: '10px',
     fontSize: '14px',
@@ -678,22 +678,22 @@ const S: Record<string, React.CSSProperties> = {
   typeBadge: {
     backgroundColor: 'var(--accent-2-bg)',
     color: 'var(--accent-2)',
-    border: '1px solid rgba(14, 165, 233, 0.25)',
+    border: '1px solid var(--ez-secondary-border)',
   },
   diffEasy: {
     backgroundColor: 'var(--success-bg)',
     color: 'var(--success)',
-    border: '1px solid rgba(16, 185, 129, 0.25)',
+    border: '1px solid var(--ez-success-border)',
   },
   diffMedium: {
     backgroundColor: 'var(--warning-bg)',
     color: 'var(--warning)',
-    border: '1px solid rgba(245, 158, 11, 0.25)',
+    border: '1px solid var(--ez-warning-border)',
   },
   diffHard: {
     backgroundColor: 'var(--danger-bg)',
     color: 'var(--danger)',
-    border: '1px solid rgba(239, 68, 68, 0.25)',
+    border: '1px solid var(--ez-error-border)',
   },
   bloomBar: {
     display: 'flex',
@@ -706,7 +706,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 0',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--ez-text-on-brand)',
     background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
     border: 'none',
     borderRadius: '10px',
@@ -808,7 +808,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 20px',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#fff',
+    color: 'var(--ez-text-on-brand)',
     backgroundColor: 'var(--danger)',
     border: 'none',
     borderRadius: '10px',
