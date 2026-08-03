@@ -355,7 +355,7 @@ code, .counter { font-family: var(--mono); }
   width: 100%;
   height: 1px;
   margin: 8px 0;
-  background: linear-gradient(90deg, transparent, rgba(139,124,248,0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(29,59,44,0.15), transparent);
 }
 
 .sidebar-label {
