@@ -278,3 +278,36 @@ def nearest_centroid(feature_vector: np.ndarray, centroids: list[list[float]]) -
     distances = np.linalg.norm(centroid_matrix - feature_vector.reshape(1, -1), axis=1)
     cluster_id = int(np.argmin(distances))
     return cluster_id, float(distances[cluster_id])
+
+
+def flag_distance_outliers(distances: list[float], *, multiplier: float) -> list[bool]:
+    """Đánh dấu các điểm nằm xa tâm cụm bất thường so với phần còn lại.
+
+    Dùng median và MAD (median absolute deviation) thay cho trung bình và độ
+    lệch chuẩn. Lý do: một điểm quá xa sẽ tự thổi phồng độ lệch chuẩn và kéo
+    ngưỡng vượt lên trên chính nó — hiệu ứng che lấp (masking) khiến ngoại
+    lai rõ ràng nhất lại lọt lưới. Median/MAD không bị điểm cực trị kéo đi.
+
+    Hệ số 0.6745 quy MAD về cùng thang với độ lệch chuẩn của phân phối chuẩn,
+    nhờ đó `multiplier` vẫn đọc được như "bao nhiêu sigma".
+
+    Chỉ đánh dấu điểm nằm XA hơn mức thường — gần tâm cụm không phải bất thường.
+    """
+    if len(distances) < 2:
+        return [False] * len(distances)
+
+    array = np.asarray(distances, dtype=float)
+    median = float(np.median(array))
+    mad = float(np.median(np.abs(array - median)))
+
+    if mad > 0:
+        threshold = median + multiplier * (mad / 0.6745)
+    else:
+        # Quá nửa số điểm trùng nhau: MAD = 0 nên công thức trên vô dụng.
+        # Lùi về độ lệch chuẩn, vẫn tốt hơn là bỏ qua hoàn toàn.
+        std = float(array.std())
+        if std == 0.0:
+            return [False] * len(distances)
+        threshold = median + multiplier * std
+
+    return [bool(value > threshold) for value in array]

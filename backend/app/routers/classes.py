@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
 from app.routers.documents import ensure_lecturer_or_admin
+from app.services.class_grouping_service import analyze_class_ability_groups
 from app.schemas.auth import UserResponse
 from app.schemas.classes import (
     ClassCreateRequest,
@@ -180,6 +181,52 @@ async def get_class_detail(class_id: str, current_user: UserResponse = Depends(g
         created_at=cls["created_at"],
         updated_at=cls.get("updated_at"),
     )
+
+
+@router.get("/{class_id}/ability-groups")
+async def get_class_ability_groups(
+    class_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Phân nhóm năng lực học sinh trong lớp bằng K-Means trên điểm từng bộ đề.
+
+    Chỉ giáo viên chủ nhiệm lớp xem được — đây là kết quả học tập của từng em.
+    """
+    db = get_database()
+    cls = await _get_owned_class_or_404(class_id, current_user, db)
+    student_ids = [sid for sid in cls.get("student_ids") or []]
+
+    attempts: list[dict] = []
+    if student_ids:
+        cursor = db["question_attempts"].find(
+            {"user_id": {"$in": student_ids}},
+            {"user_id": 1, "question_set_id": 1, "percent": 1},
+        )
+        attempts = [doc async for doc in cursor]
+
+    result = analyze_class_ability_groups(attempts, student_ids)
+
+    # Ghép tên để giáo viên đọc được, thay vì một dãy id.
+    names: dict[str, str] = {}
+    object_ids = [ObjectId(sid) for sid in student_ids if ObjectId.is_valid(sid)]
+    if object_ids:
+        async for doc in db["users"].find({"_id": {"$in": object_ids}}, {"_id": 1, "full_name": 1}):
+            names[str(doc["_id"])] = doc.get("full_name", "")
+    for student in result.get("students", []):
+        student["full_name"] = names.get(student["user_id"], "")
+
+    # Bộ đề cũng vậy — hiện tên tài liệu thay vì id.
+    set_ids = result.get("question_set_ids") or []
+    set_names: dict[str, str] = {}
+    set_object_ids = [ObjectId(s) for s in set_ids if ObjectId.is_valid(s)]
+    if set_object_ids:
+        async for doc in db["question_sets"].find(
+            {"_id": {"$in": set_object_ids}}, {"_id": 1, "document_name": 1}
+        ):
+            set_names[str(doc["_id"])] = doc.get("document_name", "")
+    result["question_set_names"] = set_names
+
+    return result
 
 
 @router.patch("/{class_id}", response_model=ClassSummary)

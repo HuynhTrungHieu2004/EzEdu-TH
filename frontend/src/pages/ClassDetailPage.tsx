@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { classesApi } from '../api/classesApi';
-import type { ClassDetail, StudentSearchResult } from '../types/classes';
+import type {
+  ClassAbilityGroupsResponse,
+  ClassDetail,
+  StudentSearchResult,
+} from '../types/classes';
 import { apiErrorMessage } from '../utils/apiError';
 
 const ClassDetailPage: React.FC = () => {
@@ -17,6 +21,7 @@ const ClassDetailPage: React.FC = () => {
   const [addingId, setAddingId] = useState('');
   const [removingId, setRemovingId] = useState('');
   const [actionError, setActionError] = useState('');
+  const [groups, setGroups] = useState<ClassAbilityGroupsResponse | null>(null);
 
   const load = () => {
     if (!classId) return;
@@ -31,6 +36,24 @@ const ClassDetailPage: React.FC = () => {
   useEffect(() => {
     queueMicrotask(() => load());
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId]);
+
+  // Phân nhóm chỉ có nghĩa khi học sinh đã làm bài. Lỗi ở đây không được
+  // chặn màn hình lớp học — đây là thông tin bổ trợ cho giáo viên.
+  useEffect(() => {
+    if (!classId) return;
+    let cancelled = false;
+    classesApi
+      .abilityGroups(classId)
+      .then((data) => {
+        if (!cancelled) setGroups(data);
+      })
+      .catch(() => {
+        if (!cancelled) setGroups(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [classId]);
 
   const handleSearch = async (event: React.FormEvent) => {
@@ -120,6 +143,54 @@ const ClassDetailPage: React.FC = () => {
         </div>
 
         {actionError && <div className="alert alert-error">{actionError}</div>}
+
+        {groups && groups.status === 'ok' && groups.groups.length > 0 && (
+          <section className="table-card" style={{ marginBottom: 24 }}>
+            <div className="table-card-header">
+              <h3 className="table-title">Nhóm năng lực trong lớp</h3>
+              <span className="muted">
+                {groups.analyzed_count}/{groups.student_count} em đã có bài làm
+                {groups.clustering
+                  ? ` · K-Means chia ${groups.clustering.selected_k} nhóm (silhouette ${groups.clustering.silhouette_score.toFixed(2)})`
+                  : ''}
+              </span>
+            </div>
+            <div style={{ padding: '0 4px 12px', display: 'grid', gap: 12 }}>
+              {groups.groups.map((group) => {
+                const members = groups.students.filter((s) => s.cluster_id === group.cluster_id);
+                const setName = (id: string) => groups.question_set_names[id] || id;
+                return (
+                  <article key={group.cluster_id} className="cls-group">
+                    <div className="cls-group-head">
+                      <strong>
+                        Nhóm {group.cluster_id + 1} · {group.size} em
+                      </strong>
+                      <span className="muted">Trung bình {group.average_percent}%</span>
+                    </div>
+                    <p className="cls-group-weak">
+                      Cần phụ đạo nhất: <strong>{setName(group.weakest_set_id)}</strong> (
+                      {group.centroid[group.weakest_set_id]}%) · Vững nhất:{' '}
+                      {setName(group.strongest_set_id)} ({group.centroid[group.strongest_set_id]}%)
+                    </p>
+                    <ul className="cls-group-members">
+                      {members.map((student) => (
+                        <li key={student.user_id}>
+                          {student.full_name || student.user_id}
+                          <span className="cls-group-score"> {student.average_percent}%</span>
+                          {student.needs_attention && (
+                            <span className="cls-group-attention" title="Kết quả lệch hẳn so với nhóm — nên xem riêng">
+                              cần xem riêng
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <section className="table-card" style={{ marginBottom: 24 }}>
           <div className="table-card-header">

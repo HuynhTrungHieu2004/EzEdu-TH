@@ -33,6 +33,7 @@ from app.core.config import settings
 from app.personalization.algorithms.kmeans_clustering import (
     KMeansTrainingError,
     choose_k_and_fit,
+    flag_distance_outliers,
     nearest_centroid,
 )
 
@@ -190,13 +191,11 @@ def analyze_question_set_quality(
 
 def _apply_outlier_flags(items: List[Dict[str, Any]], distances: List[float]) -> None:
     """Gắn cờ câu nằm quá xa tâm cụm so với mặt bằng chung của bộ đề."""
-    array = np.asarray(distances, dtype=float)
-    std = float(array.std())
-    if std == 0.0:
-        return
-    threshold = float(array.mean()) + settings.KMEANS_OUTLIER_DISTANCE_STD_MULTIPLIER * std
-    for item, distance in zip(items, distances):
-        if distance > threshold:
+    flags = flag_distance_outliers(
+        distances, multiplier=settings.KMEANS_OUTLIER_DISTANCE_STD_MULTIPLIER
+    )
+    for item, is_outlier in zip(items, flags):
+        if is_outlier:
             item.setdefault("reasons", []).append("cluster_outlier")
 
 
