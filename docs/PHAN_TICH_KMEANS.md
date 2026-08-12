@@ -2,7 +2,7 @@
 
 > Tài liệu này dựa trên đọc trực tiếp mã nguồn (`backend/app/personalization/`, `backend/app/services/`) và kiểm tra dữ liệu thật trong MongoDB `chuyende02`, không suy đoán.
 
-> **Cập nhật sau khi triển khai.** Bản đầu của tài liệu này là báo cáo rà soát, kết luận rằng K-Means huấn luyện xong nhưng không tạo ra giá trị nào cho người dùng. Sau đó **3 trong 6 đề xuất đã được cài đặt và kiểm chứng**. Các mục dưới đây được đánh dấu rõ trạng thái; phần phân tích hiện trạng ban đầu giữ nguyên để đối chiếu trước/sau.
+> **Cập nhật sau khi triển khai.** Bản đầu của tài liệu này là báo cáo rà soát, kết luận rằng K-Means huấn luyện xong nhưng không tạo ra giá trị nào cho người dùng. Sau đó **4 trong 6 đề xuất đã được cài đặt và kiểm chứng**. Các mục dưới đây được đánh dấu rõ trạng thái; phần phân tích hiện trạng ban đầu giữ nguyên để đối chiếu trước/sau.
 
 ## Tóm tắt trạng thái
 
@@ -13,10 +13,10 @@
 | Phân nhóm năng lực học sinh trong lớp | **Đã chạy** | Phân hoạch + tâm cụm đọc ra điểm yếu |
 | Gợi ý tài liệu liên quan | **Đã chạy** (cosine, không phải K-Means) | — |
 | Ràng buộc đa dạng khi sinh đề từ ma trận | Chưa làm | — |
-| Phân nhóm hành vi người dùng (quản trị) | Chưa làm | — |
+| Phân nhóm hành vi người dùng (quản trị) | **Đã chạy** | Phân khúc sử dụng + phát hiện tài khoản bất thường |
 | Gán nhãn cụm cho miền cá nhân hoá | **Bị chặn** — xem Phần 4 | — |
 
-Ba chức năng đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số) và `flag_distance_outliers` (phát hiện ngoại lai bền vững), và **dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài.
+Bốn chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số) và `flag_distance_outliers` (phát hiện ngoại lai bền vững), và **dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
 
 ---
 
@@ -96,12 +96,12 @@ Nếu chia "khai thác K-Means" thành 10 hạng mục:
 |---|---|---|---|
 | 1 | Thiết kế đặc trưng | Đã làm tốt | Đã làm tốt |
 | 2 | Chuẩn hoá / co giãn dữ liệu | Đã làm tốt | Đã làm tốt |
-| 3 | Chọn số cụm k | Đã làm tốt (đa chỉ số) | Đã làm tốt, nay dùng lại cho 3 chức năng |
+| 3 | Chọn số cụm k | Đã làm tốt (đa chỉ số) | Đã làm tốt, nay dùng lại cho 4 chức năng |
 | 4 | Đánh giá chất lượng cụm | Đã làm tốt (3 chỉ số nội tại) | Đã làm tốt, silhouette hiện ra giao diện |
 | 5 | Đánh giá độ ổn định | Đã làm tốt (ARI đa seed) | Đã làm tốt |
 | 6 | Quản lý version mô hình | Đã làm tốt | Đã làm tốt |
-| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 3 chức năng mới; **vẫn thiếu** ở miền cá nhân hoá |
-| 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 3 chức năng đều hiện kết quả cho người dùng |
+| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 4 chức năng mới; **vẫn thiếu** ở miền cá nhân hoá |
+| 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 4 chức năng đều hiện kết quả cho người dùng |
 | 9 | **Diễn giải ý nghĩa từng cụm** | Có mã, không chạy | **Đã có** — toạ độ tâm cụm đọc thẳng ra điểm yếu của nhóm |
 | 10 | **Phát hiện ngoại lai theo khoảng cách tâm cụm** | Chưa dùng | **Đã có**, dùng median/MAD (xem lỗi che lấp bên dưới) |
 
@@ -207,7 +207,7 @@ Nguyên tắc chọn đề xuất: (a) chỉ dùng chức năng **đã có sẵn
 
 ---
 
-### Đề xuất 6 — Phân nhóm hành vi người dùng cho trang quản trị — ⬜ chưa làm
+### Đề xuất 6 — Phân nhóm hành vi người dùng cho trang quản trị — ✅ ĐÃ TRIỂN KHAI
 
 **Chức năng sẵn có được nâng cấp:** Theo dõi sử dụng AI + Quản lý hạn mức (quota) + Nhật ký hoạt động.
 
@@ -241,23 +241,36 @@ Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` 
 | 2 | Đề xuất 5 — gợi ý tài liệu liên quan (nối giao diện) | ✅ xong |
 | 3 | Đề xuất 2 — phát hiện câu hỏi lỗi | ✅ xong |
 | 4 | Đề xuất 1 — phân nhóm năng lực học sinh | ✅ xong |
-| 5 | Đề xuất 6 — phân nhóm hành vi người dùng (quản trị) | ⬜ chưa |
+| 5 | Đề xuất 6 — phân nhóm hành vi người dùng (quản trị) | ✅ xong |
 | 6 | Đề xuất 4 — đa dạng hoá ma trận đề | ⬜ chưa |
 | 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi, rồi mới gán nhãn cụm | ⬜ chưa — việc lớn nhất còn lại |
 
-### 4.3. Chi tiết ba chức năng đã triển khai
+### 4.3. Chi tiết bốn chức năng K-Means đã triển khai
 
-| | Đề xuất 3 | Đề xuất 2 | Đề xuất 1 |
-|---|---|---|---|
-| Chức năng | Lọc câu trùng ý | Phát hiện câu lỗi | Phân nhóm học sinh |
-| Không gian đặc trưng | Embedding câu hỏi | (độ khó, độ phân biệt) | Điểm % theo từng bộ đề |
-| Chọn k | k = số câu cần | `choose_k_and_fit` | `choose_k_and_fit` |
-| K-Means dùng để | Chọn tập con đa dạng | Phát hiện ngoại lai | Phân hoạch + đọc tâm cụm |
-| Chuẩn hoá đặc trưng | L2 (từ embedding) | z-score | **Không** — giữ thang % để tâm cụm đọc được |
-| Nguồn dữ liệu | Câu vừa sinh | `question_attempts` | `question_attempts` |
-| Nơi hiện kết quả | Danh sách câu hỏi trả về | Trang biên tập bộ đề | Trang chi tiết lớp học |
+| | Đề xuất 3 | Đề xuất 2 | Đề xuất 1 | Đề xuất 6 |
+|---|---|---|---|---|
+| Chức năng | Lọc câu trùng ý | Phát hiện câu lỗi | Phân nhóm học sinh | Phân nhóm hành vi |
+| Không gian đặc trưng | Embedding câu hỏi | (độ khó, độ phân biệt) | Điểm % theo từng bộ đề | 6 chỉ số sử dụng |
+| Chọn k | k = số câu cần | `choose_k_and_fit` | `choose_k_and_fit` | `choose_k_and_fit` |
+| K-Means dùng để | Chọn tập con đa dạng | Phát hiện ngoại lai | Phân hoạch + đọc tâm cụm | Phân khúc + phát hiện ngoại lai |
+| Chuẩn hoá đặc trưng | L2 (từ embedding) | z-score | **Không** — giữ thang % | **Có** z-score — bắt buộc |
+| Cách đọc tâm cụm | — | trực tiếp | trực tiếp | qua trung bình số gốc |
+| Nguồn dữ liệu | Câu vừa sinh | `question_attempts` | `question_attempts` | `user_activity_logs` |
+| Nơi hiện kết quả | Danh sách câu hỏi trả về | Trang biên tập bộ đề | Trang chi tiết lớp học | Trang nhật ký hoạt động |
 
-**Ghi chú về Đề xuất 1 — quyết định không chuẩn hoá đặc trưng.** Mọi chiều đều là phần trăm 0-100, cùng đơn vị cùng thang. Giữ nguyên thang gốc khiến toạ độ tâm cụm đọc thẳng ra được: *"nhóm này 89% Hàm số nhưng 42% Lượng giác"*. Chuẩn hoá z-score sẽ làm mất tính chất đó — và chính tính chất đó mới là giá trị sư phạm.
+**Điểm đáng nhấn: hai quyết định chuẩn hoá trái ngược nhau, mỗi cái có lý do riêng.**
+
+| | Đề xuất 1 — phân nhóm lớp | Đề xuất 6 — phân nhóm hành vi |
+|---|---|---|
+| Thang các chiều | Đều là phần trăm 0-100 | Lệch xa: lượt (hàng chục–trăm), tỉ lệ lỗi (0-1), thời gian (hàng nghìn ms) |
+| Nếu **không** chuẩn hoá | Đúng — mọi chiều cùng trọng số tự nhiên | Sai — cột thời gian ms sẽ nuốt trọn khoảng cách Euclid, các chiều khác gần như vô nghĩa |
+| Nếu **có** chuẩn hoá | Mất tính đọc được của tâm cụm | Đúng — mọi chiều đóng góp cân bằng |
+| Quyết định | Không chuẩn hoá | Chuẩn hoá z-score |
+| Bù lại nhược điểm | — | Báo cáo ra ngoài bằng **trung bình số gốc**, không phải toạ độ thang z |
+
+Biết khi nào *nên* và khi nào *không nên* chuẩn hoá — kèm cách bù nhược điểm — là chỗ thể hiện hiểu thuật toán, không phải áp dụng máy móc.
+
+**Ghi chú thêm về Đề xuất 6 — loại cột không biến thiên.** Trước khi z-score, các cột có độ lệch chuẩn bằng 0 bị loại (nếu không sẽ chia cho 0). Thực tế chạy: hai cột `ai_call_count` và `ai_total_tokens` tự bị loại vì `ai_usage_events` chưa có dữ liệu. **Giao diện nêu rõ đã bỏ đặc trưng nào** thay vì im lặng — người đọc biết kết quả dựa trên đúng bao nhiêu chiều.
 
 ---
 
@@ -297,3 +310,14 @@ k = 2 (tự chọn), Silhouette = 0.683 — K-Means tách sạch nhóm câu bìn
 | 2 | 4 | 89% | **42%** | 70% | Lượng giác |
 
 k = 2 (tự chọn), Silhouette = 0.679. Một em yếu đều (33%) bị gắn cờ "cần xem riêng" nhờ khoảng cách tới tâm nhóm — thông tin mà bảng xếp hạng điểm trung bình không cho được.
+
+**Phân nhóm hành vi người dùng** — 16 người dùng, cửa sổ 90 ngày. **Đây là bộ số duy nhất chạy trên dữ liệu thật đang có trong hệ thống**, hai bảng trên dùng dữ liệu dựng để kiểm chứng:
+
+| Nhóm | Số người | Lượt hoạt động | Số loại thao tác | Tỉ lệ lỗi | Thời gian phản hồi TB |
+|---|---|---|---|---|---|
+| 1 | 2 | 6.0 | 4.5 | **17%** | 532 ms |
+| 2 | 14 | 3.4 | 2.3 | 0% | 294 ms |
+
+k = 2 (tự chọn), Silhouette = 0.58. Hai đặc trưng về AI tự bị loại vì `ai_usage_events` chưa có dữ liệu — hệ thống nêu rõ điều này ra giao diện. Năm tài khoản bị gắn cờ lệch hẳn mọi nhóm.
+
+> **Lưu ý khi trình bày:** dữ liệu hoạt động hiện tại chủ yếu là sự kiện đăng nhập (51/58 bản ghi), nên phân khúc thu được còn thô. Nêu rõ hạn chế này — kết quả sẽ giàu ý nghĩa hơn khi hệ thống tích luỹ đủ thao tác thật.
