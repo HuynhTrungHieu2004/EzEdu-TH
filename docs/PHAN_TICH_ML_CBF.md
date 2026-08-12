@@ -2,7 +2,7 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
-> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), **thông tắc đường cá nhân hoá** (BKT/IRT nay chạy được), **gán nhãn cụm**, **CBF**, và **ghép CBF × K-Means**. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. Còn lại: A2 và Thompson Sampling.
+> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), **thông tắc đường cá nhân hoá** (BKT/IRT nay chạy được), **gán nhãn cụm**, **CBF**, và **ghép CBF × K-Means**. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. Nay thêm **A2** (cảnh báo học liệu gần trùng). Chỉ còn **Thompson Sampling** chưa làm.
 
 ---
 
@@ -222,10 +222,47 @@ top-N, độ dài danh sách không đổi và không item nào bị mất.
 | # | Thuật toán | Chức năng áp dụng | Sửa ở đâu | Vì sao dùng được ngay |
 |---|---|---|---|---|
 | A1 | **Cosine trên embedding** (CBF nội dung) | Gợi ý tài liệu liên quan | ✅ **đã xong** — tab "Liên quan" ở trang chi tiết học liệu | Backend + embedding đã xong, chỉ cần nối giao diện |
-| A2 | **TF-IDF + cosine** | Cảnh báo tài liệu trùng lặp khi tải lên | ⬜ chưa làm — `routers/documents.py` sau bước trích xuất | `tfidf_service.py` đã có, hiện chỉ dùng để rút từ khoá |
+| A2 | **TF-IDF + cosine** | Cảnh báo học liệu gần trùng | ✅ **đã xong** — `document_duplicate_service.py`, chạy sau bước trích xuất | `tfidf_service.py` đã có, nay dùng thêm cho việc này |
 | A3 | **K-Means chọn tập con đa dạng** | Lọc câu hỏi trùng ý khi AI sinh đề | ✅ **đã xong** — `question_diversity_service.py` | Chỉ cần embedding của câu vừa sinh, không cần lịch sử |
 
-Ba mục này chỉ phụ thuộc nội dung tài liệu — có tài liệu là chạy được, không cần chờ học sinh dùng.
+Cả ba mục nay đã xong. Chúng chỉ phụ thuộc nội dung tài liệu — có tài liệu là chạy được, không cần chờ học sinh dùng.
+
+#### A2 đã triển khai — và bài học về việc chọn không gian vector
+
+Khi khảo sát mới thấy hệ thống **đã có sẵn bước khử trùng theo `checksum`**: tải lại
+đúng file cũ thì tái dùng bản ghi, không lưu thêm. Nên A2 không lặp lại việc đó mà bắt
+phần checksum không bắt được: **gần trùng** — cùng bài giảng xuất lại thành PDF khác,
+sửa vài dòng, hay đổi định dạng, đều cho checksum khác hoàn toàn.
+
+**Vì sao dùng TF-IDF chứ không dùng embedding sẵn có?** Đây là điểm đáng nhấn:
+
+| | Bản chất quan hệ | Công cụ đúng |
+|---|---|---|
+| "Học liệu **liên quan**" (A1) | **ngữ nghĩa** — hai bài khác nhau cùng chủ đề vẫn là liên quan | embedding |
+| "Học liệu **trùng lặp**" (A2) | **từ vựng** — cùng một văn bản, có thể sửa vài chữ | TF-IDF |
+
+Dùng embedding cho bài toán trùng lặp sẽ báo nhầm hàng loạt với mọi bài cùng chủ đề.
+**Cùng một phép đo cosine, hai không gian vector khác nhau, chọn theo bản chất bài
+toán** — không phải theo công cụ nào sẵn có.
+
+**Ngưỡng chọn theo số đo, không theo cảm tính.** Đo trên văn bản tiếng Việt thực tế:
+
+```
+Copy nguyên            1.0000  ┐
+Sửa vài chữ            0.9574  │ trùng thật
+Thêm một đoạn cuối     0.7338  │
+Rút gọn còn một nửa    0.6718  ┘
+────────── ngưỡng 0.60 nằm giữa vùng trống ──────────
+Cùng chương, khác bài  0.1109  ┐
+Khác môn hoàn toàn     0.0103  │ không trùng
+Cùng môn, khác chương  0.0000  ┘
+```
+
+Khoảng trống giữa hai nhóm rất rộng (0.11 → 0.67) nên ngưỡng **không nhạy cảm với thay
+đổi nhỏ** — chứng minh được bằng số, không phải chỉnh cho vừa dữ liệu.
+
+**Cảnh báo chứ không chặn.** Giáo viên có thể cố ý giữ hai phiên bản của cùng một bài
+giảng. Việc của hệ thống là chỉ ra, không phải quyết định thay.
 
 ### Nhóm B — Bật được ngay sau khi nối mắt xích learning event
 
@@ -258,7 +295,7 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learn
 | 4 | K-Means phân nhóm năng lực lớp *(ngoài danh sách ban đầu)* | ✅ xong | `question_attempts` |
 | 5 | K-Means phân nhóm hành vi người dùng *(ngoài danh sách ban đầu)* | ✅ xong | `user_activity_logs` |
 | 6 | K-Means ràng buộc đa dạng ma trận đề *(ngoài danh sách ban đầu)* | ✅ xong | Ngân hàng câu hỏi |
-| 7 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
+| 7 | A2 — cảnh báo học liệu gần trùng | ✅ xong | Không |
 | 8 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ✅ xong | Job nền, cờ mặc định tắt |
 | 9 | ~~Nối mắt xích: nộp bài luyện tập → phát sinh learning event~~ | ✅ **vốn đã có sẵn** | trang làm bài đã phát từ trước |
 | 10 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ✅ xong | Bước 9 |
@@ -269,7 +306,7 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learn
 
 **Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó mới là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bước 9 hoá ra đã có sẵn từ trước.
 
-Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Các bước 10, 11, 12 cũng đã hoàn thành. Còn lại chưa làm: **A2** (cảnh báo tài liệu trùng lặp) và **Thompson Sampling**, cộng hai phần có lý do hoãn rõ ràng là cách 1 và cách 2 của phần ghép CBF × K-Means.
+Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Các bước 7, 10, 11, 12 cũng đã hoàn thành. Chỉ còn **Thompson Sampling** chưa làm, cộng hai phần có lý do hoãn rõ ràng là cách 1 và cách 2 của phần ghép CBF × K-Means.
 
 ---
 
@@ -301,7 +338,7 @@ Danh sách này liệt kê các chức năng đã được giải đúng bằng 
 | Chức năng | Đang dùng | Ghi chú |
 |---|---|---|
 | Hỏi đáp AI theo học liệu (RAG) | **Hybrid search**: `0.75 × điểm vector + 0.25 × độ trùng từ khoá`, có rerank (`rag_service.py:114-127`) | Đây đã là kiến trúc hybrid retrieval chuẩn — kết hợp tìm kiếm ngữ nghĩa và tìm kiếm từ khoá. Chỉ nên tinh chỉnh trọng số, không cần thuật toán mới. |
-| Rút từ khoá từ tài liệu | TF-IDF (`tfidf_service.py`) | TF-IDF là công cụ tiêu chuẩn cho việc này. |
+| Rút từ khoá từ tài liệu | TF-IDF (`tfidf_service.py`) | TF-IDF là công cụ tiêu chuẩn cho việc này. Nay dùng lại cho cả việc phát hiện học liệu gần trùng — xem mục 2.1. |
 
 ### Nhóm 4 — Không bao giờ nên đưa ML vào
 
