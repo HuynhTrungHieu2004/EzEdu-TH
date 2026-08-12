@@ -332,6 +332,31 @@ export default function DocumentDetailPage() {
         </Alert>
       )}
 
+      {(document.near_duplicates?.length ?? 0) > 0 && (
+        <Alert tone="warning" style={{ marginBottom: 'var(--ez-space-6)' }}>
+          <strong>Học liệu này gần trùng nội dung với tài liệu đã có</strong>
+          <ul className="dd-duplicate-list">
+            {document.near_duplicates!.map((match) => (
+              <li key={match.document_id}>
+                <button
+                  type="button"
+                  className="dd-duplicate-link"
+                  onClick={() => navigate(`/documents/${match.document_id}`)}
+                >
+                  {match.original_filename || 'Tài liệu không còn tên hiển thị'}
+                </button>
+                <span className="dd-duplicate-score">
+                  giống {Math.round(match.similarity * 100)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+          <span className="dd-duplicate-note">
+            Hệ thống chỉ báo để bạn kiểm tra lại, không tự xoá — giữ nhiều phiên bản vẫn được.
+          </span>
+        </Alert>
+      )}
+
       {contentLocked && (
         <Alert tone="warning" style={{ marginBottom: 'var(--ez-space-6)' }}>
           Đang áp dụng nội dung và cập nhật chỉ mục. Tìm kiếm, hỏi đáp và sinh câu hỏi được tạm khoá.

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import os
 import time
 import uuid
@@ -37,6 +38,7 @@ from app.services.document_mutation_service import (
 )
 from app.services.document_parser import extract_text
 from app.services.rag_service import add_document_chunks, search_relevant_chunks
+from app.services.document_duplicate_service import check_document_for_duplicates
 from app.services.text_chunking_service import split_text_into_chunks
 from app.services.llm_service import transcribe_video
 from app.services.activity_log_service import record_activity
@@ -45,6 +47,7 @@ from app.services.ai_quota_service import enforce_ai_quota
 from app.services.system_settings_service import get_setting_value, require_feature_enabled_flag
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "uploads"
 
@@ -153,6 +156,7 @@ def serialize_document(document: dict) -> DocumentResponse:
         error_message=document.get("error_message"),
         checksum=document.get("checksum"),
         reuse_count=document.get("reuse_count", 0),
+        near_duplicates=document.get("near_duplicates") or [],
         created_at=document["created_at"],
         updated_at=document["updated_at"],
     )
@@ -313,6 +317,28 @@ async def save_document_content(
             status_value=status_value,
             error_message=None,
         )
+
+    # Cảnh báo học liệu gần trùng. Bước khử trùng theo checksum lúc tải lên chỉ
+    # bắt được file y hệt từng byte; chỗ này bắt phần còn lại — cùng nội dung
+    # nhưng khác file. Chỉ cảnh báo, không chặn: giáo viên có thể cố ý giữ hai
+    # phiên bản. Lỗi ở đây không được ảnh hưởng tới việc trích xuất.
+    try:
+        near_duplicates = await check_document_for_duplicates(
+            db,
+            document_id=document_id,
+            user_id=document["user_id"],
+            text=extracted_text,
+        )
+        await db["documents"].update_one(
+            {"_id": document["_id"]},
+            {"$set": {"near_duplicates": near_duplicates}},
+        )
+    except Exception as exc:  # noqa: BLE001 - cảnh báo là việc phụ
+        logger.warning(
+            "Bỏ qua kiểm tra học liệu gần trùng cho %s: %s: %s",
+            document_id, exc.__class__.__name__, exc,
+        )
+
     return await db["document_contents"].find_one(
         {"document_id": document_id, "user_id": document["user_id"]}
     )
@@ -584,6 +610,7 @@ async def upload_document(
             error_message=existing.get("error_message"),
             checksum=checksum,
             reuse_count=existing.get("reuse_count", 0) + 1,
+            near_duplicates=existing.get("near_duplicates") or [],
             text_length=content_doc.get("text_length") if content_doc else None,
             reused=True,
             created_at=existing["created_at"],

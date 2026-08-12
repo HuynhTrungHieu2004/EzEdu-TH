@@ -1,7 +1,13 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+class NearDuplicateMatch(BaseModel):
+    document_id: str
+    original_filename: str = ""
+    similarity: float
+
 
 class DocumentMetadataBase(BaseModel):
     user_id: str
@@ -16,6 +22,9 @@ class DocumentMetadataBase(BaseModel):
     error_message: Optional[str] = None
     checksum: Optional[str] = None
     reuse_count: int = 0
+    # Học liệu khác của cùng người dùng có nội dung gần trùng (TF-IDF cosine).
+    # Chỉ để cảnh báo — hệ thống không chặn việc giữ nhiều phiên bản.
+    near_duplicates: List[NearDuplicateMatch] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

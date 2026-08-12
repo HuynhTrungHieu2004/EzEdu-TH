@@ -1,5 +1,12 @@
 import client from './client';
 
+export interface NearDuplicateMatch {
+  document_id: string;
+  original_filename: string;
+  /** Độ tương đồng TF-IDF (0-1). Trên 0.60 mới được báo. */
+  similarity: number;
+}
+
 export interface DocumentResponse {
   id: string;
   user_id: string;
@@ -12,6 +19,8 @@ export interface DocumentResponse {
   media_kind?: 'document' | 'video';
   status: string;
   error_message?: string | null;
+  /** Học liệu khác cùng chủ sở hữu có nội dung gần trùng (TF-IDF cosine). */
+  near_duplicates?: NearDuplicateMatch[];
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +39,7 @@ export interface DocumentUploadResponse {
   error_message?: string | null;
   checksum?: string | null;
   reuse_count?: number;
+  near_duplicates?: NearDuplicateMatch[];
   reused?: boolean;
   created_at: string;
   updated_at: string;
