@@ -23,6 +23,7 @@ from app.schemas.question import (
 )
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
+from app.services.question_quality_service import analyze_question_set_quality
 from app.services.export_service import (
     build_export_filename,
     export_question_set_to_docx,
@@ -1157,6 +1158,28 @@ async def get_question_set(
     """
     qs = await _get_visible_qs_or_404(question_set_id, current_user)
     return _qs_to_response(qs)
+
+
+@router.get("/{question_set_id}/quality")
+async def get_question_set_quality(
+    question_set_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    """Phân tích chất lượng từng câu dựa trên bài làm thật của học sinh.
+
+    Chỉ chủ sở hữu bộ đề mới xem được — thống kê này hé lộ cách học sinh trả
+    lời, không phải thứ để lộ cho người học.
+    """
+    qs = await _get_owned_active_qs_or_404(question_set_id, current_user)
+    questions = _normalize_question_items(qs)
+
+    db = get_database()
+    cursor = db["question_attempts"].find(
+        {"question_set_id": question_set_id}, {"answers": 1}
+    )
+    attempts = [doc async for doc in cursor]
+
+    return analyze_question_set_quality(attempts, len(questions))
 
 
 # ─── 8. Delete question set (soft delete) ────────────────────────────────────

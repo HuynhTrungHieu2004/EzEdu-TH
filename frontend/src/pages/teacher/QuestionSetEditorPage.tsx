@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  AlertTriangle,
   BarChart3,
   CheckCircle2,
   Download,
@@ -11,7 +12,11 @@ import {
   Rocket,
 } from 'lucide-react';
 import { questionApi } from '../../api/questionApi';
-import type { QuestionItemUpdatePayload, QuestionSetResponse } from '../../api/questionApi';
+import type {
+  QuestionItemUpdatePayload,
+  QuestionSetQualityResponse,
+  QuestionSetResponse,
+} from '../../api/questionApi';
 import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../../api/learningEventApi';
 import QuestionCard from '../../components/QuestionCard';
 import { getApiErrorDetail, getBlobErrorDetail, isUnauthorizedError } from '../../api/errors';
@@ -41,6 +46,15 @@ import {
 import '../question-set.css';
 
 type WorkflowStatus = 'draft' | 'review_pending' | 'approved' | 'published';
+
+/** Giải thích cảnh báo chất lượng bằng lời giáo viên hiểu được, không dùng thuật ngữ thống kê. */
+const QUALITY_REASON_TEXT: Record<string, string> = {
+  negative_discrimination:
+    'Học sinh làm tốt cả bài lại sai câu này nhiều hơn học sinh yếu — nhiều khả năng đáp án đang bị sai hoặc câu hỏi gây hiểu nhầm.',
+  too_easy: 'Gần như cả lớp đều trả lời đúng, câu này không giúp phân loại được năng lực học sinh.',
+  cluster_outlier:
+    'Cách học sinh trả lời câu này lệch hẳn so với mọi nhóm câu còn lại trong bộ đề — nên đọc lại nội dung câu hỏi.',
+};
 
 const STATUS_LABELS: Record<WorkflowStatus, string> = {
   draft: 'Bản nháp',
@@ -81,6 +95,7 @@ export default function QuestionSetEditorPage() {
   const { toast } = useToast();
 
   const [questionSet, setQuestionSet] = useState<QuestionSetResponse | null>(null);
+  const [quality, setQuality] = useState<QuestionSetQualityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -108,6 +123,24 @@ export default function QuestionSetEditorPage() {
 
   const questionSessionRef = useRef<string | null>(null);
   const explanationViewedRef = useRef<Set<string>>(new Set());
+
+  // Phân tích chất lượng chỉ có nghĩa khi đã có học sinh làm bài. Lỗi ở đây
+  // không được chặn màn hình biên tập — đây là thông tin bổ trợ.
+  useEffect(() => {
+    if (!questionSetId) return;
+    let cancelled = false;
+    questionApi
+      .getQuality(questionSetId)
+      .then((data) => {
+        if (!cancelled) setQuality(data);
+      })
+      .catch(() => {
+        if (!cancelled) setQuality(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [questionSetId]);
 
   useEffect(() => {
     if (!questionSet?.id) return;
@@ -377,6 +410,46 @@ export default function QuestionSetEditorPage() {
           </div>
         </CardBody>
       </Card>
+
+      {quality && quality.status !== 'insufficient_attempts' && quality.flagged.length > 0 && (
+        <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
+          <CardHeader>
+            <div>
+              <CardTitle as="h2">
+                <AlertTriangle size={16} aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />
+                Câu hỏi nên rà soát lại
+              </CardTitle>
+              <p className="qs-quality-sub">
+                Dựa trên {quality.attempt_count} lượt làm bài thật.
+                {quality.clustering
+                  ? ` Phân cụm K-Means thành ${quality.clustering.selected_k} nhóm (silhouette ${quality.clustering.silhouette_score.toFixed(2)}).`
+                  : ''}
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <ul className="qs-quality-list">
+              {quality.flagged.map((item) => (
+                <li key={item.question_index} className="qs-quality-item">
+                  <div className="qs-quality-head">
+                    <strong>Câu {item.question_index + 1}</strong>
+                    <span className="qs-quality-metrics">
+                      Tỉ lệ đúng {item.p_value === null ? '—' : `${Math.round(item.p_value * 100)}%`}
+                      {' · '}
+                      Độ phân biệt {item.discrimination === null ? '—' : item.discrimination.toFixed(2)}
+                    </span>
+                  </div>
+                  <ul className="qs-quality-reasons">
+                    {item.reasons.map((reason) => (
+                      <li key={reason}>{QUALITY_REASON_TEXT[reason] ?? reason}</li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
 
       {(questionSet.keywords?.length || bloomTotal > 0) && (
         <div className="ez-grid ez-grid-2" style={{ marginBottom: 'var(--ez-space-6)' }}>

@@ -138,3 +138,53 @@
   gap: var(--ez-space-6);
   margin-top: var(--ez-space-6);
 }
+
+/* ── Cảnh báo chất lượng câu hỏi (thống kê + K-Means) ── */
+.qs-quality-sub {
+  margin: var(--ez-space-1) 0 0;
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+  line-height: var(--ez-leading-snug);
+}
+
+.qs-quality-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qs-quality-item {
+  padding: var(--ez-space-3);
+  border: 1px solid var(--ez-warning-border);
+  border-left-width: 3px;
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-warning-subtle);
+}
+
+.qs-quality-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ez-space-2);
+  margin-bottom: var(--ez-space-2);
+}
+
+.qs-quality-metrics {
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.qs-quality-reasons {
+  margin: 0;
+  padding-left: var(--ez-space-4);
+  color: var(--ez-text);
+  font-size: var(--ez-text-body-sm);
+  line-height: var(--ez-leading-snug);
+}
+
+.qs-quality-reasons li + li { margin-top: var(--ez-space-1); }

@@ -82,6 +82,40 @@ export interface AttemptAnswerPayload {
   answer: string;
 }
 
+export interface QuestionQualityItem {
+  question_index: number;
+  attempt_count: number;
+  correct_count: number;
+  /** Độ khó thực nghiệm: tỉ lệ học sinh trả lời đúng (0-1). */
+  p_value: number | null;
+  /** Độ phân biệt point-biserial (-1..1). Âm là dấu hiệu sai đáp án. */
+  discrimination: number | null;
+  cluster_id?: number;
+  distance_to_centroid?: number;
+  reasons?: string[];
+}
+
+export interface QuestionSetQualityResponse {
+  status: 'ok' | 'insufficient_attempts' | 'insufficient_questions' | 'clustering_unavailable';
+  attempt_count: number;
+  question_count: number;
+  min_attempts_required?: number;
+  items: QuestionQualityItem[];
+  clustering: {
+    selected_k: number;
+    silhouette_score: number;
+    davies_bouldin_index: number;
+    calinski_harabasz_score: number;
+    cluster_sizes: number[];
+  } | null;
+  flagged: Array<{
+    question_index: number;
+    reasons: string[];
+    p_value: number | null;
+    discrimination: number | null;
+  }>;
+}
+
 export interface QuestionAttemptResponse {
   id: string;
   question_set_id: string;
@@ -251,6 +285,12 @@ export const questionApi = {
 
   submitAttempt: async (id: string, answers: AttemptAnswerPayload[]): Promise<QuestionAttemptResponse> => {
     const response = await client.post<QuestionAttemptResponse>(`/questions/${id}/attempts`, { answers });
+    return response.data;
+  },
+
+  /** Phân tích chất lượng từng câu từ bài làm thật của học sinh (chỉ chủ bộ đề). */
+  getQuality: async (id: string): Promise<QuestionSetQualityResponse> => {
+    const response = await client.get<QuestionSetQualityResponse>(`/questions/${id}/quality`);
     return response.data;
   },
 
