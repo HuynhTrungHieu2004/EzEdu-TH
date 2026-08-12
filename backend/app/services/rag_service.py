@@ -29,8 +29,31 @@ def _resolve_chroma_persist_dir() -> Path:
 
 
 def init_chroma_client():
-    """Initialize the persistent ChromaDB client and create the storage directory if needed."""
-    return chromadb.PersistentClient(path=str(_resolve_chroma_persist_dir()))
+    """Tạo client ChromaDB theo chế độ đã cấu hình.
+
+    `persistent` (mặc định): đọc/ghi thẳng thư mục cục bộ, không cần dựng thêm
+    dịch vụ nào. Chỉ đúng khi backend chạy một tiến trình duy nhất — Chroma
+    lưu bằng SQLite nên nhiều tiến trình sẽ không thấy dữ liệu vector của nhau.
+
+    `http`: nối tới một Chroma server dùng chung, bắt buộc khi chạy nhiều
+    worker hoặc nhiều máy chủ.
+    """
+    mode = settings.CHROMA_MODE
+    if mode == "persistent":
+        return chromadb.PersistentClient(path=str(_resolve_chroma_persist_dir()))
+    if mode == "http":
+        headers = (
+            {"Authorization": f"Bearer {settings.CHROMA_AUTH_TOKEN}"}
+            if settings.CHROMA_AUTH_TOKEN
+            else None
+        )
+        return chromadb.HttpClient(
+            host=settings.CHROMA_HOST,
+            port=settings.CHROMA_PORT,
+            ssl=settings.CHROMA_SSL,
+            headers=headers,
+        )
+    raise ValueError(f"CHROMA_MODE không hợp lệ: {mode!r}. Chỉ nhận 'persistent' hoặc 'http'.")
 
 
 def _managed_collection_names(client) -> list[str]:

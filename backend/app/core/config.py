@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Literal, Union, Optional
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,7 +35,16 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str = ""
 
     # ChromaDB configurations
+    # `persistent` đọc/ghi thẳng thư mục cục bộ — đủ dùng khi chỉ có một tiến
+    # trình backend. Chạy nhiều worker (`uvicorn --workers N`) thì các tiến
+    # trình không thấy dữ liệu vector của nhau vì Chroma dùng SQLite cục bộ;
+    # khi đó phải dựng Chroma server riêng và chuyển sang `http`.
+    CHROMA_MODE: Literal["persistent", "http"] = "persistent"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
+    CHROMA_HOST: str = "localhost"
+    CHROMA_PORT: int = 8001
+    CHROMA_SSL: bool = False
+    CHROMA_AUTH_TOKEN: str = ""
 
     # Gemini configurations (for cross-validation)
     GEMINI_API_KEY: str = ""
@@ -234,6 +243,10 @@ class Settings(BaseSettings):
             raise ValueError("IRT beta bounds are invalid.")
         if self.IRT_MIN_ATTEMPTS_RELIABLE <= 0:
             raise ValueError("IRT_MIN_ATTEMPTS_RELIABLE must be greater than 0.")
+        if self.CHROMA_MODE == "http" and not (0 < self.CHROMA_PORT < 65536):
+            raise ValueError("CHROMA_PORT must be between 1 and 65535 when CHROMA_MODE is 'http'.")
+        if self.CHROMA_MODE == "http" and not self.CHROMA_HOST.strip():
+            raise ValueError("CHROMA_HOST must not be empty when CHROMA_MODE is 'http'.")
         if self.KMEANS_MIN_K < 2:
             raise ValueError("KMEANS_MIN_K must be at least 2.")
         if self.KMEANS_MAX_K < self.KMEANS_MIN_K:
