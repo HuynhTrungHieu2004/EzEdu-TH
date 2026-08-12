@@ -210,6 +210,24 @@ def _solve(
     _apply_group_constraints(constraints.get("difficulty_distribution", []), "difficulty", "difficulty")
     _apply_group_constraints(constraints.get("question_type_distribution", []), "question_type", "question_type")
 
+    # Ràng buộc đa dạng nội dung: giới hạn số câu lấy từ cùng một cụm ngữ nghĩa.
+    # Phân loại theo chương trình học là nhãn do người khai báo nên có thể thô —
+    # một đề đúng chủ đề, đúng mức Bloom vẫn có thể dồn hết vào một dạng bài.
+    # Nhãn cụm (do `question_content_cluster_service` gán trước khi gọi) chỉ là
+    # một ràng buộc số học nữa: CP-SAT vẫn là nơi quyết định chọn câu, vẫn chứng
+    # minh được tối ưu và vẫn báo INFEASIBLE khi không thoả được.
+    max_per_cluster = constraints.get("max_questions_per_content_cluster")
+    if max_per_cluster:
+        by_cluster: Dict[Any, List[int]] = {}
+        for i in range(n):
+            cluster_id = candidates[i].get("content_cluster")
+            # Câu chưa được gán cụm (bước gán bị bỏ qua) thì không bị ràng buộc —
+            # thà nới lỏng còn hơn chặn sinh đề vì một bước bổ trợ.
+            if cluster_id is not None:
+                by_cluster.setdefault(cluster_id, []).append(i)
+        for idxs in by_cluster.values():
+            model.Add(sum(selected[i] for i in idxs) <= int(max_per_cluster))
+
     # Không trùng câu: mỗi câu hỏi xuất hiện tối đa 1 lần trong candidates
     # (candidates là tập hợp id duy nhất ở tầng gọi) — mỗi selected[i] là một
     # biến boolean độc lập cho MỘT câu, nên ràng buộc "không trùng" tự động

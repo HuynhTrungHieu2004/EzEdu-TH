@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,9 @@ from app.exam_bank.schemas.exam import (
 from app.exam_bank.services.blueprint_service import fetch_candidate_questions, load_owned_blueprint
 from app.exam_bank.services.blueprint_solver_service import solve_blueprint, solve_blueprint_with_forced
 from app.exam_bank.services.shuffle_service import apply_shuffle_to_question, generate_equivalent_codes
+from app.services.question_content_cluster_service import assign_content_clusters
+
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -81,6 +85,15 @@ async def generate_exams(
     candidates = await fetch_candidate_questions(
         db, blueprint, exclude_recently_used_days=blueprint["constraints"].get("exclude_recently_used_days")
     )
+    # Gán nhãn cụm nội dung trước khi giải, chỉ khi ma trận thực sự yêu cầu ràng
+    # buộc đa dạng — không thì bỏ qua để khỏi tốn embedding.
+    if blueprint["constraints"].get("max_questions_per_content_cluster"):
+        cluster_stats = assign_content_clusters(candidates)
+        if not cluster_stats["applied"]:
+            logger.info(
+                "Sinh đề bỏ qua ràng buộc đa dạng nội dung (%s) — vẫn giải theo các ràng buộc còn lại.",
+                cluster_stats.get("reason"),
+            )
     result = solve_blueprint(
         candidates=candidates,
         total_points=blueprint["total_points"],

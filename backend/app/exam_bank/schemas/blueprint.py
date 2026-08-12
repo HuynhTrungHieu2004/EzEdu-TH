@@ -60,6 +60,9 @@ class BlueprintConstraints(BaseModel):
     question_type_distribution: List[QuestionTypeConstraint] = Field(default_factory=list)
     max_time_seconds: Optional[int] = Field(None, gt=0)
     exclude_recently_used_days: Optional[int] = Field(None, ge=0)
+    # Số câu tối đa được lấy từ cùng một cụm nội dung (K-Means trên embedding
+    # câu hỏi). Để trống thì không áp ràng buộc đa dạng nội dung.
+    max_questions_per_content_cluster: Optional[int] = Field(None, ge=1)
 
 
 class ExamBlueprintCreate(BaseModel):

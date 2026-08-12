@@ -24,6 +24,7 @@ import {
   Dialog,
   DialogFooter,
   ErrorState,
+  FormField,
   Input,
   PageHeader,
   Select,
@@ -639,6 +640,39 @@ export default function ExamBlueprintDetailPage() {
                   ))}
                 </tbody>
               </table>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle as="h2">Đa dạng nội dung</CardTitle>
+                <p className="ez-muted-note">
+                  Phân loại theo chủ đề là nhãn khai báo tay nên có thể thô — một đề đúng chủ đề, đúng mức Bloom
+                  vẫn có thể dồn hết vào một dạng bài. Hệ thống phân cụm nội dung câu hỏi bằng K-Means và giới hạn
+                  số câu lấy từ cùng một cụm. Để trống nếu không cần ràng buộc này.
+                </p>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <FormField
+                label="Số câu tối đa từ cùng một cụm nội dung"
+                hint="Ví dụ: đề 10 câu, đặt 3 thì đề buộc phải lấy từ ít nhất 4 cụm nội dung khác nhau."
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  disabled={!isDraft}
+                  placeholder="Không giới hạn"
+                  value={constraints.max_questions_per_content_cluster ?? ''}
+                  onChange={(e) =>
+                    setConstraints((c) => ({
+                      ...c,
+                      max_questions_per_content_cluster: e.target.value ? Number(e.target.value) : null,
+                    }))
+                  }
+                />
+              </FormField>
             </CardBody>
           </Card>
 

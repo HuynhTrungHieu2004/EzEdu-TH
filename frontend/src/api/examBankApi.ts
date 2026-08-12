@@ -101,6 +101,8 @@ export interface BlueprintConstraints {
   question_type_distribution: QuestionTypeConstraint[];
   max_time_seconds?: number | null;
   exclude_recently_used_days?: number | null;
+  /** Số câu tối đa lấy từ cùng một cụm nội dung (K-Means trên embedding câu hỏi). */
+  max_questions_per_content_cluster?: number | null;
 }
 
 export interface ExamBlueprint {
