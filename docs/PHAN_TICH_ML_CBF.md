@@ -2,7 +2,7 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
-> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), **thông tắc đường cá nhân hoá** (BKT/IRT nay chạy được), **gán nhãn cụm**, **CBF**, và **ghép CBF × K-Means**. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. Nay thêm **A2** (cảnh báo học liệu gần trùng). Chỉ còn **Thompson Sampling** chưa làm.
+> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), **thông tắc đường cá nhân hoá** (BKT/IRT nay chạy được), **gán nhãn cụm**, **CBF**, và **ghép CBF × K-Means**. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. Nay thêm **A2** (cảnh báo học liệu gần trùng) và **Thompson Sampling** (đã kiểm chứng, chờ bật). **Toàn bộ lộ trình trong tài liệu này đã hoàn thành.**
 
 ---
 
@@ -270,9 +270,48 @@ giảng. Việc của hệ thống là chỉ ra, không phải quyết định t
 |---|---|---|---|
 | B1 | **BKT** | Ước lượng mức thành thạo từng đơn vị kiến thức → trang "Tiến độ học tập" hiện chỉ có điểm số thô | `algorithms/bkt.py` |
 | B2 | **IRT (Rasch)** | Ước lượng độ khó câu hỏi **từ dữ liệu thật** thay vì để AI/giáo viên gán tay; đồng thời ước lượng năng lực học sinh trên cùng thang đo | `algorithms/irt.py` |
-| B3 | **Thompson Sampling** | Tự học xem nguồn gợi ý nào hiệu quả nhất cho từng học sinh, thay vì trọng số cố định | `algorithms/contextual_bandit.py`, đang bị tắt bởi `BANDIT_KILL_SWITCH` |
+| B3 | **Thompson Sampling** | Tự học xem nguồn gợi ý nào hiệu quả nhất cho từng học sinh, thay vì trọng số cố định | ✅ **đã kiểm chứng** — mã vốn đã nối đủ, chỉ chờ bật cờ. Xem mục ngay dưới |
 
 **Lưu ý B2 rất đáng giá:** độ khó do IRT ước lượng chính là đầu vào chất lượng cao cho đề xuất "phát hiện câu hỏi bất thường" bằng K-Means — câu có độ phân biệt âm (học sinh giỏi làm sai nhiều hơn học sinh yếu) gần như chắc chắn là câu sai đáp án. Hai thuật toán nuôi nhau.
+
+#### B3 Thompson Sampling — trường hợp duy nhất không thiếu mã
+
+Khác mọi mục khác trong tài liệu này, phần bandit **đã nối đủ hai đầu từ trước**:
+`evaluate_bandit_decision` trong luồng xếp hạng, `update_bandit_from_recommendation_feedback`
+trong luồng phản hồi, và log gợi ý có lưu đủ `bandit_context` lẫn `bandit_action` để phản
+hồi về sau dùng được. Nó chỉ bị tắt bởi `BANDIT_KILL_SWITCH`.
+
+Nhưng đường này **chưa từng chạy trong sản phẩm**, nên đã chạy tay kiểm chứng toàn bộ rồi
+chốt lại bằng test hồi quy.
+
+**Ba chế độ hoạt động đúng:**
+
+| Chế độ | Hành vi kiểm chứng được |
+|---|---|
+| `disabled` (mặc định) | thoát ngay, không đụng thứ tự gợi ý |
+| `shadow` | tính quyết định và lưu context, **không đổi thứ tự** |
+| `active` | ép bandit chọn item cuối → thứ tự đổi thành `['i3','i1','i2']` |
+
+**Vòng học đi đúng hướng** (ước lượng suy từ tham số chính tắc `b / precision`):
+
+```
+3 lần phản hồi TÍCH CỰC:  0.42 → 0.68 → 0.86
+3 lần phản hồi TIÊU CỰC:  0.50 → 0.22 → 0.00
+```
+
+Tăng dần rồi lùi đối xứng về tiên nghiệm — đúng chuẩn hồi quy Bayes tuyến tính.
+
+**Một nghi ngờ đã kiểm tra rồi bác bỏ.** `compute_bandit_reward` dùng
+`immediate_map.get(feedback_type, 0.0)`, thoạt nhìn có vẻ nuốt im lặng loại phản hồi lạ —
+đúng kiểu lỗi đã gặp nhiều lần trong dự án này. Nhưng `FeedbackType` chỉ cho đúng 8 giá
+trị và bảng phần thưởng phủ hết cả 8; đo lại cả 8 đều khác 0 và đúng dấu. Nhánh mặc định
+không tới được từ API — đây là phòng thủ, không phải lỗ hổng. Đã khoá điều kiện này bằng
+test để nếu sau này thêm loại phản hồi mới mà quên cập nhật bảng thì test sẽ đỏ.
+
+**Không bật cờ, và đó là chủ ý.** Bật hay không là quyết định vận hành của chủ hệ thống.
+Đã ghi lộ trình ba bước vào `.env.example`: tắt → chế độ quan sát (bandit quyết định và
+ghi log nhưng không đổi gợi ý, chạy vài tuần để đối chiếu) → chế độ thật.
+`BANDIT_KILL_SWITCH` thắng mọi cờ khác nên luôn dùng được làm đường thoát hiểm.
 
 ### Nhóm C — Chưa nên làm bây giờ
 
@@ -302,11 +341,17 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learn
 | 11 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ✅ xong | Bước 9 + lưu embedding cho item |
 | 12 | Ghép CBF × K-Means | ✅ cách 3 đã nối; cách 1 đo xong chưa nối; cách 2 chưa làm | Bước 10 + 11 |
 | 13 | B1, B2 — BKT & IRT | ✅ **đã chạy được** | cần bật cờ + đủ lượt làm bài |
-| 14 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 11 |
+| 14 | B3 — Thompson Sampling | ✅ đã kiểm chứng, chờ quyết định bật | Bước 11 |
 
 **Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó mới là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bước 9 hoá ra đã có sẵn từ trước.
 
-Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Các bước 7, 10, 11, 12 cũng đã hoàn thành. Chỉ còn **Thompson Sampling** chưa làm, cộng hai phần có lý do hoãn rõ ràng là cách 1 và cách 2 của phần ghép CBF × K-Means.
+**Toàn bộ 14 bước đã xong.** Ba phần còn lại đều là *quyết định có chủ đích*, không phải việc bỏ dở:
+
+| Phần | Trạng thái | Lý do |
+|---|---|---|
+| Thompson Sampling | mã đã kiểm chứng, cờ vẫn tắt | bật là quyết định vận hành, nên chạy chế độ quan sát trước |
+| Ghép CBF × K-Means cách 1 (tốc độ) | đã cài và đo, chưa nối | ở quy mô hiện tại chỉ tiết kiệm ~27ms, chưa đáng đánh đổi lấy tầng cache |
+| Ghép CBF × K-Means cách 2 (khởi đầu lạnh) | chưa làm | thiếu cầu nối giữa hai không gian đặc trưng; đường lùi hiện tại vẫn chạy đúng |
 
 ---
 

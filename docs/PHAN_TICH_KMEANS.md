@@ -17,7 +17,16 @@
 | Gán nhãn cụm cho miền cá nhân hoá | **Đã chạy** | Gán 5 loại cụm về đúng đối tượng |
 | Ghép CBF × K-Means (chống bong bóng lọc) | **Đã chạy** | Cụm chỉ ra vùng nội dung người học chưa chạm |
 
-Năm chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững). **Dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
+Sáu chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba
+trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững).
+
+Chia theo nguồn dữ liệu nuôi chúng:
+
+- **Năm chức năng chạy trên dữ liệu tự sinh từ luồng dùng bình thường** — giáo viên tạo
+  đề, học sinh làm bài, người dùng thao tác. Không phụ thuộc gì thêm.
+- **Riêng "gán nhãn cụm cho miền cá nhân hoá"** cần `learning_items`, tức phụ thuộc mắt
+  xích knowledge extraction. Mắt xích đó **nay đã thông** (Phần 4.1), nhưng chỉ chạy khi
+  bật hai cờ `PERSONALIZATION_ENABLED` và `KNOWLEDGE_GRAPH_ENABLED` — mặc định vẫn tắt.
 
 ---
 
@@ -336,6 +345,12 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 - **Một lỗi chỉ lộ ra khi chạy với MongoDB thật** (`ConflictingUpdateOperators` trong `upsert_graph_edge`) mà 500+ test dùng `mongomock` không bắt được — vì mongomock chấp nhận lệnh mà MongoDB thật từ chối. Nêu điểm này cho thấy hiểu giới hạn của việc giả lập cơ sở dữ liệu trong kiểm thử.
 - **Một lỗi im lặng do giá trị mặc định**: `learning_items` chưa từng lưu `semantic_embedding`, mà cụm `content` và `question` dành 70% trọng số cho trường này. Hàm đọc có sẵn fallback cứng `[0,0,0,0]` nên phân cụm vẫn chạy, vẫn ra kết quả — chỉ là 70% trọng số đổ vào một vector hằng. Sau khi sửa, độ tách không gian đặc trưng tăng từ **0.0000 lên 0.9899**. Bài học: một giá trị mặc định "cho an toàn" có thể che giấu việc cả một khối đặc trưng không bao giờ có dữ liệu.
 - **Chọn không gian vector theo bản chất bài toán, không theo công cụ sẵn có**: chức năng "học liệu liên quan" dùng embedding vì *liên quan* là quan hệ ngữ nghĩa; chức năng "cảnh báo học liệu gần trùng" dùng TF-IDF vì *trùng lặp* là quan hệ từ vựng. Cùng một phép đo cosine, hai không gian khác nhau. Dùng embedding cho bài toán trùng lặp sẽ báo nhầm mọi bài cùng chủ đề. Chi tiết và số đo ở `PHAN_TICH_ML_CBF.md`.
+- **Không phải nghi ngờ nào cũng là lỗi.** Ở phần Thompson Sampling, một dòng
+  `map.get(key, 0.0)` thoạt nhìn giống hệt kiểu lỗi "giá trị mặc định che giấu vấn đề" đã
+  gặp ở trên. Kiểm tra kỹ thì kiểu dữ liệu đầu vào chỉ cho đúng 8 giá trị và bảng tra phủ
+  hết cả 8, nên nhánh mặc định không tới được — đó là phòng thủ hợp lý. Nêu cả trường hợp
+  nghi sai này cho thấy quy trình là *kiểm chứng rồi mới kết luận*, không phải đi tìm lỗi
+  cho đủ số.
 - **Một tối ưu đã đo rồi quyết định KHÔNG dùng**: ghép cụm để thu hẹp trước khi xếp hạng CBF nhanh 3.9× khi tâm cụm tính sẵn, nhưng **chậm hơn 15-25%** nếu tính lại tâm cụm mỗi lượt. Ở quy mô hiện tại chỉ tiết kiệm ~27ms, chưa đủ để đánh đổi lấy một tầng cache kèm rủi ro dữ liệu cũ. Trình bày cả số đo lẫn quyết định hoãn thường được đánh giá cao hơn là tối ưu mà không đo.
 
 ### Số liệu kiểm chứng có thể trích vào báo cáo
