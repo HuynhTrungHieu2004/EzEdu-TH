@@ -5,6 +5,10 @@ from typing import Optional
 
 from app.core.config import settings
 from app.personalization.repositories.mongo import PersonalizationMongoRepository
+from app.personalization.services.content_based_filtering_service import (
+    build_learner_profile_vector,
+    score_item_similarity,
+)
 from app.personalization.schemas.candidates import (
     CandidateGenerationResponse,
     CandidateResponse,
@@ -101,6 +105,12 @@ async def generate_candidates_for_user(
     twin = await get_current_user_digital_twin(user_id, repository=repo, use_cache=False)
     all_items = await repo.list_accessible_learning_items_for_user(user_id, limit=1000)
     recent_events = await repo.list_learning_events_for_user(user_id, limit=100)
+
+    # Hồ sơ nội dung của người học, dựng từ chính nội dung họ đã tương tác.
+    # Rỗng khi chưa đủ lịch sử — nguồn `learner_interest` tự lùi về cách cũ.
+    learner_profile_vector = build_learner_profile_vector(
+        recent_events, {str(item.get("id") or item.get("_id")): item for item in all_items}
+    )
     states = await repo.list_knowledge_states_for_user(user_id, limit=500)
     components = await repo.list_knowledge_components_for_user(user_id, limit=500)
 
@@ -144,7 +154,9 @@ async def generate_candidates_for_user(
     await _collect_current_learning_goal(accumulator, repo, user_id, twin, component_by_id, per_source_limit)
     _collect_similar_to_recent_error(accumulator, pool_by_id, recent_error_events, per_source_limit)
     _collect_appropriate_difficulty(accumulator, pool_by_id, twin, per_source_limit)
-    _collect_learner_interest(accumulator, pool_by_id, twin, component_by_id, per_source_limit)
+    _collect_learner_interest(
+        accumulator, pool_by_id, twin, component_by_id, per_source_limit, learner_profile_vector
+    )
     _collect_cluster_match(accumulator, pool_by_id, recent_events, per_source_limit)
     _collect_continue_current_path(accumulator, pool_by_id, recent_events, per_source_limit)
 
@@ -347,7 +359,15 @@ def _collect_learner_interest(
     twin,
     component_by_id: dict[str, dict],
     per_source_limit: int,
+    profile_vector: list[float] | None = None,
 ) -> None:
+    """Nguồn ứng viên theo sở thích nội dung.
+
+    Có hồ sơ nội dung (dựng từ lịch sử tương tác) thì chấm bằng độ tương đồng
+    cosine — mỗi item một điểm khác nhau, đúng nghĩa lọc theo nội dung. Chưa đủ
+    lịch sử để dựng hồ sơ thì lùi về cách khớp nhãn cũ, vì lúc đó không có gì
+    để so nội dung với nhau.
+    """
     preferred_types = set(twin.content_preferences.preferred_content_types)
     added = 0
     for item in pool_by_id.values():
@@ -357,7 +377,14 @@ def _collect_learner_interest(
             for kc_id in _item_kcs(item)
         )
         if type_match and subject_match:
-            accumulator.add(item, "learner_interest", 0.5 + (_quality(item) or 0.0) * 0.25)
+            if profile_vector:
+                # Trọng số 0.75 cho độ tương đồng nội dung, 0.25 cho chất lượng
+                # item — nội dung hợp gu là tiêu chí chính, chất lượng là phụ.
+                similarity = score_item_similarity(profile_vector, item)
+                score = 0.75 * similarity + 0.25 * (_quality(item) or 0.0)
+            else:
+                score = 0.5 + (_quality(item) or 0.0) * 0.25
+            accumulator.add(item, "learner_interest", score)
             added += 1
         if added >= per_source_limit:
             break
