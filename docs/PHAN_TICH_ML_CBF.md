@@ -2,7 +2,7 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
-> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), và **đã thông tắc đường cá nhân hoá** — BKT/IRT nay chạy được. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. CBF vẫn chưa triển khai.
+> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), **thông tắc đường cá nhân hoá** (BKT/IRT nay chạy được), **gán nhãn cụm**, **CBF**, và **ghép CBF × K-Means**. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. Còn lại: A2 và Thompson Sampling.
 
 ---
 
@@ -66,12 +66,17 @@ CBF cần 3 thành phần:
 | Thành phần | Trạng thái | Vị trí |
 |---|---|---|
 | Vector đặc trưng nội dung | **Đã có** | `rag_service.build_embeddings()`, `tfidf_service.extract_keywords()` |
-| Vector hồ sơ người dùng | **Chưa có** | cần dựng từ `learning_events` / `question_attempts` |
+| Vector hồ sơ người dùng | **Đã có** | `content_based_filtering_service.build_learner_profile_vector` |
 | Hàm đo tương đồng | **Đã có** | `rag_service._normalize_vector()` — chuẩn hoá L2 rồi tích vô hướng chính là cosine |
 
-Thiếu đúng một thành phần: vector hồ sơ người dùng.
+~~Thiếu đúng một thành phần: vector hồ sơ người dùng.~~ **Nay đã đủ cả ba.**
 
-### 1.2. Vị trí chèn chính xác
+> **Một điều kiện ẩn phát hiện khi bắt tay làm:** thành phần (1) tưởng là "đã có"
+> nhưng thực ra **chưa** — `learning_items` không hề lưu vector nội dung. Chi tiết
+> ở mục 1.4 bên dưới, vì đây đồng thời là một lỗi âm thầm làm hỏng hai loại cụm
+> K-Means.
+
+### 1.2. Vị trí chèn chính xác — ✅ ĐÃ TRIỂN KHAI
 
 Hàm `_collect_learner_interest` (`candidate_generator_service.py:344-365`) hiện đang **so khớp hạng mục thô**, không phải CBF thật:
 
@@ -90,11 +95,59 @@ if type_match and subject_match:
 2. Điểm CBF = cosine(vector hồ sơ, embedding item).
 3. Điểm này thay cho hằng số `0.5`, cho ra thứ hạng thật sự cá nhân hoá.
 
-### 1.3. Ghép CBF với K-Means — 3 cách có giá trị thật
+**Kết quả thật** — học sinh vừa học 2 bài về phương trình bậc hai, chấm 4 ứng viên:
+
+| Ứng viên | Cách cũ | CBF |
+|---|---|---|
+| Định lý Viète cho phương trình bậc hai | 0.700 | **0.510** |
+| Đồ thị hàm bậc hai, đỉnh parabol | 0.700 | 0.413 |
+| Cấu tạo tế bào, ti thể | 0.700 | 0.314 |
+| Chiến dịch Điện Biên Phủ | 0.700 | 0.209 |
+
+Cách cũ cho **cả 4 điểm bằng nhau** nên không xếp hạng được gì — đây là bằng chứng
+định lượng cho nhận định "lọc theo nhãn chứ không phải theo nội dung". CBF xếp đúng
+thứ tự gần gũi về nội dung.
+
+**Hai lựa chọn thiết kế đáng nêu khi bảo vệ:**
+
+- **Câu trả lời SAI vẫn tính như tương tác bình thường.** Đây là hồ sơ *sở thích
+  nội dung*, không phải hồ sơ *năng lực* — làm sai không có nghĩa là không quan tâm.
+  Lẫn hai khái niệm này là lỗi thiết kế thường gặp.
+- **Suy giảm theo thời gian**, chu kỳ bán rã 30 ngày. Không có bước này thì hồ sơ
+  bị đóng băng theo những gì học sinh học từ đầu năm.
+
+### 1.4. Điều kiện ẩn: `learning_items` chưa từng lưu vector nội dung
+
+Cụm `content` và `question` dành **70% trọng số đặc trưng** cho trường
+`semantic_embedding`. Nhưng không dòng mã nào ghi trường đó, và schema
+`PersonalizationDocument` đặt `extra="forbid"` nên nó cũng **không lưu được** kể cả
+khi có ai ghi. Hàm đọc lại có sẵn fallback cứng `[0.0, 0.0, 0.0, 0.0]`.
+
+Hệ quả: lỗi diễn ra **hoàn toàn im lặng**. Phân cụm vẫn chạy, vẫn ra kết quả, chỉ là
+70% trọng số đổ vào một vector hằng không phân biệt được gì — tức chạy trên 30% tín
+hiệu so với thiết kế.
+
+Đã sửa: thêm trường vào schema, nhúng nội dung theo lô ngay trong bước trích xuất tri
+thức. Kiểm chứng với 4 đoạn nội dung thuộc 2 chủ đề khác hẳn nhau (toán và lịch sử):
+
+| | Trước | Sau |
+|---|---|---|
+| Vector lưu được | không | 384 chiều, khác 0 |
+| Độ tách không gian đặc trưng `content` | **0.0000** | **0.9899** |
+
+Bài học: một giá trị mặc định "cho an toàn" có thể che giấu việc cả một khối đặc trưng
+không bao giờ có dữ liệu. Nên cân nhắc ghi log hoặc báo lỗi thay vì lặng lẽ dùng
+giá trị thay thế.
+
+### 1.3. Ghép CBF với K-Means — 3 cách, ba kết cục khác nhau
+
+> **Tóm tắt sau khi triển khai:** cách 3 đã nối vào luồng chạy; cách 1 đã cài và đo
+> nhưng **cố tình chưa nối**; cách 2 chưa làm vì thiếu một cầu nối không gian đặc
+> trưng. Lý do từng trường hợp ghi ngay dưới mỗi cách.
 
 Đây là phần trả lời trực tiếp câu hỏi "CBF kết hợp K-Means được không". Ba cách dưới đây không gượng ép, mỗi cách giải một điểm yếu cụ thể.
 
-**Cách 1 — Cụm thu hẹp, CBF xếp hạng (giải bài toán tốc độ)**
+**Cách 1 — Cụm thu hẹp, CBF xếp hạng (tốc độ)** — ⚠️ đã cài và đo, CỐ TÌNH chưa nối
 
 CBF thuần phải tính cosine với toàn bộ N item, chi phí O(N), tăng tuyến tính khi kho học liệu lớn dần. Ghép K-Means:
 
@@ -103,19 +156,60 @@ vector hồ sơ → cosine với k tâm cụm (k ≈ 8)  → chọn 2 cụm gầ
              → chỉ cosine trong 2 cụm đó      → xếp hạng cuối
 ```
 
-Chi phí giảm từ `O(N)` xuống `O(k + 2N/k)`. Với 10.000 item và k = 8, số phép tính giảm khoảng 4 lần. Tâm cụm đã được lưu sẵn trong `cluster_models.centroids` — không cần tính lại.
+Chi phí giảm từ `O(N)` xuống `O(k + 2N/k)`.
 
-**Cách 2 — Cụm giải bài toán khởi đầu lạnh của CBF (điểm yếu cố hữu của CBF)**
+**Đo thực tế** (vector 384 chiều, 8 cụm, chọn 2 cụm gần nhất):
+
+| N item | CBF toàn bộ | Cụm rồi CBF | Tỉ lệ |
+|---|---|---|---|
+| 1.000 | 36.8ms | 9.4ms | **3.91×** |
+| 5.000 | 182.1ms | 47.1ms | 3.87× |
+| 20.000 | 738.3ms | 184.8ms | 3.99× |
+
+**Nhưng phép đo đầu tiên cho kết quả ngược lại — chậm hơn 15-25%.** Nguyên nhân: bước
+dựng tâm cụm cũng phải quét hết N item và cộng vector 384 chiều, tốn ngang việc chấm
+điểm toàn bộ. Con số 3.9× ở trên chỉ đạt được khi tâm cụm được **tính sẵn và lưu lại**.
+
+**Quyết định: chưa nối.** Kho học liệu hiện giới hạn 1.000 item mỗi lượt, tiết kiệm
+khoảng 27ms — chưa đủ để đánh đổi lấy một tầng cache tâm cụm kèm rủi ro dùng nhầm dữ
+liệu cũ khi mô hình được huấn luyện lại. Hàm đã có test đầy đủ, số đo ghi trong
+docstring, sẵn sàng nối khi quy mô lớn hơn.
+
+**Đính chính bản đầu:** câu *"tâm cụm đã được lưu sẵn trong `cluster_models.centroids`
+— không cần tính lại"* là **sai**. Tâm cụm đó nằm ở không gian đặc trưng **đã trộn và
+chuẩn hoá** (embedding × 0.7 + khối số × 0.3, đã z-score), nên không so cosine trực
+tiếp với vector hồ sơ được. Phải tính lại tâm cụm trong chính không gian embedding —
+vẫn dùng đúng cách phân hoạch của K-Means, chỉ đổi hệ quy chiếu để phép đo có nghĩa.
+
+**Cách 2 — Cụm giải bài toán khởi đầu lạnh của CBF** — ⬜ chưa làm, có lý do
 
 CBF cần lịch sử tương tác mới dựng được vector hồ sơ. Học sinh mới đăng ký có lịch sử rỗng → CBF không chạy được.
 
-Cách xử lý: trang `StudentOnboardingPage` **đã thu thập sẵn** khối lớp, môn mạnh/yếu, tổ hợp môn mục tiêu (`learner_profiles.grade_level`, `strong_subjects`, `weak_subjects`, `target_exam_combinations`). Dùng các trường này gán học sinh mới vào cụm `learner_interest` gần nhất, rồi **lấy tâm cụm làm vector hồ sơ tạm thời** cho tới khi tích luỹ đủ lịch sử thật (trường `cold_start_status: new | collecting | ready` đã có sẵn trong schema để theo dõi trạng thái này).
+Cách xử lý dự kiến: trang `StudentOnboardingPage` **đã thu thập sẵn** khối lớp, môn mạnh/yếu, tổ hợp môn mục tiêu. Dùng các trường này gán học sinh mới vào cụm `learner_interest` gần nhất, rồi lấy tâm cụm làm vector hồ sơ tạm thời.
 
-**Cách 3 — Cụm chống bong bóng lọc của CBF (điểm yếu cố hữu thứ hai)**
+**Vì sao chưa làm:** đặc trưng của cụm `learner_interest` là các **phân bố tương tác**
+(tỉ lệ chạm chủ đề, ưu tiên loại nội dung, phân bố click gợi ý), còn dữ liệu onboarding
+là **khối lớp và tên môn** — hai không gian khác nhau, cần một cầu nối ánh xạ chưa tồn
+tại. Gán bừa sẽ cho ra cụm vô nghĩa.
+
+Hiện tại học sinh mới có `profile_vector` rỗng và **tự lùi về cách khớp nhãn cũ** — vẫn
+chạy đúng, chỉ là chưa cá nhân hoá. Đây là đường lùi an toàn, không phải lỗi.
+
+**Cách 3 — Cụm chống bong bóng lọc của CBF** — ✅ ĐÃ NỐI vào luồng chạy
 
 CBF chỉ gợi ý thứ giống cái đã học → học sinh bị nhốt trong một vùng kiến thức, không bao giờ gặp chủ đề mới. Đây là nhược điểm kinh điển của CBF.
 
-Cách xử lý: áp ràng buộc trên cụm — trong top-N gợi ý phải có tối thiểu 1 item thuộc cụm mà học sinh chưa từng chạm. Cơ chế này **đã được cài sẵn một nửa**: `RERANK_MAX_SAME_QUESTION_CLUSTER = 2` trong `config.py:161` giới hạn số item liên tiếp cùng cụm, chỉ cần bổ sung chiều ngược lại (bắt buộc có cụm mới).
+Cách xử lý: áp ràng buộc trên cụm — trong top-N gợi ý phải có tối thiểu 1 item thuộc
+cụm mà học sinh chưa từng chạm.
+
+Khi đọc kỹ mã mới thấy rõ hơn: `RERANK_MAX_SAME_QUESTION_CLUSTER = 2` chỉ chặn item
+**liên tiếp** cùng cụm — đó là *giãn cách*, không phải *phủ*. Một top-10 vẫn hoàn toàn
+có thể chỉ gồm hai cụm xen kẽ nhau, tức vẫn nằm trong bong bóng.
+
+`ensure_cluster_exploration` bổ sung đúng chiều còn thiếu, kèm một ràng buộc quan
+trọng: **giữ nguyên item điểm cao nhất ở đầu danh sách** — thăm dò không được đánh đổi
+bằng việc đẩy gợi ý tốt nhất xuống dưới. Item được đề lên thay vào vị trí cuối của
+top-N, độ dài danh sách không đổi và không item nào bị mất.
 
 > Tóm tắt vai trò: **K-Means lo độ phủ và tốc độ, CBF lo độ chính xác cá nhân.** Hai thuật toán bù đúng nhược điểm của nhau chứ không chồng chéo.
 
@@ -167,15 +261,15 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learn
 | 7 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
 | 8 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ✅ xong | Job nền, cờ mặc định tắt |
 | 9 | ~~Nối mắt xích: nộp bài luyện tập → phát sinh learning event~~ | ✅ **vốn đã có sẵn** | trang làm bài đã phát từ trước |
-| 10 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ⬜ chưa | Bước 9 |
-| 11 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ⬜ chưa | Bước 9 |
-| 12 | Ghép CBF × K-Means (cách 1, 2, 3) | ⬜ chưa | Bước 10 + 11 |
+| 10 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ✅ xong | Bước 9 |
+| 11 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ✅ xong | Bước 9 + lưu embedding cho item |
+| 12 | Ghép CBF × K-Means | ✅ cách 3 đã nối; cách 1 đo xong chưa nối; cách 2 chưa làm | Bước 10 + 11 |
 | 13 | B1, B2 — BKT & IRT | ✅ **đã chạy được** | cần bật cờ + đủ lượt làm bài |
 | 14 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 11 |
 
 **Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó mới là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bước 9 hoá ra đã có sẵn từ trước.
 
-Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Còn lại chưa làm: A2, gán nhãn cụm cho miền cá nhân hoá, CBF, ghép CBF × K-Means, và Thompson Sampling.
+Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Các bước 10, 11, 12 cũng đã hoàn thành. Còn lại chưa làm: **A2** (cảnh báo tài liệu trùng lặp) và **Thompson Sampling**, cộng hai phần có lý do hoãn rõ ràng là cách 1 và cách 2 của phần ghép CBF × K-Means.
 
 ---
 

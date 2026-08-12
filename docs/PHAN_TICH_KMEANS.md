@@ -14,7 +14,8 @@
 | Gợi ý tài liệu liên quan | **Đã chạy** (cosine, không phải K-Means) | — |
 | Ràng buộc đa dạng khi sinh đề từ ma trận | **Đã chạy** | Gán nhãn cụm nội dung làm ràng buộc cho CP-SAT |
 | Phân nhóm hành vi người dùng (quản trị) | **Đã chạy** | Phân khúc sử dụng + phát hiện tài khoản bất thường |
-| Gán nhãn cụm cho miền cá nhân hoá | **Hết bị chặn**, chưa làm — xem Phần 4.1 | — |
+| Gán nhãn cụm cho miền cá nhân hoá | **Đã chạy** | Gán 5 loại cụm về đúng đối tượng |
+| Ghép CBF × K-Means (chống bong bóng lọc) | **Đã chạy** | Cụm chỉ ra vùng nội dung người học chưa chạm |
 
 Năm chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững). **Dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
 
@@ -69,6 +70,10 @@ Một quy trình phân cụm hoàn chỉnh có 3 khâu:
 
 Hệ thống hiện có **khâu [1] rất tốt, thiếu hoàn toàn khâu [2], nên khâu [3] chạy rỗng.**
 
+> **Cập nhật:** cả ba khâu nay đã đủ. Xem Phần 4.1 để biết nguyên nhân cấu trúc khiến
+> khâu [2] không làm được và cách sửa. Phần mô tả bên dưới giữ nguyên trạng thái ban
+> đầu để đối chiếu.
+
 Bằng chứng cụ thể:
 
 - Hàm gán cụm `predict_cluster` **có tồn tại** (`clustering_service.py:169-216`) nhưng **không có nơi nào trong mã sản phẩm gọi nó** — chỉ có 2 test gọi (`tests/test_kmeans_clustering.py:109,121`).
@@ -100,7 +105,7 @@ Nếu chia "khai thác K-Means" thành 10 hạng mục:
 | 4 | Đánh giá chất lượng cụm | Đã làm tốt (3 chỉ số nội tại) | Đã làm tốt, silhouette hiện ra giao diện |
 | 5 | Đánh giá độ ổn định | Đã làm tốt (ARI đa seed) | Đã làm tốt |
 | 6 | Quản lý version mô hình | Đã làm tốt | Đã làm tốt |
-| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 5 chức năng mới; miền cá nhân hoá nay hết bị chặn nhưng **chưa làm** |
+| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có đủ** — 5 chức năng mới, và cả 5 loại cụm của miền cá nhân hoá |
 | 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 5 chức năng đều hiện kết quả cho người dùng |
 | 9 | **Diễn giải ý nghĩa từng cụm** | Có mã, không chạy | **Đã có** — toạ độ tâm cụm đọc thẳng ra điểm yếu của nhóm |
 | 10 | **Phát hiện ngoại lai theo khoảng cách tâm cụm** | Chưa dùng | **Đã có**, dùng median/MAD (xem lỗi che lấp bên dưới) |
@@ -233,7 +238,35 @@ Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` 
 
 **Cách xử lý lúc đó:** không cố thông tắc ngay, mà chuyển sang các chức năng có **dữ liệu tự sinh từ luồng dùng bình thường** — giáo viên tạo đề (`question_sets`), học sinh làm bài (`question_attempts`). Đề xuất 1, 2, 3 đều nằm trên đường này, và chúng **tự gán nhãn cụm ngay trong lượt tính**, không cần job nền.
 
-**Cập nhật — tắc nghẽn đã được thông.** Sau khi hoàn thành cả 6 đề xuất, tắc nghẽn này đã được xử lý: thêm job nền `extract_document_knowledge` tự xếp hàng sau khi sinh câu hỏi. Chi tiết và kết quả kiểm chứng xem `PHAN_TICH_ML_CBF.md`. Hệ quả cho tài liệu này: `learning_items` nay sinh ra được, nên **hạng mục 7 (gán nhãn cụm cho miền cá nhân hoá) không còn bị chặn** — chỉ còn là việc chưa làm, không phải việc không làm được.
+**Cập nhật — tắc nghẽn đã thông VÀ khâu [2] đã hoàn thiện.** Thêm job nền
+`extract_document_knowledge` tự xếp hàng sau khi sinh câu hỏi, nhờ đó `learning_items`
+sinh ra được. Sau đó bổ sung luôn `cluster_assignment_service` gán nhãn cụm cho cả năm
+loại cụm.
+
+**Nguyên nhân cấu trúc của khâu [2] tìm được khi bắt tay làm:** hàm
+`collect_cluster_samples` trả về vector đặc trưng **không kèm id đối tượng**, nên mất
+đường ánh xạ ngược — huấn luyện xong không biết gán kết quả cho ai. Đó mới là lý do
+thật, không phải "quên viết".
+
+Cách sửa: đổi hàm gốc thành `collect_labelled_cluster_samples` trả cặp `(id, đặc_trưng)`,
+rồi giữ hàm cũ làm **lớp bọc mỏng** chỉ lấy phần đặc trưng. Nhờ vậy huấn luyện và gán
+nhãn luôn thấy **cùng một vector**; tách thành hai đường dựng riêng thì sửa một bên
+quên bên kia sẽ khiến cụm gán ra sai âm thầm. Có test khẳng định hai đường khớp từng
+phần tử. Id nằm ngoài vector nên ràng buộc chặn định danh lọt vào đặc trưng vẫn nguyên
+vẹn — cũng có test riêng.
+
+**Kiểm chứng với MongoDB thật** (12 học sinh thuộc 2 dải năng lực):
+
+```
+TRƯỚC:  0 hồ sơ có ability_cluster_id
+KHÂU [1] huấn luyện:  k=2 (tự chọn), 12 mẫu
+KHÂU [2] gán nhãn:    gán 12, ngoại lai 0, bỏ qua 0
+KHÂU [3] đọc lại:     cụm 0 → 6 em yếu  [0.10 … 0.35]
+                      cụm 1 → 6 em khá  [0.70 … 0.85]
+```
+
+Một quyết định đáng nêu: mẫu quá xa mọi tâm cụm được ghi `None` và đếm riêng, **không
+ép vào cụm gần nhất** — ép là bịa ra kết luận mà mô hình không đưa ra.
 
 ### 4.2. Thứ tự thực tế đã đi
 
@@ -246,7 +279,8 @@ Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` 
 | 5 | Đề xuất 6 — phân nhóm hành vi người dùng (quản trị) | ✅ xong |
 | 6 | Đề xuất 4 — đa dạng hoá ma trận đề | ✅ xong |
 | 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi | ✅ xong — BKT/IRT nay chạy được |
-| 8 | Gán nhãn cụm cho miền cá nhân hoá (nay đã hết bị chặn) | ⬜ chưa |
+| 8 | Gán nhãn cụm cho miền cá nhân hoá | ✅ xong — khâu [2] hoàn thiện |
+| 9 | Ghép CBF × K-Means chống bong bóng lọc | ✅ xong |
 
 ### 4.3. Chi tiết năm chức năng K-Means đã triển khai
 
@@ -300,6 +334,8 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 - **Quy tắc "độ phân biệt âm" không phải phát hiện của K-Means** — đó là quy tắc xác định trong đo lường giáo dục. Trong mã, hai lớp này được tách riêng (`_apply_rule_based_flags` và `_apply_outlier_flags`); trình bày lẫn lộn là không trung thực. K-Means đóng góp phần phát hiện bất thường theo khoảng cách tâm cụm.
 - **Miền cá nhân hoá (5 loại cụm gốc) vẫn chưa gán nhãn cụm**, dù mắt xích knowledge extraction nay đã thông. Đây là việc còn lại rõ ràng nhất, và nêu thẳng sẽ được đánh giá cao hơn là né tránh.
 - **Một lỗi chỉ lộ ra khi chạy với MongoDB thật** (`ConflictingUpdateOperators` trong `upsert_graph_edge`) mà 500+ test dùng `mongomock` không bắt được — vì mongomock chấp nhận lệnh mà MongoDB thật từ chối. Nêu điểm này cho thấy hiểu giới hạn của việc giả lập cơ sở dữ liệu trong kiểm thử.
+- **Một lỗi im lặng do giá trị mặc định**: `learning_items` chưa từng lưu `semantic_embedding`, mà cụm `content` và `question` dành 70% trọng số cho trường này. Hàm đọc có sẵn fallback cứng `[0,0,0,0]` nên phân cụm vẫn chạy, vẫn ra kết quả — chỉ là 70% trọng số đổ vào một vector hằng. Sau khi sửa, độ tách không gian đặc trưng tăng từ **0.0000 lên 0.9899**. Bài học: một giá trị mặc định "cho an toàn" có thể che giấu việc cả một khối đặc trưng không bao giờ có dữ liệu.
+- **Một tối ưu đã đo rồi quyết định KHÔNG dùng**: ghép cụm để thu hẹp trước khi xếp hạng CBF nhanh 3.9× khi tâm cụm tính sẵn, nhưng **chậm hơn 15-25%** nếu tính lại tâm cụm mỗi lượt. Ở quy mô hiện tại chỉ tiết kiệm ~27ms, chưa đủ để đánh đổi lấy một tầng cache kèm rủi ro dữ liệu cũ. Trình bày cả số đo lẫn quyết định hoãn thường được đánh giá cao hơn là tối ưu mà không đo.
 
 ### Số liệu kiểm chứng có thể trích vào báo cáo
 
