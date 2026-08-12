@@ -5,6 +5,10 @@ from typing import Optional
 
 from app.core.config import settings
 from app.personalization.repositories.mongo import PersonalizationMongoRepository
+from app.personalization.services.cbf_kmeans_hybrid_service import (
+    ensure_cluster_exploration_for_entries,
+    touched_clusters,
+)
 from app.personalization.schemas.candidates import CandidateResponse
 from app.personalization.schemas.data_models import RecommendationLog
 from app.personalization.schemas.recommendations import (
@@ -145,6 +149,16 @@ async def recommend_for_user(
     log_context["bandit_context_by_item_id"] = bandit_context_by_item_id
 
     reranked = _rerank(ranked, limit=limit)
+
+    # Chống bong bóng lọc của CBF: nếu cả top-N đều thuộc các cụm người học đã
+    # quen, đề một item thuộc cụm chưa chạm lên. Cơ chế rerank ở trên chỉ chặn
+    # item LIÊN TIẾP cùng cụm (giãn cách), không đảm bảo có vùng nội dung mới.
+    learner_events = await repo.list_learning_events_for_user(user_id, limit=100)
+    reranked = ensure_cluster_exploration_for_entries(
+        reranked,
+        touched=touched_clusters(learner_events, item_by_id),
+        top_n=limit,
+    )
     recommendations: list[RecommendationItemResponse] = []
     for index, entry in enumerate(reranked, start=1):
         candidate = entry["candidate"]
