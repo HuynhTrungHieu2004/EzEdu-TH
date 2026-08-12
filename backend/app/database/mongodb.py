@@ -33,6 +33,11 @@ def create_mongo_client() -> AsyncIOMotorClient:
         client_options["tlsCAFile"] = certifi.where()
     return AsyncIOMotorClient(settings.MONGODB_URI, **client_options)
 
+def _mock_fallback_available() -> bool:
+    """Rơi về mock chỉ hợp lệ khi được bật tường minh và thư viện có sẵn."""
+    return bool(settings.ALLOW_MOCK_DB_FALLBACK) and AsyncMongoMockClient is not None
+
+
 def create_mock_mongo_client() -> AsyncIOMotorClient:
     """Create an in-memory async Mongo-compatible client for local fallback."""
     if AsyncMongoMockClient is None:
@@ -42,9 +47,12 @@ def create_mock_mongo_client() -> AsyncIOMotorClient:
 async def connect_to_mongo():
     """Khởi tạo kết nối tới MongoDB"""
     if not settings.MONGODB_URI:
-        if AsyncMongoMockClient is None:
-            logger.error("MONGODB_URI chưa được cấu hình!")
-            return
+        if not _mock_fallback_available():
+            raise RuntimeError(
+                "MONGODB_URI chưa được cấu hình nên không thể kết nối MongoDB. "
+                "Đặt MONGODB_URI, hoặc bật ALLOW_MOCK_DB_FALLBACK=true nếu thật sự "
+                "muốn chạy trên dữ liệu giả trong bộ nhớ."
+            )
         db_manager.client = create_mock_mongo_client()
         db_manager.using_mock = True
         logger.warning("MONGODB_URI chưa được cấu hình. Đang dùng bộ nhớ mock cho môi trường local.")
@@ -60,11 +68,20 @@ async def connect_to_mongo():
         logger.info("Kết nối MongoDB Atlas thành công!")
     except Exception as e:
         logger.error(f"Lỗi kết nối tới MongoDB: {e}")
-        if AsyncMongoMockClient is not None:
-            db_manager.client.close()
-            db_manager.client = create_mock_mongo_client()
-            db_manager.using_mock = True
-            logger.warning("Đang chuyển sang Mongo mock trong bộ nhớ để tiếp tục phát triển local.")
+        db_manager.client.close()
+        db_manager.client = None
+        if not _mock_fallback_available():
+            # Dừng hẳn ở đây. Nếu để chạy tiếp trên mock, trang web vẫn lên
+            # bình thường nhưng mọi số liệu đều là bịa, và không ai thấy khác
+            # biệt cho tới lúc đã quá muộn.
+            raise RuntimeError(
+                f"Không kết nối được MongoDB ({e}). Kiểm tra MONGODB_URI và dịch vụ "
+                "MongoDB, hoặc bật ALLOW_MOCK_DB_FALLBACK=true nếu thật sự muốn "
+                "chạy trên dữ liệu giả trong bộ nhớ."
+            ) from e
+        db_manager.client = create_mock_mongo_client()
+        db_manager.using_mock = True
+        logger.warning("Đang chuyển sang Mongo mock trong bộ nhớ để tiếp tục phát triển local.")
 
     await create_database_indexes()
 

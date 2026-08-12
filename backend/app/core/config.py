@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # MongoDB configurations
     MONGODB_URI: str = ""
     MONGODB_DB_NAME: str = "ai_question_generator"
+    # Khi không kết nối được MongoDB, mặc định là dừng hẳn thay vì âm thầm chạy
+    # trên bộ nhớ giả — một trang web chạy dữ liệu bịa trông y hệt trang chạy
+    # thật. Chỉ bật cờ này khi cố ý phát triển ngoại tuyến.
+    ALLOW_MOCK_DB_FALLBACK: bool = False
 
     # JWT configurations
     JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
