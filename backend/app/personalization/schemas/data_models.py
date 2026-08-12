@@ -97,6 +97,11 @@ class LearningItem(PersonalizationDocument):
     guessing: Optional[float] = Field(None, ge=0.0, le=1.0)
     bloom_level: Optional[Literal["remember", "understand", "apply", "analyze"]] = None
     estimated_duration_seconds: Optional[int] = Field(None, ge=0)
+    # Vector ngữ nghĩa của nội dung item. Cụm `content` và `question` dành 70%
+    # trọng số đặc trưng cho trường này; trước đây schema chặn `extra` nên nó
+    # không lưu được, khiến phân cụm luôn chạy trên vector hằng và mất trắng
+    # phần trọng số đó.
+    semantic_embedding: List[float] = Field(default_factory=list)
     content_cluster_id: Optional[str] = None
     quality_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     verification_status: LearningItemVerificationStatus = "unverified"

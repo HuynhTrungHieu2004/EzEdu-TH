@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
@@ -25,6 +26,8 @@ from app.personalization.utils.knowledge_normalization import (
     normalize_weights,
     token_alias_key,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeExtractionValidationError(ValueError):
@@ -211,6 +214,47 @@ def _edge_status(confidence: float, source_subject: str, target_subject: str, ev
     return "verified"
 
 
+def _item_text(source_item: dict) -> str:
+    """Lấy phần chữ đại diện cho item — mỗi loại item lưu ở một khoá khác nhau."""
+    for key in ("content", "question", "title"):
+        value = source_item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _build_item_embeddings(item_mappings, available_items: dict) -> dict[str, list[float]]:
+    """Nhúng nội dung các item theo lô, trả về map item_id -> vector.
+
+    Không bao giờ ném lỗi: trích xuất tri thức phải hoàn tất kể cả khi dịch vụ
+    embedding trục trặc — khi đó item chỉ thiếu vector, các phần khác vẫn đúng.
+    """
+    from app.services.rag_service import build_embeddings
+
+    targets = []
+    for mapping in item_mappings:
+        source_item = available_items.get(mapping.item_id)
+        if not source_item:
+            continue
+        text = _item_text(source_item)
+        if text:
+            targets.append((mapping.item_id, text))
+
+    if not targets:
+        return {}
+
+    try:
+        _, vectors = build_embeddings([text for _, text in targets])
+    except Exception as exc:  # noqa: BLE001 - thiếu vector còn hơn hỏng cả bước trích xuất
+        logger.warning(
+            "Không nhúng được nội dung item, phân cụm nội dung sẽ kém chính xác: %s: %s",
+            exc.__class__.__name__, exc,
+        )
+        return {}
+
+    return {item_id: list(vector) for (item_id, _), vector in zip(targets, vectors)}
+
+
 async def process_document_knowledge_graph(
     document_id: str,
     user_id: str,
@@ -367,6 +411,12 @@ async def process_document_knowledge_graph(
             )
             persisted_edges.append(await repo.upsert_graph_edge(edge))
 
+    # Nhúng nội dung từng item TRƯỚC vòng lặp để gọi embedding theo lô thay vì
+    # từng cái một. Vector này là 70% trọng số đặc trưng của cụm `content` và
+    # `question`; thiếu nó thì phân cụm chạy trên vector hằng và mất trắng phần
+    # trọng số đó.
+    item_embeddings = _build_item_embeddings(parsed.item_mappings, available_items)
+
     persisted_items: list[dict] = []
     for mapping in parsed.item_mappings:
         _validate_evidence(mapping.item_id, mapping.evidence_chunk_ids, valid_chunk_ids)
@@ -394,6 +444,7 @@ async def process_document_knowledge_graph(
         source_item = available_items[mapping.item_id]
         learning_item = LearningItem(
             id=mapping.item_id,
+            semantic_embedding=item_embeddings.get(mapping.item_id, []),
             item_type=source_item.get("item_type", "question"),
             document_id=document_id,
             source_chunk_ids=mapping.evidence_chunk_ids,
