@@ -5,6 +5,7 @@ import {
   Check,
   FileSearch,
   FileText,
+  Library,
   Loader,
   MessageSquare,
   Mic,
@@ -40,7 +41,14 @@ import {
 } from '../components/ui';
 import './document-detail.css';
 
-type TabKey = 'content' | 'search' | 'verify' | 'chat';
+type TabKey = 'content' | 'search' | 'verify' | 'chat' | 'related';
+
+type SimilarDocument = {
+  document_id: string;
+  similarity: number;
+  document_name?: string;
+  file_type?: string;
+};
 
 const PROCESSED_STATUSES = ['processed', 'transcribed', 'indexed', 'indexing', 'index_failed'];
 
@@ -66,6 +74,9 @@ export default function DocumentDetailPage() {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>('content');
+  const [similarDocs, setSimilarDocs] = useState<SimilarDocument[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarMessage, setSimilarMessage] = useState<string | null>(null);
   const [confirmIndexOpen, setConfirmIndexOpen] = useState(false);
 
   const currentDocumentStatus = document?.status;
@@ -127,6 +138,35 @@ export default function DocumentDetailPage() {
     }
     void Promise.resolve().then(() => fetchDocument());
   }, [documentId, fetchDocument, navigate]);
+
+  // Chỉ gọi API khi người dùng thực sự mở tab — tránh tốn một request cho
+  // mọi lượt xem chi tiết học liệu.
+  useEffect(() => {
+    if (activeTab !== 'related' || !documentId) return;
+    let cancelled = false;
+    setSimilarLoading(true);
+    setSimilarMessage(null);
+    documentApi
+      .getSimilar(documentId)
+      .then((data) => {
+        if (cancelled) return;
+        // Cosine âm hoặc bằng 0 nghĩa là hai học liệu không chung nội dung —
+        // liệt kê chúng dưới nhãn "liên quan" chỉ gây hiểu nhầm.
+        setSimilarDocs((data.similar_documents ?? []).filter((item) => item.similarity > 0));
+        setSimilarMessage(data.message ?? null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSimilarDocs([]);
+        setSimilarMessage(getApiErrorDetail(err) ?? 'Không tải được danh sách học liệu liên quan.');
+      })
+      .finally(() => {
+        if (!cancelled) setSimilarLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, documentId]);
 
   useEffect(() => {
     if (!document?.id) return;
@@ -273,6 +313,7 @@ export default function DocumentDetailPage() {
     { id: 'search', label: 'Tìm kiếm', icon: <Search size={16} /> },
     { id: 'verify', label: 'Kiểm chứng', icon: <ShieldCheck size={16} /> },
     { id: 'chat', label: 'Hỏi đáp', icon: <MessageSquare size={16} /> },
+    { id: 'related', label: 'Liên quan', icon: <Library size={16} /> },
   ];
 
   return (
@@ -576,6 +617,56 @@ export default function DocumentDetailPage() {
                     disabledMessage="Hỏi đáp tạm khoá trong khi nội dung và chỉ mục đang được cập nhật."
                     onBusyChange={setChatBusy}
                   />
+                )}
+              </>
+            )}
+
+            {activeTab === 'related' && (
+              <>
+                {!isIndexedState ? (
+                  <EmptyState
+                    compact
+                    icon={<Library size={24} />}
+                    title="Cần lập chỉ mục trước khi tìm học liệu liên quan"
+                    description="Hoàn thành bước 3 trong quy trình xử lý ở trên để so sánh học liệu này với các học liệu khác."
+                  />
+                ) : similarLoading ? (
+                  <SkeletonText lines={4} />
+                ) : similarDocs.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={<Library size={24} />}
+                    title="Chưa tìm thấy học liệu liên quan"
+                    description={similarMessage ?? 'Tải lên và lập chỉ mục thêm học liệu để hệ thống so sánh nội dung.'}
+                  />
+                ) : (
+                  <>
+                    <p className="dd-related-hint">
+                      So sánh bằng độ tương đồng cosine trên vector nội dung — học liệu càng gần nhau về nội dung thì
+                      tỉ lệ càng cao.
+                    </p>
+                    <ul className="dd-related-list">
+                      {similarDocs.map((item) => (
+                        <li key={item.document_id}>
+                          <button
+                            type="button"
+                            className="dd-related-item"
+                            onClick={() => navigate(`/documents/${item.document_id}`)}
+                          >
+                            <span className="dd-related-name">
+                              {item.document_name || 'Học liệu không còn tên hiển thị'}
+                            </span>
+                            <span
+                              className="dd-related-score"
+                              data-strength={item.similarity >= 0.5 ? 'high' : item.similarity >= 0.25 ? 'medium' : 'low'}
+                            >
+                              {Math.round(item.similarity * 100)}% tương đồng
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </>
             )}
