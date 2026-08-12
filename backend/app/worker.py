@@ -24,15 +24,21 @@ from app.services.background_job_service import ensure_background_job_indexes, p
 from app.exam_bank.services.attempt_service import GRADE_ESSAY_JOB_TYPE, grade_essay_answer_job, sweep_expired_attempts
 from app.services.cloudinary_service import CLEANUP_ASSET_JOB_TYPE, cleanup_cloudinary_asset_job
 from app.curriculum_kb.services.ingestion_service import INGEST_JOB_TYPE, ingest_curriculum_source_job
+from app.personalization.services.knowledge_extraction_job import (
+    KNOWLEDGE_EXTRACTION_JOB_TYPE,
+    extract_document_knowledge_job,
+)
 
 logger = logging.getLogger("app.worker")
 
 # Đăng ký handler theo job_type — giai đoạn 4 thêm chấm tự luận AI, giai đoạn
-# 5 thêm xoá asset Cloudinary có retry, giai đoạn 7 thêm nạp kho tri thức chuẩn.
+# 5 thêm xoá asset Cloudinary có retry, giai đoạn 7 thêm nạp kho tri thức chuẩn,
+# giai đoạn 8 thêm trích xuất tri thức để mở đường cho mô hình người học.
 HANDLERS: Dict[str, Callable[[dict], Awaitable[object]]] = {
     GRADE_ESSAY_JOB_TYPE: lambda payload: grade_essay_answer_job(get_database(), payload),
     CLEANUP_ASSET_JOB_TYPE: cleanup_cloudinary_asset_job,
     INGEST_JOB_TYPE: lambda payload: ingest_curriculum_source_job(get_database(), payload),
+    KNOWLEDGE_EXTRACTION_JOB_TYPE: extract_document_knowledge_job,
 }
 
 POLL_INTERVAL_SECONDS = 3.0

@@ -1,5 +1,6 @@
-import re
 import hashlib
+import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -24,6 +25,7 @@ from app.schemas.question import (
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
 from app.services.question_quality_service import analyze_question_set_quality
+from app.personalization.services.knowledge_extraction_job import enqueue_knowledge_extraction
 from app.services.export_service import (
     build_export_filename,
     export_question_set_to_docx,
@@ -38,6 +40,7 @@ from app.schemas.analytics import UsageEventCreate
 from app.utils.cursor import serialize_cursor, deserialize_cursor
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def _record_question_generation_usage(
@@ -500,6 +503,13 @@ async def generate_questions_api(
         metadata=safe_metadata,
         database=db,
     )
+
+    # Mở đường cho mô hình người học: trích xuất tri thức sinh ra `learning_items`
+    # kèm q_matrix — thứ duy nhất giúp BKT/IRT biết câu hỏi thuộc đơn vị kiến
+    # thức nào. Chạy nền vì bước này gọi AI trên toàn bộ tài liệu; giáo viên
+    # nhận bộ câu hỏi ngay, không phải chờ.
+    await enqueue_knowledge_extraction(db, document_id=payload.document_id, user_id=current_user.id)
+
     return _qs_to_response(question_set)
 
 
@@ -1030,6 +1040,7 @@ async def submit_question_attempt(
     db = get_database()
     result = await db["question_attempts"].insert_one(attempt_doc)
     attempt_doc["_id"] = result.inserted_id
+
     return QuestionAttemptResponse(
         id=str(result.inserted_id),
         question_set_id=question_set_id,

@@ -158,6 +158,11 @@ class PersonalizationMongoRepository:
     async def upsert_graph_edge(self, edge: KnowledgeGraphEdge) -> dict:
         data = _serialize_model(edge)
         data.pop("_id", None)
+        # Phải tách khỏi `$set`: MongoDB từ chối khi cùng một trường xuất hiện
+        # ở hai toán tử update (ConflictingUpdateOperators). Ở đây
+        # `evidence_chunk_ids` do `$addToSet` phụ trách để gộp dồn qua nhiều
+        # lần trích xuất thay vì ghi đè.
+        data.pop("evidence_chunk_ids", None)
         result = await self.db[KNOWLEDGE_GRAPH_EDGES].find_one_and_update(
             {
                 "source_knowledge_component_id": edge.source_knowledge_component_id,
