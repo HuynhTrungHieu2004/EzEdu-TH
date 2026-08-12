@@ -22,24 +22,32 @@ def _embedding_from_item(item: dict) -> list[float]:
     return [0.0, 0.0, 0.0, 0.0]
 
 
-async def collect_cluster_samples(
+async def collect_labelled_cluster_samples(
     cluster_type: ClusterType,
     *,
     repository: Optional[PersonalizationMongoRepository] = None,
-) -> list[dict]:
+) -> list[tuple[str, dict]]:
+    """Trả về các cặp `(id_đối_tượng, vector_đặc_trưng)`.
+
+    Id nằm NGOÀI vector đặc trưng — vector vẫn không chứa định danh (ràng buộc
+    quyền riêng tư trong `kmeans_clustering._validate_no_identifier_features`),
+    nhưng nhờ giữ id song song mà kết quả phân cụm gán ngược lại được cho đúng
+    đối tượng. Thiếu đúng đường ánh xạ này là lý do trước đây huấn luyện xong
+    rồi bỏ đó.
+    """
     repo = repository or PersonalizationMongoRepository()
     db = repo.db
 
     if cluster_type == "content":
         samples = []
         async for item in db[LEARNING_ITEMS].find({"item_type": {"$in": ["lesson", "review_chunk", "document_chunk", "other"]}}):
-            samples.append({
+            samples.append((str(item["_id"]), {
                 "semantic_embedding": _embedding_from_item(item),
                 "difficulty": item.get("difficulty"),
                 "bloom_level_encoded": BLOOM_ENCODING.get(item.get("bloom_level"), 0.33),
                 "estimated_duration_seconds": item.get("estimated_duration_seconds"),
                 "topic": item.get("topic") or "unknown",
-            })
+            }))
         return samples
 
     if cluster_type == "question":
@@ -53,7 +61,7 @@ async def collect_cluster_samples(
         async for item in db[LEARNING_ITEMS].find({"item_type": "question"}):
             item_stats = stats.get(str(item["_id"]), {"attempts": 0, "correct": 0, "response_time": 0.0})
             attempts = max(1, item_stats["attempts"])
-            samples.append({
+            samples.append((str(item["_id"]), {
                 "semantic_embedding": _embedding_from_item(item),
                 "difficulty": item.get("difficulty"),
                 "bloom_level_encoded": BLOOM_ENCODING.get(item.get("bloom_level"), 0.33),
@@ -61,7 +69,7 @@ async def collect_cluster_samples(
                 "average_response_time_ms": item_stats["response_time"] / attempts,
                 "discrimination": item.get("discrimination") or 0.0,
                 "required_knowledge_component_count": len(item.get("knowledge_component_ids", [])),
-            })
+            }))
         return samples
 
     if cluster_type == "learner_ability":
@@ -75,13 +83,13 @@ async def collect_cluster_samples(
                 continue
             avg_mastery = sum(float(item.get("mastery_probability") or 0.0) for item in states) / len(states)
             recent_accuracy = sum(float(item.get("recent_accuracy") or 0.0) for item in states) / len(states)
-            samples.append({
+            samples.append((str(profile["user_id"]), {
                 "global_theta": profile.get("global_ability") or 0.0,
                 "average_mastery": avg_mastery,
                 "recent_accuracy": recent_accuracy,
                 "solved_difficulty": avg_mastery,
                 "prerequisite_gaps": sum(1 for item in states if (item.get("mastery_probability") or 0.0) < 0.5),
-            })
+            }))
         return samples
 
     event_groups = defaultdict(list)
@@ -90,36 +98,52 @@ async def collect_cluster_samples(
 
     if cluster_type == "learner_behavior":
         samples = []
-        for events in event_groups.values():
+        for owner_id, events in event_groups.items():
             total = max(1, len(events))
             completed = sum(1 for item in events if item.get("completed"))
             skipped = sum(1 for item in events if item.get("skipped"))
-            samples.append({
+            samples.append((str(owner_id), {
                 "average_response_time_ms": sum(float(item.get("response_time_ms") or 0.0) for item in events) / total,
                 "completion_rate": completed / total,
                 "hint_rate": sum(float(item.get("hint_count") or 0.0) for item in events) / total,
                 "answer_change_rate": sum(float(item.get("answer_change_count") or 0.0) for item in events) / total,
                 "skip_rate": skipped / total,
                 "session_consistency": len({item.get("session_id") for item in events if item.get("session_id")}) / total,
-            })
+            }))
         return samples
 
     if cluster_type == "learner_interest":
         samples = []
-        for events in event_groups.values():
+        for owner_id, events in event_groups.items():
             total = max(1, len(events))
             recommendation_clicks = sum(1 for item in events if item.get("event_type") == "recommendation_clicked")
             question_events = sum(1 for item in events if str(item.get("item_id", "")).count(":") == 1)
             document_events = sum(1 for item in events if item.get("document_id"))
-            samples.append({
+            samples.append((str(owner_id), {
                 "topic_interaction_distribution": [question_events / total, document_events / total],
                 "content_type_preference": [question_events / total, document_events / total],
                 "document_category_preference": [document_events / total],
                 "recommendation_click_distribution": [recommendation_clicks / total],
-            })
+            }))
         return samples
 
     return []
+
+
+async def collect_cluster_samples(
+    cluster_type: ClusterType,
+    *,
+    repository: Optional[PersonalizationMongoRepository] = None,
+) -> list[dict]:
+    """Chỉ lấy phần đặc trưng — dùng cho huấn luyện.
+
+    Cố tình bọc mỏng quanh `collect_labelled_cluster_samples` để huấn luyện và
+    gán nhãn luôn thấy CÙNG một vector đặc trưng. Tách thành hai đường dựng
+    riêng thì một thay đổi ở đường này mà quên đường kia sẽ khiến cụm gán ra
+    sai âm thầm, rất khó phát hiện.
+    """
+    labelled = await collect_labelled_cluster_samples(cluster_type, repository=repository)
+    return [sample for _, sample in labelled]
 
 
 async def train_cluster_type(

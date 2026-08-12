@@ -25,7 +25,9 @@ from app.exam_bank.services.attempt_service import GRADE_ESSAY_JOB_TYPE, grade_e
 from app.services.cloudinary_service import CLEANUP_ASSET_JOB_TYPE, cleanup_cloudinary_asset_job
 from app.curriculum_kb.services.ingestion_service import INGEST_JOB_TYPE, ingest_curriculum_source_job
 from app.personalization.services.knowledge_extraction_job import (
+    CLUSTER_ASSIGNMENT_JOB_TYPE,
     KNOWLEDGE_EXTRACTION_JOB_TYPE,
+    assign_personalization_clusters_job,
     extract_document_knowledge_job,
 )
 
@@ -39,6 +41,7 @@ HANDLERS: Dict[str, Callable[[dict], Awaitable[object]]] = {
     CLEANUP_ASSET_JOB_TYPE: cleanup_cloudinary_asset_job,
     INGEST_JOB_TYPE: lambda payload: ingest_curriculum_source_job(get_database(), payload),
     KNOWLEDGE_EXTRACTION_JOB_TYPE: extract_document_knowledge_job,
+    CLUSTER_ASSIGNMENT_JOB_TYPE: assign_personalization_clusters_job,
 }
 
 POLL_INTERVAL_SECONDS = 3.0

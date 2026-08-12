@@ -56,3 +56,19 @@ async def extract_document_knowledge_job(payload: Dict[str, Any]) -> Dict[str, A
         document_id=payload["document_id"],
         user_id=payload["user_id"],
     )
+
+
+CLUSTER_ASSIGNMENT_JOB_TYPE = "assign_personalization_clusters"
+
+
+async def assign_personalization_clusters_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Handler cho job `assign_personalization_clusters` — gọi từ `app/worker.py`.
+
+    Gán nhãn cụm cho mọi loại cụm. Chạy sau khi đã huấn luyện; nếu chưa có mô
+    hình active nào thì từng loại tự trả `no_active_model` chứ không lỗi.
+    """
+    from app.personalization.services.cluster_assignment_service import assign_all_clusters
+
+    if not settings.PERSONALIZATION_ENABLED:
+        return {"status": "disabled"}
+    return await assign_all_clusters()
