@@ -2,6 +2,8 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
+> **Cập nhật sau khi triển khai.** Ba việc trong Nhóm A đã làm xong (A1, A3, cộng thêm hai chức năng K-Means ngoài danh sách ban đầu — xem `PHAN_TICH_KMEANS.md`). Mắt xích learning event **vẫn chưa nối**, và lý do đã được xác minh cụ thể hơn ở mục bên dưới. CBF chưa triển khai.
+
 ---
 
 ## Phát hiện quan trọng trước khi đề xuất
@@ -21,7 +23,11 @@ Tất cả đều mắc **cùng một bệnh**: được gọi qua `learner_mode
 
 **Mắt xích đứt duy nhất:** khi học sinh nộp bài luyện tập (`app/routers/questions.py:1017-1045`), hệ thống chỉ ghi vào `question_attempts` rồi trả kết quả — **không phát sinh learning event nào**. Nên BKT, IRT, AKT, NeuralCD, bandit đều không bao giờ được kích hoạt.
 
-> **Nối một chỗ này là bật được đồng thời 5 thuật toán đã viết sẵn.** Đây là việc đáng làm trước mọi đề xuất bên dưới.
+> **Nối một chỗ này là bật được đồng thời 5 thuật toán đã viết sẵn.**
+
+**Cập nhật — vì sao vẫn chưa nối.** Khi bắt tay làm mới thấy nối learning event là chưa đủ. `process_learning_event` cần `q_matrix` để biết câu hỏi thuộc đơn vị kiến thức nào, mà `q_matrix` lấy từ `learning_items`; `learning_items` chỉ sinh ra từ `knowledge_extraction_service`, và service này chỉ chạy qua một endpoint **không giao diện nào gọi**. Nối event mà chưa thông chỗ đó thì mọi event đều rơi vào nhánh `missing_q_matrix` và không cải thiện gì.
+
+Thứ tự đúng là: **tự động chạy knowledge extraction sau khi sinh câu hỏi → nối learning event → BKT/IRT mới có dữ liệu**. Vì việc này lớn và phụ thuộc AI, các chức năng đã triển khai được chọn theo hướng khác: dùng dữ liệu tự sinh từ luồng bình thường (`question_attempts`), không cần đi qua `learning_items`.
 
 ---
 
@@ -95,9 +101,9 @@ Cách xử lý: áp ràng buộc trên cụm — trong top-N gợi ý phải có
 
 | # | Thuật toán | Chức năng áp dụng | Sửa ở đâu | Vì sao dùng được ngay |
 |---|---|---|---|---|
-| A1 | **Cosine trên embedding** (CBF nội dung) | Gợi ý tài liệu liên quan | Nối giao diện cho `documentApi.getSimilar` | Backend + embedding đã xong, chỉ chưa nối |
-| A2 | **TF-IDF + cosine** | Cảnh báo tài liệu trùng lặp khi tải lên | `routers/documents.py` sau bước trích xuất | `tfidf_service.py` đã có, hiện chỉ dùng để rút từ khoá |
-| A3 | **K-Means chọn tập con đa dạng** | Lọc câu hỏi trùng ý khi AI sinh đề | `question_generation_service.py` | Chỉ cần embedding của câu vừa sinh, không cần lịch sử |
+| A1 | **Cosine trên embedding** (CBF nội dung) | Gợi ý tài liệu liên quan | ✅ **đã xong** — tab "Liên quan" ở trang chi tiết học liệu | Backend + embedding đã xong, chỉ cần nối giao diện |
+| A2 | **TF-IDF + cosine** | Cảnh báo tài liệu trùng lặp khi tải lên | ⬜ chưa làm — `routers/documents.py` sau bước trích xuất | `tfidf_service.py` đã có, hiện chỉ dùng để rút từ khoá |
+| A3 | **K-Means chọn tập con đa dạng** | Lọc câu hỏi trùng ý khi AI sinh đề | ✅ **đã xong** — `question_diversity_service.py` | Chỉ cần embedding của câu vừa sinh, không cần lịch sử |
 
 Ba mục này chỉ phụ thuộc nội dung tài liệu — có tài liệu là chạy được, không cần chờ học sinh dùng.
 
@@ -122,19 +128,24 @@ Ba mục này chỉ phụ thuộc nội dung tài liệu — có tài liệu là
 
 ## Phần 3 — Thứ tự triển khai
 
-| Bước | Việc | Phụ thuộc |
-|---|---|---|
-| 1 | Nối mắt xích: nộp bài luyện tập → phát sinh learning event | Không |
-| 2 | A3 — lọc câu hỏi trùng ý khi sinh đề | Không |
-| 3 | A1 — gợi ý tài liệu liên quan (nối giao diện) | Không |
-| 4 | A2 — cảnh báo tài liệu trùng lặp | Không |
-| 5 | Gán nhãn cụm K-Means (`predict_cluster` + job định kỳ) | Bước 1 |
-| 6 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | Bước 1 |
-| 7 | Ghép CBF × K-Means (cách 1, 2, 3) | Bước 5 + 6 |
-| 8 | B1, B2 — BKT & IRT | Bước 1 + đủ lượt làm bài |
-| 9 | B3 — bật Thompson Sampling | Bước 6 (cần nguồn gợi ý đã hoạt động) |
+Bảng dưới đã cập nhật theo thực tế đã đi. Thứ tự thay đổi so với bản đầu vì bước "nối learning event" hoá ra bị chặn (xem mục đầu tài liệu).
 
-Bước 1 đến 4 làm được ngay hôm nay, không phụ thuộc dữ liệu người dùng.
+| Bước | Việc | Trạng thái | Phụ thuộc |
+|---|---|---|---|
+| 1 | A3 — lọc câu hỏi trùng ý khi sinh đề | ✅ xong | Không |
+| 2 | A1 — gợi ý tài liệu liên quan (nối giao diện) | ✅ xong | Không |
+| 3 | K-Means phát hiện câu hỏi lỗi *(ngoài danh sách ban đầu)* | ✅ xong | `question_attempts` |
+| 4 | K-Means phân nhóm năng lực lớp *(ngoài danh sách ban đầu)* | ✅ xong | `question_attempts` |
+| 5 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
+| 6 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ⬜ chưa | Không — nhưng tốn AI |
+| 7 | Nối mắt xích: nộp bài luyện tập → phát sinh learning event | ⬜ chưa | Bước 6 |
+| 8 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ⬜ chưa | Bước 7 |
+| 9 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ⬜ chưa | Bước 7 |
+| 10 | Ghép CBF × K-Means (cách 1, 2, 3) | ⬜ chưa | Bước 8 + 9 |
+| 11 | B1, B2 — BKT & IRT | ⬜ chưa | Bước 7 + đủ lượt làm bài |
+| 12 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 9 |
+
+**Thay đổi quan trọng so với bản đầu:** bước 6 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bốn việc đã xong đều đi đường khác, dựa vào `question_attempts` là dữ liệu tự sinh từ luồng dùng bình thường.
 
 ---
 
