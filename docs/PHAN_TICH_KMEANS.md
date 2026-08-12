@@ -2,7 +2,7 @@
 
 > Tài liệu này dựa trên đọc trực tiếp mã nguồn (`backend/app/personalization/`, `backend/app/services/`) và kiểm tra dữ liệu thật trong MongoDB `chuyende02`, không suy đoán.
 
-> **Cập nhật sau khi triển khai.** Bản đầu của tài liệu này là báo cáo rà soát, kết luận rằng K-Means huấn luyện xong nhưng không tạo ra giá trị nào cho người dùng. Sau đó **4 trong 6 đề xuất đã được cài đặt và kiểm chứng**. Các mục dưới đây được đánh dấu rõ trạng thái; phần phân tích hiện trạng ban đầu giữ nguyên để đối chiếu trước/sau.
+> **Cập nhật sau khi triển khai.** Bản đầu của tài liệu này là báo cáo rà soát, kết luận rằng K-Means huấn luyện xong nhưng không tạo ra giá trị nào cho người dùng. Sau đó **cả 6 đề xuất đã được cài đặt và kiểm chứng**. Các mục dưới đây được đánh dấu rõ trạng thái; phần phân tích hiện trạng ban đầu giữ nguyên để đối chiếu trước/sau.
 
 ## Tóm tắt trạng thái
 
@@ -12,11 +12,11 @@
 | Phát hiện câu hỏi lỗi trong bộ đề | **Đã chạy** | Ngoại lai theo khoảng cách tâm cụm |
 | Phân nhóm năng lực học sinh trong lớp | **Đã chạy** | Phân hoạch + tâm cụm đọc ra điểm yếu |
 | Gợi ý tài liệu liên quan | **Đã chạy** (cosine, không phải K-Means) | — |
-| Ràng buộc đa dạng khi sinh đề từ ma trận | Chưa làm | — |
+| Ràng buộc đa dạng khi sinh đề từ ma trận | **Đã chạy** | Gán nhãn cụm nội dung làm ràng buộc cho CP-SAT |
 | Phân nhóm hành vi người dùng (quản trị) | **Đã chạy** | Phân khúc sử dụng + phát hiện tài khoản bất thường |
 | Gán nhãn cụm cho miền cá nhân hoá | **Bị chặn** — xem Phần 4 | — |
 
-Bốn chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số) và `flag_distance_outliers` (phát hiện ngoại lai bền vững), và **dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
+Năm chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững). **Dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
 
 ---
 
@@ -96,12 +96,12 @@ Nếu chia "khai thác K-Means" thành 10 hạng mục:
 |---|---|---|---|
 | 1 | Thiết kế đặc trưng | Đã làm tốt | Đã làm tốt |
 | 2 | Chuẩn hoá / co giãn dữ liệu | Đã làm tốt | Đã làm tốt |
-| 3 | Chọn số cụm k | Đã làm tốt (đa chỉ số) | Đã làm tốt, nay dùng lại cho 4 chức năng |
+| 3 | Chọn số cụm k | Đã làm tốt (đa chỉ số) | Đã làm tốt, nay dùng lại cho 5 chức năng |
 | 4 | Đánh giá chất lượng cụm | Đã làm tốt (3 chỉ số nội tại) | Đã làm tốt, silhouette hiện ra giao diện |
 | 5 | Đánh giá độ ổn định | Đã làm tốt (ARI đa seed) | Đã làm tốt |
 | 6 | Quản lý version mô hình | Đã làm tốt | Đã làm tốt |
-| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 4 chức năng mới; **vẫn thiếu** ở miền cá nhân hoá |
-| 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 4 chức năng đều hiện kết quả cho người dùng |
+| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 5 chức năng mới; **vẫn thiếu** ở miền cá nhân hoá |
+| 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 5 chức năng đều hiện kết quả cho người dùng |
 | 9 | **Diễn giải ý nghĩa từng cụm** | Có mã, không chạy | **Đã có** — toạ độ tâm cụm đọc thẳng ra điểm yếu của nhóm |
 | 10 | **Phát hiện ngoại lai theo khoảng cách tâm cụm** | Chưa dùng | **Đã có**, dùng median/MAD (xem lỗi che lấp bên dưới) |
 
@@ -185,7 +185,7 @@ Nguyên tắc chọn đề xuất: (a) chỉ dùng chức năng **đã có sẵn
 
 ---
 
-### Đề xuất 4 — Ràng buộc đa dạng nội dung khi sinh đề từ ma trận — ⬜ chưa làm
+### Đề xuất 4 — Ràng buộc đa dạng nội dung khi sinh đề từ ma trận — ✅ ĐÃ TRIỂN KHAI
 
 **Chức năng sẵn có được nâng cấp:** Ma trận đề & sinh đề tự động.
 
@@ -242,21 +242,29 @@ Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` 
 | 3 | Đề xuất 2 — phát hiện câu hỏi lỗi | ✅ xong |
 | 4 | Đề xuất 1 — phân nhóm năng lực học sinh | ✅ xong |
 | 5 | Đề xuất 6 — phân nhóm hành vi người dùng (quản trị) | ✅ xong |
-| 6 | Đề xuất 4 — đa dạng hoá ma trận đề | ⬜ chưa |
+| 6 | Đề xuất 4 — đa dạng hoá ma trận đề | ✅ xong |
 | 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi, rồi mới gán nhãn cụm | ⬜ chưa — việc lớn nhất còn lại |
 
-### 4.3. Chi tiết bốn chức năng K-Means đã triển khai
+### 4.3. Chi tiết năm chức năng K-Means đã triển khai
 
-| | Đề xuất 3 | Đề xuất 2 | Đề xuất 1 | Đề xuất 6 |
-|---|---|---|---|---|
-| Chức năng | Lọc câu trùng ý | Phát hiện câu lỗi | Phân nhóm học sinh | Phân nhóm hành vi |
-| Không gian đặc trưng | Embedding câu hỏi | (độ khó, độ phân biệt) | Điểm % theo từng bộ đề | 6 chỉ số sử dụng |
-| Chọn k | k = số câu cần | `choose_k_and_fit` | `choose_k_and_fit` | `choose_k_and_fit` |
-| K-Means dùng để | Chọn tập con đa dạng | Phát hiện ngoại lai | Phân hoạch + đọc tâm cụm | Phân khúc + phát hiện ngoại lai |
-| Chuẩn hoá đặc trưng | L2 (từ embedding) | z-score | **Không** — giữ thang % | **Có** z-score — bắt buộc |
-| Cách đọc tâm cụm | — | trực tiếp | trực tiếp | qua trung bình số gốc |
-| Nguồn dữ liệu | Câu vừa sinh | `question_attempts` | `question_attempts` | `user_activity_logs` |
-| Nơi hiện kết quả | Danh sách câu hỏi trả về | Trang biên tập bộ đề | Trang chi tiết lớp học | Trang nhật ký hoạt động |
+| | Đề xuất 3 | Đề xuất 2 | Đề xuất 1 | Đề xuất 6 | Đề xuất 4 |
+|---|---|---|---|---|---|
+| Chức năng | Lọc câu trùng ý | Phát hiện câu lỗi | Phân nhóm học sinh | Phân nhóm hành vi | Đa dạng ma trận đề |
+| Không gian đặc trưng | Embedding câu hỏi | (độ khó, độ phân biệt) | Điểm % theo từng bộ đề | 6 chỉ số sử dụng | Embedding nội dung câu |
+| Chọn k | k = số câu cần | `choose_k_and_fit` | `choose_k_and_fit` | `choose_k_and_fit` | `choose_k_and_fit` |
+| K-Means dùng để | Chọn tập con đa dạng | Phát hiện ngoại lai | Phân hoạch + đọc tâm cụm | Phân khúc + phát hiện ngoại lai | **Chỉ gán nhãn** — làm đầu vào cho CP-SAT |
+| Chuẩn hoá đặc trưng | L2 (từ embedding) | z-score | **Không** — giữ thang % | **Có** z-score — bắt buộc | L2 (từ embedding) |
+| Cách đọc tâm cụm | — | trực tiếp | trực tiếp | qua trung bình số gốc | — |
+| Nguồn dữ liệu | Câu vừa sinh | `question_attempts` | `question_attempts` | `user_activity_logs` | Ngân hàng câu hỏi |
+| Nơi hiện kết quả | Danh sách câu hỏi trả về | Trang biên tập bộ đề | Trang chi tiết lớp học | Trang nhật ký hoạt động | Đề sinh ra |
+
+**Đề xuất 4 là trường hợp kiến trúc khác hẳn bốn cái còn lại — và đó là chủ ý.**
+
+Ở bốn chức năng kia, K-Means tự quyết định kết quả cuối. Ở đây thì không: bộ giải ràng buộc **CP-SAT** mới là nơi chọn câu, K-Means chỉ **gán nhãn `content_cluster`** rồi nhãn đó trở thành một ràng buộc tuyến tính nữa trong mô hình.
+
+Lý do phải giữ ranh giới này: CP-SAT **chứng minh được** lời giải tối ưu và chứng minh được INFEASIBLE khi ngân hàng không đủ câu. Nếu để K-Means (hay bất kỳ phương pháp gần đúng nào) thay chỗ đó thì mất cả hai tính chất — một bước lùi rõ ràng. Chính mã nguồn `blueprint_solver_service.py` đã ghi nguyên tắc: *"KHÔNG dùng AI để thay thế bước kiểm tra ràng buộc"*.
+
+Đây là ví dụ tốt cho câu hỏi phản biện *"vì sao chỗ này dùng K-Means, chỗ kia không?"* — trả lời được rằng K-Means bổ sung một chiều thông tin mà nhãn thủ công không có, chứ không thay thế thứ đang làm tốt hơn nó.
 
 **Điểm đáng nhấn: hai quyết định chuẩn hoá trái ngược nhau, mỗi cái có lý do riêng.**
 
@@ -321,3 +329,30 @@ k = 2 (tự chọn), Silhouette = 0.679. Một em yếu đều (33%) bị gắn 
 k = 2 (tự chọn), Silhouette = 0.58. Hai đặc trưng về AI tự bị loại vì `ai_usage_events` chưa có dữ liệu — hệ thống nêu rõ điều này ra giao diện. Năm tài khoản bị gắn cờ lệch hẳn mọi nhóm.
 
 > **Lưu ý khi trình bày:** dữ liệu hoạt động hiện tại chủ yếu là sự kiện đăng nhập (51/58 bản ghi), nên phân khúc thu được còn thô. Nêu rõ hạn chế này — kết quả sẽ giàu ý nghĩa hơn khi hệ thống tích luỹ đủ thao tác thật.
+
+**Ràng buộc đa dạng nội dung khi sinh đề** — 9 câu hỏi tiếng Việt thuộc 3 chủ đề (bề lõm parabol / toạ độ đỉnh / trục đối xứng), tất cả cùng chủ đề, cùng mức Bloom, cùng độ khó nên ma trận truyền thống **không phân biệt được**:
+
+K-Means gom đúng 3 cụm, mỗi cụm 3 câu — khớp chính xác 3 chủ đề thật.
+
+| Cấu hình | Cụm của 3 câu được chọn | Trạng thái bộ giải |
+|---|---|---|
+| Không đặt ràng buộc | `[2, 2, 2]` — **cả 3 câu cùng một cụm** | OPTIMAL |
+| Đặt tối đa 1 câu/cụm | `[0, 1, 2]` — mỗi cụm một câu | OPTIMAL |
+
+Dòng đầu chính là vấn đề cần giải: đề đúng ma trận trên giấy nhưng dồn hết vào một dạng bài. Dòng sau cho thấy ràng buộc giải đúng vấn đề đó **mà không làm mất tính tối ưu** — bộ giải vẫn trả về OPTIMAL, và khi yêu cầu bất khả thi thì vẫn báo INFEASIBLE thay vì trả về một đề sai ma trận.
+
+---
+
+## Phần 6 — Tổng kết: K-Means trong hệ thống sau khi hoàn thành
+
+Năm chức năng dùng K-Means, mỗi chức năng khai thác một năng lực khác nhau của thuật toán:
+
+| Năng lực của K-Means | Chức năng khai thác |
+|---|---|
+| Phân hoạch không giám sát | Phân nhóm học sinh, phân nhóm hành vi người dùng |
+| Diễn giải qua toạ độ tâm cụm | Phân nhóm học sinh ("nhóm này yếu Hàm số"), phân nhóm hành vi |
+| Đo khoảng cách tới tâm cụm | Phát hiện câu hỏi lỗi, học sinh cần quan tâm riêng, tài khoản bất thường |
+| Chọn tập con đại diện | Lọc câu hỏi trùng ý khi sinh đề |
+| Sinh nhãn làm đầu vào cho thuật toán khác | Ràng buộc đa dạng nội dung (đầu vào cho CP-SAT) |
+
+Điều đáng nói không phải số lượng chức năng, mà là **năm cách dùng khác nhau của cùng một thuật toán** — từ phân nhóm thuần tuý, tới phát hiện bất thường, tới chọn mẫu đại diện, tới làm bước tiền xử lý cho một bộ giải ràng buộc. Đó là bằng chứng cho việc hiểu thuật toán đủ sâu để đặt nó đúng chỗ, thay vì áp một khuôn duy nhất cho mọi bài toán.

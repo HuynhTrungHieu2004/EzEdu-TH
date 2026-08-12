@@ -2,7 +2,7 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
-> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, cộng thêm ba chức năng K-Means ngoài danh sách ban đầu (phát hiện câu hỏi lỗi, phân nhóm năng lực lớp, phân nhóm hành vi người dùng — xem `PHAN_TICH_KMEANS.md`). Mắt xích learning event **vẫn chưa nối**, và lý do đã được xác minh cụ thể hơn ở mục bên dưới. CBF chưa triển khai.
+> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, cộng thêm bốn chức năng K-Means ngoài danh sách ban đầu (phát hiện câu hỏi lỗi, phân nhóm năng lực lớp, phân nhóm hành vi người dùng, ràng buộc đa dạng ma trận đề — xem `PHAN_TICH_KMEANS.md`). Mắt xích learning event **vẫn chưa nối**, và lý do đã được xác minh cụ thể hơn ở mục bên dưới. CBF chưa triển khai.
 
 ---
 
@@ -27,7 +27,7 @@ Tất cả đều mắc **cùng một bệnh**: được gọi qua `learner_mode
 
 **Cập nhật — vì sao vẫn chưa nối.** Khi bắt tay làm mới thấy nối learning event là chưa đủ. `process_learning_event` cần `q_matrix` để biết câu hỏi thuộc đơn vị kiến thức nào, mà `q_matrix` lấy từ `learning_items`; `learning_items` chỉ sinh ra từ `knowledge_extraction_service`, và service này chỉ chạy qua một endpoint **không giao diện nào gọi**. Nối event mà chưa thông chỗ đó thì mọi event đều rơi vào nhánh `missing_q_matrix` và không cải thiện gì.
 
-Thứ tự đúng là: **tự động chạy knowledge extraction sau khi sinh câu hỏi → nối learning event → BKT/IRT mới có dữ liệu**. Vì việc này lớn và phụ thuộc AI, các chức năng đã triển khai được chọn theo hướng khác: dùng dữ liệu tự sinh từ luồng bình thường (`question_attempts`, `user_activity_logs`), không cần đi qua `learning_items`.
+Thứ tự đúng là: **tự động chạy knowledge extraction sau khi sinh câu hỏi → nối learning event → BKT/IRT mới có dữ liệu**. Vì việc này lớn và phụ thuộc AI, các chức năng đã triển khai được chọn theo hướng khác: dùng dữ liệu tự sinh từ luồng bình thường (`question_attempts`, `user_activity_logs`, ngân hàng câu hỏi), không cần đi qua `learning_items`.
 
 ---
 
@@ -137,16 +137,17 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Thứ tự thay đ�
 | 3 | K-Means phát hiện câu hỏi lỗi *(ngoài danh sách ban đầu)* | ✅ xong | `question_attempts` |
 | 4 | K-Means phân nhóm năng lực lớp *(ngoài danh sách ban đầu)* | ✅ xong | `question_attempts` |
 | 5 | K-Means phân nhóm hành vi người dùng *(ngoài danh sách ban đầu)* | ✅ xong | `user_activity_logs` |
-| 6 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
-| 7 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ⬜ chưa | Không — nhưng tốn AI |
-| 8 | Nối mắt xích: nộp bài luyện tập → phát sinh learning event | ⬜ chưa | Bước 7 |
-| 9 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ⬜ chưa | Bước 8 |
-| 10 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ⬜ chưa | Bước 8 |
-| 11 | Ghép CBF × K-Means (cách 1, 2, 3) | ⬜ chưa | Bước 9 + 10 |
-| 12 | B1, B2 — BKT & IRT | ⬜ chưa | Bước 8 + đủ lượt làm bài |
-| 13 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 10 |
+| 6 | K-Means ràng buộc đa dạng ma trận đề *(ngoài danh sách ban đầu)* | ✅ xong | Ngân hàng câu hỏi |
+| 7 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
+| 8 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ⬜ chưa | Không — nhưng tốn AI |
+| 9 | Nối mắt xích: nộp bài luyện tập → phát sinh learning event | ⬜ chưa | Bước 8 |
+| 10 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ⬜ chưa | Bước 9 |
+| 11 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ⬜ chưa | Bước 9 |
+| 12 | Ghép CBF × K-Means (cách 1, 2, 3) | ⬜ chưa | Bước 10 + 11 |
+| 13 | B1, B2 — BKT & IRT | ⬜ chưa | Bước 9 + đủ lượt làm bài |
+| 14 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 11 |
 
-**Thay đổi quan trọng so với bản đầu:** bước 7 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Năm việc đã xong đều đi đường khác, dựa vào `question_attempts` và `user_activity_logs` là dữ liệu tự sinh từ luồng dùng bình thường.
+**Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Sáu việc đã xong đều đi đường khác, dựa vào dữ liệu tự sinh từ luồng dùng bình thường (`question_attempts`, `user_activity_logs`, ngân hàng câu hỏi).
 
 ---
 
