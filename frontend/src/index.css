@@ -2861,7 +2861,6 @@ code, .counter { font-family: var(--mono); }
 .cls-group {
   padding: 12px 14px;
   border: 1px solid var(--ez-border);
-  border-left: 3px solid var(--ez-primary);
   border-radius: var(--radius-lg);
   background: var(--ez-surface);
 }

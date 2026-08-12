@@ -1944,7 +1944,6 @@
   margin-top: var(--ez-space-4);
   padding: var(--ez-space-3);
   border: 1px solid var(--ez-warning-border);
-  border-left-width: 3px;
   border-radius: var(--ez-radius-md);
   background-color: var(--ez-warning-subtle);
 }
