@@ -6,6 +6,7 @@ import type {
   UserActivityLogItem,
   UserActivityLogListResponse,
   UserActivityLogStatisticsResponse,
+  UserBehaviorGroupsResponse,
 } from '../types/activityLogs';
 import { ACTIVITY_ACTIONS, ACTIVITY_CATEGORIES } from '../types/activityLogs';
 import {
@@ -18,7 +19,7 @@ import {
   Alert,
   Badge,
   Button,
-  Card, CardBody,
+  Card, CardBody, CardHeader, CardTitle,
   Checkbox,
   DataTable,
   Dialog,
@@ -48,6 +49,35 @@ const STATUS_BADGE_MAP: Record<ActivityStatus, 'success' | 'warning' | 'error'> 
 
 function fmtNumber(value: number | undefined) {
   return (value ?? 0).toLocaleString('vi-VN');
+}
+
+/** Thứ tự và nhãn cho các chỉ số hành vi — tên kỹ thuật không hiện ra giao diện. */
+const BEHAVIOR_METRIC_ORDER = [
+  'activity_count',
+  'active_days',
+  'actions_per_active_day',
+  'distinct_action_count',
+  'error_rate',
+  'avg_duration_ms',
+  'ai_call_count',
+  'ai_total_tokens',
+];
+
+const BEHAVIOR_METRIC_LABELS: Record<string, string> = {
+  activity_count: 'Số lượt hoạt động',
+  active_days: 'Số ngày hoạt động',
+  actions_per_active_day: 'Lượt mỗi ngày',
+  distinct_action_count: 'Số loại thao tác',
+  error_rate: 'Tỉ lệ lỗi',
+  avg_duration_ms: 'Thời gian phản hồi TB',
+  ai_call_count: 'Lượt gọi AI',
+  ai_total_tokens: 'Tổng token AI',
+};
+
+function formatBehaviorMetric(key: string, value: number) {
+  if (key === 'error_rate') return `${Math.round(value * 100)}%`;
+  if (key === 'avg_duration_ms') return `${Math.round(value)} ms`;
+  return value.toLocaleString('vi-VN', { maximumFractionDigits: 1 });
 }
 
 function toIsoDateStart(value: string) {
@@ -108,7 +138,23 @@ export default function AdminActivityLogsPage() {
     error_only: false,
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [behavior, setBehavior] = useState<UserBehaviorGroupsResponse | null>(null);
   const pageSize = 30;
+
+  // Phân nhóm hành vi không phụ thuộc bộ lọc của bảng bên dưới, và lỗi ở đây
+  // không được chặn trang nhật ký — đây là thông tin bổ trợ.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    activityLogsApi
+      .behaviorGroups(90, ctrl.signal)
+      .then((data) => setBehavior(data))
+      .catch((err) => {
+        if (err?.name !== 'CanceledError') setBehavior(null);
+      });
+    return () => ctrl.abort();
+  }, []);
+
+  const anomalousUsers = behavior?.users.filter((user) => user.is_anomalous) ?? [];
 
   const load = useCallback(() => {
     const ctrl = new AbortController();
@@ -204,6 +250,72 @@ export default function AdminActivityLogsPage() {
           <StatTile label="Bị từ chối quyền" value={fmtNumber(stats.permission_denied_count)} />
           <StatTile label="Vượt quota" value={fmtNumber(stats.quota_exceeded_count)} />
         </StatGrid>
+      )}
+
+      {behavior && behavior.status === 'ok' && behavior.groups.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle as="h2">Nhóm hành vi người dùng</CardTitle>
+              <p className="ez-muted-note">
+                K-Means trên {behavior.user_count} người dùng trong {behavior.window_days} ngày —
+                chia {behavior.clustering?.selected_k} nhóm
+                {behavior.clustering ? ` (silhouette ${behavior.clustering.silhouette_score.toFixed(2)})` : ''}.
+                Dùng để đặt hạn mức theo mức sử dụng thật thay vì theo vai trò.
+                {behavior.dropped_features.length > 0 && (
+                  <>
+                    {' '}Đã bỏ {behavior.dropped_features.length} đặc trưng không biến thiên:{' '}
+                    {behavior.dropped_features
+                      .map((key) => (BEHAVIOR_METRIC_LABELS[key] ?? key).toLowerCase())
+                      .join(', ')}
+                    .
+                  </>
+                )}
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="ez-behavior-groups">
+              {behavior.groups.map((group) => (
+                <article key={group.cluster_id} className="ez-behavior-group">
+                  <div className="ez-behavior-group-head">
+                    <strong>Nhóm {group.cluster_id + 1} · {group.size} người</strong>
+                    {group.hint && <span className="ez-behavior-hint">{group.hint}</span>}
+                  </div>
+                  <dl className="ez-behavior-metrics">
+                    {BEHAVIOR_METRIC_ORDER.filter((key) => key in group.profile).map((key) => (
+                      <div key={key}>
+                        <dt>{BEHAVIOR_METRIC_LABELS[key] ?? key}</dt>
+                        <dd>{formatBehaviorMetric(key, group.profile[key])}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </article>
+              ))}
+            </div>
+
+            {anomalousUsers.length > 0 && (
+              <div className="ez-behavior-anomalies">
+                <strong>Tài khoản lệch hẳn mọi nhóm ({anomalousUsers.length})</strong>
+                <p className="ez-muted-note">
+                  Hành vi không giống bất kỳ phân khúc nào — nên xem lại trước khi áp hạn mức chung.
+                </p>
+                <ul>
+                  {anomalousUsers.map((user) => (
+                    <li key={user.user_id}>
+                      {/* Log vẫn còn nhưng tài khoản đã bị xoá — nói rõ thay vì hiện id trần. */}
+                      {user.full_name || user.email || 'Tài khoản đã xoá'}
+                      {user.role && <span className="ez-behavior-role">{user.role}</span>}
+                      <span className="ez-behavior-metric-inline">
+                        {user.metrics.activity_count} lượt · lỗi {Math.round((user.metrics.error_rate ?? 0) * 100)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       )}
 
       <Card>

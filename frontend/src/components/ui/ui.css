@@ -1874,3 +1874,103 @@
   text-transform: uppercase;
   letter-spacing: var(--ez-tracking-caps);
 }
+
+/* ── Nhóm hành vi người dùng (K-Means, trang nhật ký hoạt động) ── */
+.ez-muted-note {
+  margin: var(--ez-space-1) 0 0;
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+  line-height: var(--ez-leading-snug);
+}
+
+.ez-behavior-groups {
+  display: grid;
+  gap: var(--ez-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.ez-behavior-group {
+  padding: var(--ez-space-3);
+  border: 1px solid var(--ez-border);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+}
+
+.ez-behavior-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ez-space-2);
+  margin-bottom: var(--ez-space-2);
+}
+
+.ez-behavior-hint {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: var(--ez-accent-subtle);
+  color: var(--ez-accent-text);
+  font-size: var(--ez-text-caption);
+  font-weight: var(--ez-weight-semibold);
+}
+
+.ez-behavior-metrics {
+  display: grid;
+  gap: var(--ez-space-1);
+  margin: 0;
+}
+
+.ez-behavior-metrics > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ez-space-3);
+}
+
+.ez-behavior-metrics dt {
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+}
+
+.ez-behavior-metrics dd {
+  margin: 0;
+  color: var(--ez-text);
+  font-size: var(--ez-text-body-sm);
+  font-weight: var(--ez-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ez-behavior-anomalies {
+  margin-top: var(--ez-space-4);
+  padding: var(--ez-space-3);
+  border: 1px solid var(--ez-warning-border);
+  border-left-width: 3px;
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-warning-subtle);
+}
+
+.ez-behavior-anomalies ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-2);
+  margin: var(--ez-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ez-behavior-anomalies li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--ez-space-2);
+  padding: 4px 10px;
+  border: 1px solid var(--ez-border-subtle);
+  border-radius: 999px;
+  background-color: var(--ez-surface);
+  font-size: var(--ez-text-body-sm);
+}
+
+.ez-behavior-role,
+.ez-behavior-metric-inline {
+  color: var(--ez-text-muted);
+  font-size: var(--ez-text-caption);
+}

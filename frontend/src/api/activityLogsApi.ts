@@ -3,6 +3,7 @@ import type {
   ActivityLogListParams,
   UserActivityLogListResponse,
   UserActivityLogStatisticsResponse,
+  UserBehaviorGroupsResponse,
 } from '../types/activityLogs';
 
 export const activityLogsApi = {
@@ -25,6 +26,15 @@ export const activityLogsApi = {
     signal?: AbortSignal,
   ): Promise<UserActivityLogListResponse> => {
     const response = await client.get<UserActivityLogListResponse>(`/admin/users/${userId}/activity`, { params, signal });
+    return response.data;
+  },
+
+  /** Phân nhóm hành vi người dùng bằng K-Means (chỉ quản trị). */
+  behaviorGroups: async (days = 90, signal?: AbortSignal): Promise<UserBehaviorGroupsResponse> => {
+    const response = await client.get<UserBehaviorGroupsResponse>('/admin/behavior-groups', {
+      params: { days },
+      signal,
+    });
     return response.data;
   },
 };
