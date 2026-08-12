@@ -14,7 +14,7 @@
 | Gợi ý tài liệu liên quan | **Đã chạy** (cosine, không phải K-Means) | — |
 | Ràng buộc đa dạng khi sinh đề từ ma trận | **Đã chạy** | Gán nhãn cụm nội dung làm ràng buộc cho CP-SAT |
 | Phân nhóm hành vi người dùng (quản trị) | **Đã chạy** | Phân khúc sử dụng + phát hiện tài khoản bất thường |
-| Gán nhãn cụm cho miền cá nhân hoá | **Bị chặn** — xem Phần 4 | — |
+| Gán nhãn cụm cho miền cá nhân hoá | **Hết bị chặn**, chưa làm — xem Phần 4.1 | — |
 
 Năm chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững). **Dữ liệu nuôi chúng tự sinh ra từ luồng dùng bình thường** — giáo viên tạo đề, học sinh làm bài, người dùng thao tác trên hệ thống. Không cái nào phụ thuộc mắt xích knowledge extraction đang tắc.
 
@@ -100,7 +100,7 @@ Nếu chia "khai thác K-Means" thành 10 hạng mục:
 | 4 | Đánh giá chất lượng cụm | Đã làm tốt (3 chỉ số nội tại) | Đã làm tốt, silhouette hiện ra giao diện |
 | 5 | Đánh giá độ ổn định | Đã làm tốt (ARI đa seed) | Đã làm tốt |
 | 6 | Quản lý version mô hình | Đã làm tốt | Đã làm tốt |
-| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 5 chức năng mới; **vẫn thiếu** ở miền cá nhân hoá |
+| 7 | **Gán nhãn cụm cho đối tượng** | Thiếu hoàn toàn | **Đã có** cho 5 chức năng mới; miền cá nhân hoá nay hết bị chặn nhưng **chưa làm** |
 | 8 | **Dùng cụm để thay đổi đầu ra** | Thiếu hoàn toàn | **Đã có** — 5 chức năng đều hiện kết quả cho người dùng |
 | 9 | **Diễn giải ý nghĩa từng cụm** | Có mã, không chạy | **Đã có** — toạ độ tâm cụm đọc thẳng ra điểm yếu của nhóm |
 | 10 | **Phát hiện ngoại lai theo khoảng cách tâm cụm** | Chưa dùng | **Đã có**, dùng median/MAD (xem lỗi che lấp bên dưới) |
@@ -221,7 +221,7 @@ Nguyên tắc chọn đề xuất: (a) chỉ dùng chức năng **đã có sẵn
 
 ## Phần 4 — Thứ tự triển khai và phát hiện làm đổi thứ tự
 
-### 4.1. Vì sao "gán nhãn cụm" không còn là bước 0
+### 4.1. Vì sao "gán nhãn cụm" không còn là bước 0 — và tắc nghẽn nay đã được thông
 
 Bản đầu xếp *"bổ sung khâu gán nhãn cụm + job huấn luyện định kỳ"* làm bước 0 bắt buộc. Khi bắt tay làm mới phát hiện **bước này bị chặn, không phải do thiếu mã**:
 
@@ -231,7 +231,9 @@ Bản đầu xếp *"bổ sung khâu gán nhãn cụm + job huấn luyện đị
 
 Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` vẫn rỗng vĩnh viễn, nên gán nhãn xong cũng không có gì để gán.
 
-**Cách xử lý đã chọn:** không cố thông tắc đường đó trước, mà chuyển sang các chức năng có **dữ liệu tự sinh từ luồng dùng bình thường** — giáo viên tạo đề (`question_sets`), học sinh làm bài (`question_attempts`). Ba đề xuất 1, 2, 3 đều nằm trên đường này, và chúng **tự gán nhãn cụm ngay trong lượt tính**, không cần job nền.
+**Cách xử lý lúc đó:** không cố thông tắc ngay, mà chuyển sang các chức năng có **dữ liệu tự sinh từ luồng dùng bình thường** — giáo viên tạo đề (`question_sets`), học sinh làm bài (`question_attempts`). Đề xuất 1, 2, 3 đều nằm trên đường này, và chúng **tự gán nhãn cụm ngay trong lượt tính**, không cần job nền.
+
+**Cập nhật — tắc nghẽn đã được thông.** Sau khi hoàn thành cả 6 đề xuất, tắc nghẽn này đã được xử lý: thêm job nền `extract_document_knowledge` tự xếp hàng sau khi sinh câu hỏi. Chi tiết và kết quả kiểm chứng xem `PHAN_TICH_ML_CBF.md`. Hệ quả cho tài liệu này: `learning_items` nay sinh ra được, nên **hạng mục 7 (gán nhãn cụm cho miền cá nhân hoá) không còn bị chặn** — chỉ còn là việc chưa làm, không phải việc không làm được.
 
 ### 4.2. Thứ tự thực tế đã đi
 
@@ -243,7 +245,8 @@ Hệ quả: dù người dùng dùng web bao nhiêu đi nữa, `learning_items` 
 | 4 | Đề xuất 1 — phân nhóm năng lực học sinh | ✅ xong |
 | 5 | Đề xuất 6 — phân nhóm hành vi người dùng (quản trị) | ✅ xong |
 | 6 | Đề xuất 4 — đa dạng hoá ma trận đề | ✅ xong |
-| 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi, rồi mới gán nhãn cụm | ⬜ chưa — việc lớn nhất còn lại |
+| 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi | ✅ xong — BKT/IRT nay chạy được |
+| 8 | Gán nhãn cụm cho miền cá nhân hoá (nay đã hết bị chặn) | ⬜ chưa |
 
 ### 4.3. Chi tiết năm chức năng K-Means đã triển khai
 
@@ -295,7 +298,8 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 ### Hai điểm nên thẳng thắn nêu là hạn chế
 
 - **Quy tắc "độ phân biệt âm" không phải phát hiện của K-Means** — đó là quy tắc xác định trong đo lường giáo dục. Trong mã, hai lớp này được tách riêng (`_apply_rule_based_flags` và `_apply_outlier_flags`); trình bày lẫn lộn là không trung thực. K-Means đóng góp phần phát hiện bất thường theo khoảng cách tâm cụm.
-- **Miền cá nhân hoá (5 loại cụm gốc) vẫn chưa gán được nhãn**, vì mắt xích knowledge extraction chưa có ai kích hoạt (Phần 4.1). Nêu rõ nguyên nhân kỹ thuật và hướng thông tắc sẽ được đánh giá cao hơn là né tránh.
+- **Miền cá nhân hoá (5 loại cụm gốc) vẫn chưa gán nhãn cụm**, dù mắt xích knowledge extraction nay đã thông. Đây là việc còn lại rõ ràng nhất, và nêu thẳng sẽ được đánh giá cao hơn là né tránh.
+- **Một lỗi chỉ lộ ra khi chạy với MongoDB thật** (`ConflictingUpdateOperators` trong `upsert_graph_edge`) mà 500+ test dùng `mongomock` không bắt được — vì mongomock chấp nhận lệnh mà MongoDB thật từ chối. Nêu điểm này cho thấy hiểu giới hạn của việc giả lập cơ sở dữ liệu trong kiểm thử.
 
 ### Số liệu kiểm chứng có thể trích vào báo cáo
 

@@ -2,7 +2,7 @@
 
 > Dựa trên đọc mã nguồn trực tiếp. Mọi đề xuất đều chỉ rõ file cần sửa và hạ tầng đã có sẵn.
 
-> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, cộng thêm bốn chức năng K-Means ngoài danh sách ban đầu (phát hiện câu hỏi lỗi, phân nhóm năng lực lớp, phân nhóm hành vi người dùng, ràng buộc đa dạng ma trận đề — xem `PHAN_TICH_KMEANS.md`). Mắt xích learning event **vẫn chưa nối**, và lý do đã được xác minh cụ thể hơn ở mục bên dưới. CBF chưa triển khai.
+> **Cập nhật sau khi triển khai.** Đã làm xong A1, A3 trong Nhóm A, bốn chức năng K-Means ngoài danh sách ban đầu (xem `PHAN_TICH_KMEANS.md`), và **đã thông tắc đường cá nhân hoá** — BKT/IRT nay chạy được. Chẩn đoán ban đầu về mắt xích đứt là **sai**; chỗ sai và nguyên nhân được ghi lại nguyên vẹn ở mục ngay dưới. CBF vẫn chưa triển khai.
 
 ---
 
@@ -21,13 +21,39 @@ Kho thuật toán trong `backend/app/personalization/algorithms/` **đã có s�
 
 Tất cả đều mắc **cùng một bệnh**: được gọi qua `learner_model_service.process_learning_event`, mà hàm này chỉ chạy khi có `learning_event` được ghi.
 
-**Mắt xích đứt duy nhất:** khi học sinh nộp bài luyện tập (`app/routers/questions.py:1017-1045`), hệ thống chỉ ghi vào `question_attempts` rồi trả kết quả — **không phát sinh learning event nào**. Nên BKT, IRT, AKT, NeuralCD, bandit đều không bao giờ được kích hoạt.
+### Chẩn đoán ban đầu và chỗ nó sai
 
-> **Nối một chỗ này là bật được đồng thời 5 thuật toán đã viết sẵn.**
+Bản đầu tài liệu này kết luận: *"mắt xích đứt duy nhất là khi nộp bài luyện tập, hệ thống không phát learning event nào"*. **Kết luận đó sai**, và ghi lại chỗ sai ở đây vì bản thân sai lầm cũng đáng rút kinh nghiệm.
 
-**Cập nhật — vì sao vẫn chưa nối.** Khi bắt tay làm mới thấy nối learning event là chưa đủ. `process_learning_event` cần `q_matrix` để biết câu hỏi thuộc đơn vị kiến thức nào, mà `q_matrix` lấy từ `learning_items`; `learning_items` chỉ sinh ra từ `knowledge_extraction_service`, và service này chỉ chạy qua một endpoint **không giao diện nào gọi**. Nối event mà chưa thông chỗ đó thì mọi event đều rơi vào nhánh `missing_q_matrix` và không cải thiện gì.
+Sai ở đâu: kết luận dựa trên một lệnh tìm kiếm bị cắt ngắn (`grep ... | head -5`), chỉ thấy các dòng khai báo kiểu mà không thấy chỗ gọi thật. Thực tế `PracticeAttemptPage.tsx:168-187` **đã phát đầy đủ** sự kiện `question_answered` sau mỗi lượt nộp, kèm thời gian làm từng câu đo thật, `idempotency_key`, số lần đổi đáp án và metadata.
 
-Thứ tự đúng là: **tự động chạy knowledge extraction sau khi sinh câu hỏi → nối learning event → BKT/IRT mới có dữ liệu**. Vì việc này lớn và phụ thuộc AI, các chức năng đã triển khai được chọn theo hướng khác: dùng dữ liệu tự sinh từ luồng bình thường (`question_attempts`, `user_activity_logs`, ngân hàng câu hỏi), không cần đi qua `learning_items`.
+Bài học: một lệnh tìm kiếm bị cắt ngắn có thể dẫn tới kết luận ngược hẳn. Phải đọc hết kết quả trước khi kết luận "không có chỗ nào gọi".
+
+### Mắt xích đứt thật sự — ✅ ĐÃ THÔNG
+
+`process_learning_event` cần **q-matrix** để biết câu hỏi thuộc đơn vị kiến thức nào. Q-matrix nằm trên `learning_items`, mà `learning_items` chỉ do `knowledge_extraction_service` sinh ra — và service này trước đây chỉ gọi được qua một endpoint **không giao diện nào dùng**. Nên dù người dùng thao tác bao nhiêu, `learning_items` vẫn rỗng vĩnh viễn và mọi sự kiện đều rơi vào nhánh `missing_q_matrix`.
+
+**Cách đã thông:** thêm job nền `extract_document_knowledge`, tự xếp hàng ngay sau khi sinh câu hỏi xong (`knowledge_extraction_job.py`). Chạy nền vì bước này gọi AI trên toàn bộ tài liệu — giáo viên nhận bộ câu hỏi ngay, không phải chờ. Có `idempotency_key` nên sinh câu hỏi nhiều lần trên cùng tài liệu chỉ trích xuất một lần.
+
+**Kiểm chứng end-to-end với MongoDB thật:**
+
+```
+BƯỚC 1 — trích xuất:  q_matrix câu 0 = {KC_bề_lõm: 1.0}
+BƯỚC 2 — trả lời SAI: process_learning_event → "processed"
+                      (trước đây luôn là "missing_q_matrix")
+        BKT mastery = 0.1552   ← thấp, đúng vì trả lời sai
+        IRT theta   = −0.0479  ← năng lực âm nhẹ, đúng hướng
+```
+
+**Cách bật:** đặt `PERSONALIZATION_ENABLED=true` và `KNOWLEDGE_GRAPH_ENABLED=true` trong `backend/.env`, rồi chạy worker (`python -m app.worker`) để job nền được xử lý. Cả hai cờ mặc định tắt nên hệ thống giữ nguyên hành vi cũ cho tới khi quản trị viên bật.
+
+### Lỗi chỉ lộ ra khi chạy với MongoDB thật
+
+Ngay lần chạy thật đầu tiên, bước trích xuất chết hoàn toàn với lỗi `ConflictingUpdateOperators`: hàm `upsert_graph_edge` quên tách `evidence_chunk_ids` khỏi `$set` trong khi `$addToSet` cũng ghi trường đó. MongoDB không cho phép một trường xuất hiện ở hai toán tử update.
+
+Vì sao 500+ test không bắt được: test dùng `mongomock`, mà mongomock **chấp nhận** lệnh này. Đây là giới hạn cố hữu của việc giả lập cơ sở dữ liệu — hành vi giả lập lỏng hơn hành vi thật.
+
+Cách khắc phục ở tầng test: thay vì dựa vào driver phát hiện, thêm test **soi cấu trúc lệnh update** và khẳng định không trường nào xuất hiện ở hai toán tử. Đã xác minh test này thật sự bắt được lỗi (bỏ bản sửa thì test đỏ, khôi phục thì xanh).
 
 ---
 
@@ -128,7 +154,7 @@ Ba mục này chỉ phụ thuộc nội dung tài liệu — có tài liệu là
 
 ## Phần 3 — Thứ tự triển khai
 
-Bảng dưới đã cập nhật theo thực tế đã đi. Thứ tự thay đổi so với bản đầu vì bước "nối learning event" hoá ra bị chặn (xem mục đầu tài liệu).
+Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learning event" hoá ra **không cần làm** — trang làm bài đã phát sự kiện từ trước; thứ thật sự thiếu là trích xuất tri thức (xem mục đầu tài liệu).
 
 | Bước | Việc | Trạng thái | Phụ thuộc |
 |---|---|---|---|
@@ -139,15 +165,17 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Thứ tự thay đ�
 | 5 | K-Means phân nhóm hành vi người dùng *(ngoài danh sách ban đầu)* | ✅ xong | `user_activity_logs` |
 | 6 | K-Means ràng buộc đa dạng ma trận đề *(ngoài danh sách ban đầu)* | ✅ xong | Ngân hàng câu hỏi |
 | 7 | A2 — cảnh báo tài liệu trùng lặp | ⬜ chưa | Không |
-| 8 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ⬜ chưa | Không — nhưng tốn AI |
-| 9 | Nối mắt xích: nộp bài luyện tập → phát sinh learning event | ⬜ chưa | Bước 8 |
+| 8 | **Tự động chạy knowledge extraction sau khi sinh câu hỏi** | ✅ xong | Job nền, cờ mặc định tắt |
+| 9 | ~~Nối mắt xích: nộp bài luyện tập → phát sinh learning event~~ | ✅ **vốn đã có sẵn** | trang làm bài đã phát từ trước |
 | 10 | Gán nhãn cụm cho miền cá nhân hoá (`predict_cluster` + job định kỳ) | ⬜ chưa | Bước 9 |
 | 11 | CBF: dựng vector hồ sơ + cosine thay cho khớp nhãn thô | ⬜ chưa | Bước 9 |
 | 12 | Ghép CBF × K-Means (cách 1, 2, 3) | ⬜ chưa | Bước 10 + 11 |
-| 13 | B1, B2 — BKT & IRT | ⬜ chưa | Bước 9 + đủ lượt làm bài |
+| 13 | B1, B2 — BKT & IRT | ✅ **đã chạy được** | cần bật cờ + đủ lượt làm bài |
 | 14 | B3 — bật Thompson Sampling | ⬜ chưa | Bước 11 |
 
-**Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Sáu việc đã xong đều đi đường khác, dựa vào dữ liệu tự sinh từ luồng dùng bình thường (`question_attempts`, `user_activity_logs`, ngân hàng câu hỏi).
+**Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó mới là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bước 9 hoá ra đã có sẵn từ trước.
+
+Sau khi thông bước 8, **BKT và IRT đã chạy được** (bước 13). Còn lại chưa làm: A2, gán nhãn cụm cho miền cá nhân hoá, CBF, ghép CBF × K-Means, và Thompson Sampling.
 
 ---
 
