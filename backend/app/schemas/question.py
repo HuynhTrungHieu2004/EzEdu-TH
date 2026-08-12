@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Dict, List, Literal
+from typing import Any, Optional, Dict, List, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -123,6 +123,8 @@ class ValidationStats(BaseModel):
     fixed_count: int = 0
     replaced_count: int = 0
     validator: Optional[str] = None
+    # Thống kê bước K-Means khử trùng lặp ngữ nghĩa (xem question_diversity_service).
+    diversity: Optional[Dict[str, Any]] = None
 
 
 class QuestionSetResponse(BaseModel):

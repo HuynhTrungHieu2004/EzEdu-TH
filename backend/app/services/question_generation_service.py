@@ -14,6 +14,7 @@ from app.services.llm_service import (
     classify_bloom_levels,
 )
 from app.services.tfidf_service import extract_keywords
+from app.services.question_diversity_service import select_diverse_questions
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +386,17 @@ async def generate_questions(
         validation_stats["valid_count"] = len(final_questions)
         logger.info("ℹ️ Groq or Gemini not fully configured - skipping cross-validation")
 
-    # Select the requested count
-    selected_questions = final_questions[:question_count]
+    # ── Select the requested count — K-Means khử trùng lặp ngữ nghĩa ──
+    # Bước khử trùng ở trên chỉ so khớp chuỗi chính xác, không bắt được các
+    # câu khác chữ nhưng cùng ý. Phân cụm embedding rồi mỗi cụm giữ một câu
+    # để `question_count` câu cuối trải đều nội dung tài liệu.
+    selected_questions, diversity_stats = select_diverse_questions(final_questions, question_count)
+    validation_stats["diversity"] = diversity_stats
+    if diversity_stats.get("applied"):
+        logger.info(
+            f"🎯 K-Means chọn {diversity_stats['selected']}/{diversity_stats['pool_size']} câu đa dạng "
+            f"(bỏ {diversity_stats['duplicates_dropped']} câu trùng ý, embedding: {diversity_stats.get('embedding_model')})"
+        )
 
     # If we don't have enough questions, fallback to using all questions in pool
     if len(selected_questions) < question_count:
