@@ -426,8 +426,13 @@ def _collect_cluster_match(
     recent_events: list[dict],
     per_source_limit: int,
 ) -> None:
+    # Dùng chung định nghĩa "item này thuộc cụm nào" với phần ghép CBF×K-Means.
+    # Chỉ đọc `content_cluster_id` thì bỏ sót toàn bộ câu hỏi — loại item chiếm
+    # đa số — vì chúng mang nhãn `question_cluster_id`, và nguồn này im lặng.
+    from app.personalization.services.cbf_kmeans_hybrid_service import _cluster_of
+
     recent_clusters = {
-        pool_by_id[str(event["item_id"])].get("content_cluster_id")
+        _cluster_of(pool_by_id[str(event["item_id"])])
         for event in recent_events
         if event.get("item_id") and str(event["item_id"]) in pool_by_id
     }
@@ -436,7 +441,7 @@ def _collect_cluster_match(
         return
     added = 0
     for item in pool_by_id.values():
-        if item.get("content_cluster_id") in recent_clusters:
+        if _cluster_of(item) in recent_clusters:
             accumulator.add(item, "cluster_match", 0.55 + (_quality(item) or 0.0) * 0.2)
             added += 1
         if added >= per_source_limit:
