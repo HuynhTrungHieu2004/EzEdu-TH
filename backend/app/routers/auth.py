@@ -404,6 +404,15 @@ async def google_login(payload: GoogleLoginRequest, request: Request):
 
     user_status = _normalize_user_status(user)
     if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:
+        await record_activity(
+            action="login_failed",
+            category="auth", status="failure",
+            user_id=str(user["_id"]), resource_type="user", resource_id=str(user["_id"]),
+            request=request, duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="ACCOUNT_BLOCKED",
+            metadata={"provider": "google", "status": user_status, "role": user.get("role", "user")},
+            database=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.",

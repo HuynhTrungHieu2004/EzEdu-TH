@@ -84,11 +84,15 @@ async def find_or_link_google_user(db, identity: GoogleIdentity) -> tuple[Option
     theo_email = await db["users"].find_one({"email": identity.email, "deleted_at": None})
     if theo_email:
         # Gắn thêm, không ghi đè: giữ nguyên vai, mật khẩu cũ và mọi dữ liệu.
+        moc_thoi_gian = datetime.now(timezone.utc)
         await db["users"].update_one(
             {"_id": theo_email["_id"]},
-            {"$set": {"google_sub": identity.sub, "updated_at": datetime.now(timezone.utc)}},
+            {"$set": {"google_sub": identity.sub, "updated_at": moc_thoi_gian}},
         )
+        # Đồng bộ dict trả về với DB — thiếu dòng dưới thì updated_at trong
+        # dict vẫn là giá trị cũ, khiến nơi gọi vô tình ghi đè lùi lại.
         theo_email["google_sub"] = identity.sub
+        theo_email["updated_at"] = moc_thoi_gian
         return theo_email, True
 
     return None, False

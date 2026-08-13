@@ -89,6 +89,30 @@ class GoogleLoginEndpointTests(unittest.IsolatedAsyncioTestCase):
             await self._goi()
 
         self.assertEqual(ctx.exception.status_code, 403)
+        nhat_ky = await self.db["user_activity_logs"].find({}).to_list(None)
+        self.assertTrue(
+            any(b.get("error_code") == "ACCOUNT_BLOCKED" for b in nhat_ky),
+            "tài khoản bị khoá cũng phải được ghi nhật ký, như login mật khẩu",
+        )
+
+    async def test_linking_an_existing_email_bumps_updated_at_forward(self):
+        """Gắn google_sub vào tài khoản email cũ không được làm updated_at
+        chạy lùi về giá trị trước khi gắn (bug đã sửa: dict trả về của
+        find_or_link_google_user từng giữ updated_at cũ, khiến route ghi đè
+        updated_at mới bằng chính giá trị cũ đó)."""
+        cu = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        await self.db["users"].insert_one({
+            "_id": ObjectId(), "email": "an@example.com", "full_name": "An",
+            "role": "student", "status": "active",
+            "is_active": True, "deleted_at": None, "created_at": cu, "updated_at": cu,
+        })
+
+        kq = await self._goi()
+
+        self.assertTrue(kq.access_token)
+        trong_db = await self.db["users"].find_one({"email": "an@example.com"})
+        # mongomock trả datetime không tz (naive); so sánh theo giờ naive.
+        self.assertGreater(trong_db["updated_at"].replace(tzinfo=None), cu.replace(tzinfo=None))
 
     async def test_registration_gate_blocks_new_users_only(self):
         """Tắt đăng ký nghĩa là 'không nhận người mới', không phải 'khoá cửa
