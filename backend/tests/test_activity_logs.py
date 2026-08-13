@@ -20,6 +20,27 @@ def make_user(role: str = "admin") -> UserResponse:
     )
 
 
+# Đồng hồ ghim cho cả lớp test. Thống kê "hôm nay" đếm trong cửa sổ
+# [nửa đêm UTC, bây giờ], nên nếu để dữ liệu mẫu bám giờ thật thì một lần chạy
+# vắt qua nửa đêm UTC sẽ đẩy cả hai bản ghi sang "hôm qua" và test đỏ mà không
+# ai đụng vào mã. Đã tái hiện được: seed lúc 23:58, thống kê chạy lúc 00:01 thì
+# total_today = 0 thay vì 2.
+#
+# Chọn giữa trưa để mọi mốc trong test (±5 phút, −2 ngày) đều nằm gọn một phía
+# của ranh giới ngày.
+FIXED_NOW = datetime(2026, 8, 13, 12, 0, tzinfo=timezone.utc)
+
+# Dữ liệu mẫu cần "vài sự kiện đã xảy ra trước đó trong cùng ngày", nên đồng hồ
+# ghim phải cách nửa đêm đủ xa. Đặt FIXED_NOW vào lúc 00:01 thì bản ghi "5 phút
+# trước" rơi sang hôm qua và các phép đếm sai — không phải lỗi mã, mà là dữ liệu
+# mẫu vô nghĩa. Chặn ngay ở đây để người sửa sau thấy lý do thay vì thấy một con
+# số đếm lệch khó hiểu.
+assert FIXED_NOW.hour >= 1, (
+    "FIXED_NOW phải cách nửa đêm UTC ít nhất 1 giờ: dữ liệu mẫu có bản ghi "
+    "'5 phút trước' và nó cần nằm cùng ngày với FIXED_NOW."
+)
+
+
 class ActivityLogServiceTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.client = AsyncMongoMockClient()
@@ -27,9 +48,12 @@ class ActivityLogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.patch_db = patch("app.services.activity_log_service.get_database", return_value=self.db)
         self.patch_db.start()
         self.addCleanup(self.patch_db.stop)
+        self.patch_now = patch("app.services.activity_log_service._now", return_value=FIXED_NOW)
+        self.patch_now.start()
+        self.addCleanup(self.patch_now.stop)
         self.admin = make_user("admin")
         self.user_id = str(ObjectId())
-        self.now = datetime.now(timezone.utc)
+        self.now = FIXED_NOW
 
     async def test_record_activity_sanitizes_private_metadata(self):
         from app.services.activity_log_service import record_activity
@@ -120,6 +144,27 @@ class ActivityLogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stats.permission_denied_count, 1)
         self.assertEqual(stats.quota_exceeded_count, 0)
         self.assertEqual(stats.by_category["auth"], 1)
+
+    async def test_today_window_starts_at_midnight_not_24_hours_ago(self):
+        """Chốt ranh giới ngày — đây chính là chỗ từng làm test chớp nháy.
+
+        "Hôm nay" tính từ nửa đêm UTC, không phải "24 giờ gần nhất". Một bản
+        ghi lúc 23:59 hôm qua nằm ngoài, dù chỉ cách hiện tại vài phút.
+        """
+        from app.services.activity_log_service import activity_statistics
+
+        gan_nua_dem_hom_qua = FIXED_NOW.replace(hour=0, minute=0) - timedelta(minutes=1)
+        vua_qua_nua_dem = FIXED_NOW.replace(hour=0, minute=1)
+        await self.db["user_activity_logs"].insert_many([
+            {"user_id": self.user_id, "action": "login_success", "category": "auth",
+             "status": "success", "timestamp": gan_nua_dem_hom_qua, "metadata": {}},
+            {"user_id": self.user_id, "action": "login_success", "category": "auth",
+             "status": "success", "timestamp": vua_qua_nua_dem, "metadata": {}},
+        ])
+
+        stats = await activity_statistics()
+
+        self.assertEqual(stats.total_today, 1, "chỉ bản ghi sau nửa đêm mới tính là hôm nay")
 
     async def test_admin_user_activity_endpoint_uses_user_filter(self):
         from app.routers.admin_activity_logs import get_admin_user_activity
