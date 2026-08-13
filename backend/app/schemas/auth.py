@@ -59,3 +59,19 @@ class Token(BaseModel):
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
     exp: Optional[int] = None
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(..., min_length=1, max_length=4096)
+    # Chỉ gửi ở lần gọi thứ hai, sau khi người dùng mới chọn vai. Literal chặn
+    # sẵn việc tự phong 'admin' bằng cách sửa request.
+    role: Optional[Literal["student", "lecturer"]] = None
+
+
+class GoogleLoginResponse(BaseModel):
+    needs_role: bool = False
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
+    # Hai trường dưới chỉ dùng để hiện lời chào ở màn chọn vai.
+    email: Optional[str] = None
+    full_name: Optional[str] = None
