@@ -6,6 +6,10 @@ const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 /** Cache ở phạm vi module: mọi lời gọi loadGoogleScript() dùng chung một promise. */
 let scriptPromise: Promise<void> | null = null;
 
+function googleReady(): boolean {
+  return !!(window as unknown as { google?: any }).google?.accounts?.id;
+}
+
 /**
  * Nạp script Google Identity Services đúng một lần cho cả ứng dụng.
  *
@@ -16,15 +20,35 @@ let scriptPromise: Promise<void> | null = null;
  * StrictMode, effect chạy hai lần liên tiếp — lần hai sẽ thấy thẻ script đã
  * tồn tại và resolve ngay lập tức dù `onload` thật sự chưa bắn, khiến
  * `window.google` chưa sẵn sàng và nút không bao giờ hiện.
+ *
+ * Hai điều cần giữ khi thẻ script đã tồn tại từ trước:
+ * - Nếu `window.google` đã sẵn sàng (script tải xong từ lâu, ví dụ module bị
+ *   HMR nạp lại) thì resolve ngay — sự kiện `load` của thẻ cũ đã bắn qua rồi,
+ *   gắn listener lúc này sẽ không bao giờ được gọi.
+ * - Nếu lần tải trước hỏng, xoá `scriptPromise` khi reject để lần gọi sau tạo
+ *   lại từ đầu — nếu không, một lần mất mạng sẽ kẹt vĩnh viễn ở lỗi cũ.
  */
 function loadGoogleScript(): Promise<void> {
   if (scriptPromise) return scriptPromise;
 
   scriptPromise = new Promise((resolve, reject) => {
+    // Xoá thẻ hỏng khỏi DOM: nếu không, lần gọi sau (retry) sẽ lại thấy "đã
+    // tồn tại" và gắn listener vào đúng thẻ đã chết, treo vô thời hạn thay vì
+    // tải lại từ đầu.
+    const fail = (tag: HTMLScriptElement) => {
+      tag.remove();
+      scriptPromise = null;
+      reject(new Error('Không tải được thư viện Google.'));
+    };
+
     const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
+      if (googleReady()) {
+        resolve();
+        return;
+      }
       existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Không tải được thư viện Google.')));
+      existing.addEventListener('error', () => fail(existing));
       return;
     }
     const script = document.createElement('script');
@@ -32,7 +56,7 @@ function loadGoogleScript(): Promise<void> {
     script.src = SCRIPT_SRC;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Không tải được thư viện Google.'));
+    script.onerror = () => fail(script);
     document.head.appendChild(script);
   });
 
