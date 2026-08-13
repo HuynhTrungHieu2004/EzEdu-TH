@@ -165,7 +165,7 @@ const RegisterPage = () => {
 
         <div style={{ display: 'grid', gap: 12, justifyItems: 'center', marginTop: 16 }}>
           <span className="text-muted">hoặc</span>
-          <GoogleSignInButton onCredential={google.onCredential} />
+          <GoogleSignInButton onCredential={google.onCredential} disabled={google.dangXuLy} />
           {google.error && <p className="text-danger">{google.error}</p>}
         </div>
         {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}

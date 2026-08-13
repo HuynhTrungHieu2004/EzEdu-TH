@@ -108,5 +108,15 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
 
   if (error) return <p className="text-muted">{error}</p>;
 
-  return <div ref={holder} aria-busy={disabled} style={{ minHeight: 44 }} />;
+  // Nút thật do Google render là một iframe bên trong div này — HTML
+  // `disabled` không áp dụng được cho nó. `pointer-events: none` chặn mọi
+  // click/hover xuống tới iframe (hành vi CSS chuẩn, không cần biết API nội
+  // bộ của GSI), còn opacity là dấu hiệu nhìn thấy được rằng đang xử lý.
+  return (
+    <div
+      ref={holder}
+      aria-busy={disabled}
+      style={{ minHeight: 44, opacity: disabled ? 0.6 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+    />
+  );
 }

@@ -19,26 +19,33 @@ export function useGoogleSignIn(thongBaoLoiMacDinh = 'Đăng nhập bằng Googl
   const [error, setError] = useState<string | null>(null);
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [info, setInfo] = useState<{ email: string; fullName: string } | null>(null);
+  const [dangXuLy, setDangXuLy] = useState(false);
 
   const dangNhap = useCallback(
     async (idToken: string, role?: 'student' | 'lecturer') => {
       setError(null);
+      setDangXuLy(true);
       try {
         const kq = await authApi.loginWithGoogle({ id_token: idToken, role });
         if (kq.needs_role) {
           // Người mới: giữ token để gọi lần hai kèm vai vừa chọn.
           setPendingToken(idToken);
           setInfo({ email: kq.email ?? '', fullName: kq.full_name ?? '' });
+          setDangXuLy(false);
           return;
         }
         localStorage.setItem('access_token', kq.access_token as string);
         const user = await authApi.getMe();
         await refresh();
         navigate(postLoginPath(user));
+        // Không tắt dangXuLy ở đây: trang sắp điều hướng đi, nút không còn ai
+        // nhìn thấy nữa. Tắt sớm chỉ mở lại cửa sổ bấm-lại trong khoảnh khắc
+        // giữa navigate() và khi router thật sự đổi trang.
       } catch (err: unknown) {
         setPendingToken(null);
         setInfo(null);
         setError(getApiErrorDetail(err) ?? thongBaoLoiMacDinh);
+        setDangXuLy(false);
       }
     },
     [navigate, refresh, thongBaoLoiMacDinh],
@@ -53,6 +60,7 @@ export function useGoogleSignIn(thongBaoLoiMacDinh = 'Đăng nhập bằng Googl
 
   return {
     error,
+    dangXuLy,
     onCredential,
     /** null khi chưa cần hỏi vai; ngược lại là props sẵn sàng cho GoogleRoleDialog. */
     dialogProps:
