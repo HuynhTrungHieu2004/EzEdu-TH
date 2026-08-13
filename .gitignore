@@ -63,3 +63,6 @@ playwright-report/
 
 # Codex isolated feature worktrees
 .worktrees/
+
+# Thư mục làm việc tạm của quy trình subagent-driven — không phải mã nguồn
+.superpowers/
