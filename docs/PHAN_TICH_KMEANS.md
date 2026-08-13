@@ -407,6 +407,18 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 - **Cùng một loại lỗi MongoDB thật, dính hai lần** — và lần thứ hai nghiêm trọng hơn hẳn. `ConflictingUpdateOperators` xảy ra khi một lệnh update ghi cùng một trường bằng hai toán tử (`$set` và `$setOnInsert`). Lần đầu ở `upsert_graph_edge`; lần hai ở `upsert_learning_session`, chặn **mọi** sự kiện học tập — tức chặn cả chuỗi cá nhân hoá ngay mắt xích đầu tiên. Cả hai lần, 580+ test dùng `mongomock` đều xanh, vì mongomock chấp nhận lệnh mà MongoDB thật từ chối.
 
   Thay vì chờ lần thứ ba, nay có một test **quét tĩnh toàn bộ `app/`** bằng `ast`, tìm mọi dict literal có khoá trùng giữa các cặp toán tử xung khắc, và chỉ thẳng ra `file:dòng`. Bài học đáng nêu: khi một loại lỗi tái phát, sửa từng chỗ là chưa đủ — phải dựng cái lưới bắt được cả loại.
+
+- **"Test xanh" có ba cách nói dối khác nhau**, và dự án này gặp cả ba:
+
+  | Kiểu | Test xanh nhưng thực tế | Gặp ở đâu |
+  |---|---|---|
+  | Giả lập lỏng hơn thật | mongomock nhận lệnh MongoDB thật từ chối | `ConflictingUpdateOperators`, hai lần |
+  | Test đúng nhưng đường chạy chưa bật | hàm CBF đúng, mà nó nằm sau bốn tầng chặn | `PHAN_TICH_ML_CBF.md` mục 1.2b |
+  | Test phụ thuộc giờ thật | `test_statistics_counts_today` đỏ khi chạy vắt qua nửa đêm UTC | thống kê nhật ký hoạt động — chính nguồn dữ liệu của đề xuất 6 |
+
+  Ca thứ ba đáng kể vì nó **ngược chiều** hai ca đầu: mã đúng, test sai. Cửa sổ "hôm nay" tính từ nửa đêm UTC, còn dữ liệu mẫu bám giờ thật lúc dựng, nên seed lúc 23:58 rồi thống kê chạy lúc 00:01 là cả hai bản ghi rơi sang hôm qua (`total_today = 0` thay vì 2 — con số đã tái hiện được trước khi sửa). Cách sửa là ghim đồng hồ của service cho cả lớp test, và kiểm chứng bằng cách chạy lại với đồng hồ ghim ở 01:00, 06:30, 12:00 và 23:58.
+
+  Điểm cuối đáng nêu: một test chớp nháy còn tệ hơn một test đỏ hẳn, vì nó dạy người ta thói quen chạy lại cho tới khi xanh.
 - **Một lỗi im lặng do giá trị mặc định**: `learning_items` chưa từng lưu `semantic_embedding`, mà cụm `content` và `question` dành 70% trọng số cho trường này. Hàm đọc có sẵn fallback cứng `[0,0,0,0]` nên phân cụm vẫn chạy, vẫn ra kết quả — chỉ là 70% trọng số đổ vào một vector hằng. Sau khi sửa, độ tách không gian đặc trưng tăng từ **0.0000 lên 0.9899**. Bài học: một giá trị mặc định "cho an toàn" có thể che giấu việc cả một khối đặc trưng không bao giờ có dữ liệu.
 - **Chọn không gian vector theo bản chất bài toán, không theo công cụ sẵn có**: chức năng "học liệu liên quan" dùng embedding vì *liên quan* là quan hệ ngữ nghĩa; chức năng "cảnh báo học liệu gần trùng" dùng TF-IDF vì *trùng lặp* là quan hệ từ vựng. Cùng một phép đo cosine, hai không gian khác nhau. Dùng embedding cho bài toán trùng lặp sẽ báo nhầm mọi bài cùng chủ đề. Chi tiết và số đo ở `PHAN_TICH_ML_CBF.md`.
 - **Không phải nghi ngờ nào cũng là lỗi.** Ở phần Thompson Sampling, một dòng

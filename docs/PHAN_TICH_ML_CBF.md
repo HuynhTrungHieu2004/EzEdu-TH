@@ -426,6 +426,10 @@ Ba lỗi đầu chặn cứng, ba lỗi sau làm thuật toán chạy mà không
 
 **Đây là điểm nên nêu thẳng khi bảo vệ.** Nó cho thấy quy trình kiểm chứng có tầng: test đơn vị bắt lỗi logic, nhưng chỉ chạy thật với cơ sở dữ liệu thật và trên trình duyệt mới bắt được lỗi tích hợp và lỗi "chạy mà vô dụng". Một hệ thống 600 test xanh vẫn có thể có sáu chỗ hỏng nếu chưa ai bật nó lên chạy.
 
+Chiều ngược lại cũng đúng và cũng gặp: **test sai trong khi mã đúng**. `test_statistics_counts_today` đỏ ngẫu nhiên vì so dữ liệu mẫu bám giờ thật với cửa sổ "hôm nay" tính từ nửa đêm UTC — chạy vắt qua nửa đêm là đỏ, chạy lại lúc khác là xanh. Đã sửa bằng cách ghim đồng hồ cho cả lớp test. Ba kiểu "test xanh nói dối" của dự án được liệt kê đủ ở `PHAN_TICH_KMEANS.md`, Phần 5.
+
+Tổng số test hiện tại: **615**, chạy trong ~18 giây.
+
 **Toàn bộ 18 bước đã xong.** Ba phần còn lại đều là *quyết định có chủ đích*, không phải việc bỏ dở:
 
 | Phần | Trạng thái | Lý do |
