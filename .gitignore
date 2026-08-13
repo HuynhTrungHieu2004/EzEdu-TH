@@ -4,6 +4,11 @@ frontend/.env
 .env
 .env.local
 .env.*.local
+# Bản sao lưu cấu hình cũng chứa nguyên bộ khoá thật — dễ lọt lên remote nhất
+# vì tên khác .env nên các mẫu ở trên không bắt.
+.env.bak*
+*.env.bak*
+.env.*.bak*
 
 # Virtual environments
 backend/.venv/
