@@ -245,14 +245,68 @@ def answers_for(
 
 
 async def purge(db) -> None:
+    """Gỡ sạch dữ liệu mẫu, kể cả phần do hệ thống tự sinh ra từ nó.
+
+    Chỉ xoá theo `seed_tag` là chưa đủ. Khi chạy thật, hệ thống sinh thêm cả
+    một tầng dữ liệu phái sinh — learning item, sự kiện học tập, trạng thái
+    BKT/IRT, nhật ký gợi ý, vector trong Chroma — và những bản ghi đó do API
+    thật tạo nên không mang cờ. Bỏ lại chúng thì lần seed sau chạy trên một
+    kho đầy bản ghi mồ côi trỏ vào tài liệu đã biến mất.
+
+    Mọi truy vấn dưới đây đều giới hạn theo đúng người dùng và tài liệu của bộ
+    mẫu, không xoá theo collection, để không đụng vào dữ liệu thật.
+    """
+    seed_user_ids = [str(doc["_id"]) async for doc in db["users"].find({"seed_tag": SEED_TAG}, {"_id": 1})]
+    seed_document_ids = [str(doc["_id"]) async for doc in db["documents"].find({"seed_tag": SEED_TAG}, {"_id": 1})]
+
     tong = 0
-    for name in ("question_attempts", "question_sets", "document_contents", "documents",
-                 "classes", "user_activity_logs", "users"):
-        result = await db[name].delete_many({"seed_tag": SEED_TAG})
+
+    async def xoa(name: str, query: dict) -> None:
+        nonlocal tong
+        result = await db[name].delete_many(query)
         if result.deleted_count:
             print(f"  xoá {result.deleted_count:4d} bản ghi trong {name}")
         tong += result.deleted_count
-    print(f"Đã gỡ {tong} bản ghi mang cờ {SEED_TAG}.")
+
+    # Vector trong Chroma phải gỡ trước, vì cần document_id còn tồn tại.
+    if seed_document_ids:
+        try:
+            from app.services.rag_service import _delete_document_vectors, init_chroma_client
+
+            client = init_chroma_client()
+            owners = {
+                str(doc["_id"]): doc.get("user_id")
+                async for doc in db["documents"].find({"seed_tag": SEED_TAG}, {"_id": 1, "user_id": 1})
+            }
+            for document_id, owner_id in owners.items():
+                _delete_document_vectors(client, document_id, owner_id)
+            print(f"  gỡ vector Chroma của {len(owners)} tài liệu")
+        except Exception as exc:  # noqa: BLE001 - Chroma hỏng không được chặn việc dọn Mongo
+            print(f"  (bỏ qua vector Chroma: {exc})")
+
+    if seed_user_ids:
+        for name in ("learning_events", "learning_sessions", "learner_profiles",
+                     "learner_knowledge_states", "recommendation_logs"):
+            await xoa(name, {"user_id": {"$in": seed_user_ids}})
+        await xoa("knowledge_graph_edges", {"created_by": {"$in": seed_user_ids}})
+        # `knowledge_components` không có `document_id`; nó nối với tài liệu qua
+        # `source_document_ids` (danh sách). Lọc theo `document_id` thì trượt
+        # sạch và để lại một kho thành phần tri thức mồ côi.
+        await xoa("knowledge_components", {"created_by": {"$in": seed_user_ids}})
+
+    if seed_document_ids:
+        for name in ("learning_items", "document_chunks"):
+            await xoa(name, {"document_id": {"$in": seed_document_ids}})
+        await xoa("knowledge_components", {"source_document_ids": {"$in": seed_document_ids}})
+
+    for name in ("question_attempts", "question_sets", "document_contents", "documents",
+                 "classes", "user_activity_logs", "users"):
+        await xoa(name, {"seed_tag": SEED_TAG})
+
+    print(f"Đã gỡ {tong} bản ghi.")
+    if tong:
+        print("  Lưu ý: mô hình cụm đã huấn luyện (`cluster_models`) không bị xoá — "
+              "chúng chỉ là tham số, không chứa dữ liệu cá nhân. Xoá tay nếu muốn sạch hẳn.")
 
 
 async def seed(db) -> None:
