@@ -10,9 +10,18 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.core.rbac import has_role, sanitize_permissions
 from app.database.mongodb import get_database
 from app.personalization.constants.collections import LEARNER_PROFILES
-from app.schemas.auth import UserRegister, UserLogin, UserResponse, Token, TokenPayload
+from app.schemas.auth import (
+    UserRegister, UserLogin, UserResponse, Token, TokenPayload,
+    GoogleLoginRequest, GoogleLoginResponse,
+)
 from app.services.activity_log_service import record_activity
 from app.services.system_settings_service import get_setting_value, is_feature_enabled
+from app.services.google_auth_service import (
+    GoogleAuthError,
+    create_google_user,
+    find_or_link_google_user,
+    verify_google_id_token,
+)
 
 router = APIRouter()
 
@@ -190,7 +199,10 @@ async def login(user_in: UserLogin, request: Request):
     started = time.perf_counter()
     db = get_database()
     user = await db["users"].find_one({"email": user_in.email})
-    if not user or not verify_password(user_in.password, user["hashed_password"]):
+    mat_khau_bam = user.get("hashed_password") if user else None
+    # Tài khoản đăng ký bằng Google không có mật khẩu. Đọc thẳng khoá này làm
+    # cả endpoint trả HTTP 500 thay vì báo cho người dùng biết phải bấm nút nào.
+    if not user or not mat_khau_bam or not verify_password(user_in.password, mat_khau_bam):
         await record_activity(
             action="login_failed",
             category="auth",
@@ -206,7 +218,14 @@ async def login(user_in: UserLogin, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            # Lộ "email này tồn tại và dùng Google" khi báo tài khoản chỉ-Google
+            # là đánh đổi có chủ đích: đổi lấy việc người dùng biết đúng nút cần
+            # bấm. Trang đăng ký đã lộ điều tương tự qua "Email already registered".
+            detail=(
+                "Tài khoản này đăng nhập bằng Google. Hãy dùng nút \"Đăng nhập với Google\"."
+                if user and not mat_khau_bam
+                else "Email hoặc mật khẩu không đúng."
+            ),
         )
     user_status = _normalize_user_status(user)
     if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:
@@ -261,7 +280,10 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
     started = time.perf_counter()
     db = get_database()
     user = await db["users"].find_one({"email": form_data.username})
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
+    mat_khau_bam = user.get("hashed_password") if user else None
+    # Tài khoản đăng ký bằng Google không có mật khẩu. Đọc thẳng khoá này làm
+    # cả endpoint trả HTTP 500 thay vì báo cho người dùng biết phải bấm nút nào.
+    if not user or not mat_khau_bam or not verify_password(form_data.password, mat_khau_bam):
         await record_activity(
             action="login_failed",
             category="auth",
@@ -277,7 +299,14 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            # Lộ "email này tồn tại và dùng Google" khi báo tài khoản chỉ-Google
+            # là đánh đổi có chủ đích: đổi lấy việc người dùng biết đúng nút cần
+            # bấm. Trang đăng ký đã lộ điều tương tự qua "Email already registered".
+            detail=(
+                "Tài khoản này đăng nhập bằng Google. Hãy dùng nút \"Đăng nhập với Google\"."
+                if user and not mat_khau_bam
+                else "Email hoặc mật khẩu không đúng."
+            ),
             headers={"WWW-Authenticate": "Bearer"},
         )
     user_status = _normalize_user_status(user)
@@ -327,6 +356,99 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
         database=db,
     )
     return Token(access_token=access_token, token_type="bearer")
+
+@router.post("/google", response_model=GoogleLoginResponse)
+async def google_login(payload: GoogleLoginRequest, request: Request):
+    """Đăng nhập/đăng ký bằng tài khoản Google.
+
+    Gọi lần đầu chỉ với `id_token`. Nếu là người dùng mới, trả `needs_role` và
+    KHÔNG tạo gì; frontend hỏi vai rồi gọi lại cùng endpoint kèm `role`.
+    """
+    started = time.perf_counter()
+    db = get_database()
+
+    if not await is_feature_enabled("enable_google_login", database=db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đăng nhập bằng Google hiện không khả dụng.",
+        )
+
+    try:
+        identity = verify_google_id_token(payload.id_token)
+    except GoogleAuthError as exc:
+        await record_activity(
+            action="login_failed", category="auth", status="failure",
+            user_id=None, resource_type="user", resource_id=None, request=request,
+            duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="GOOGLE_TOKEN_REJECTED",
+            metadata={"provider": "google"}, database=db,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    user, _ = await find_or_link_google_user(db, identity)
+    la_nguoi_moi = user is None
+
+    if la_nguoi_moi:
+        if payload.role is None:
+            # Chưa tạo gì cả — chỉ hỏi vai rồi chờ lần gọi thứ hai.
+            return GoogleLoginResponse(
+                needs_role=True, email=identity.email, full_name=identity.full_name
+            )
+        dang_ky_bat = bool(await get_setting_value("registration_enabled", True, database=db))
+        if not dang_ky_bat or not await is_feature_enabled("enable_user_registration", database=db):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Đăng ký tài khoản hiện đang tạm tắt.",
+            )
+        # Cài đặt default_role khoá vai tự chọn, giống hệt luồng /register —
+        # thiếu chốt này thì quản trị đặt default_role=student vẫn không ngăn
+        # được người mới tự phong lecturer qua nút Google.
+        forced_role = str(await get_setting_value("default_role", "", database=db))
+        vai = forced_role if forced_role in {"student", "lecturer"} else payload.role
+        user = await create_google_user(db, identity, role=vai)
+
+    user_status = _normalize_user_status(user)
+    if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:
+        await record_activity(
+            action="login_failed",
+            category="auth", status="failure",
+            user_id=str(user["_id"]), resource_type="user", resource_id=str(user["_id"]),
+            request=request, duration_ms=int((time.perf_counter() - started) * 1000),
+            error_code="ACCOUNT_BLOCKED",
+            metadata={"provider": "google", "status": user_status, "role": user.get("role", "user")},
+            database=db,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.",
+        )
+
+    if await is_feature_enabled("enable_maintenance_mode", database=db):
+        if user.get("role") not in {"admin", "super_admin"}:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Hệ thống đang bảo trì. Vui lòng quay lại sau.",
+            )
+
+    now = datetime.now(timezone.utc)
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {"last_login_at": now, "updated_at": user.get("updated_at") or now}},
+    )
+    await record_activity(
+        action="user_registered" if la_nguoi_moi else "login_success",
+        category="auth", status="success",
+        user_id=str(user["_id"]), resource_type="user", resource_id=str(user["_id"]),
+        request=request, duration_ms=int((time.perf_counter() - started) * 1000),
+        metadata={"provider": "google", "role": user.get("role", "user")},
+        database=db,
+    )
+    return GoogleLoginResponse(
+        needs_role=False,
+        access_token=create_access_token(subject=str(user["_id"])),
+        token_type="bearer",
+    )
+
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: UserResponse = Depends(get_current_user)):

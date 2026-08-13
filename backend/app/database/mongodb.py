@@ -142,6 +142,11 @@ async def create_database_indexes():
         await db["users"].create_index([("last_login_at", -1)])
         await db["users"].create_index([("deleted_at", 1)])
         await db["users"].create_index([("role", 1), ("status", 1), ("created_at", -1)])
+        # unique: hai tài khoản không được trỏ cùng một Google.
+        # sparse: tài khoản không dùng Google (không có trường này) không vướng
+        # ràng buộc unique — nếu thiếu sparse thì chỉ tài khoản Google ĐẦU TIÊN
+        # tạo được, mọi tài khoản mật khẩu sau đó đều đụng khoá null trùng nhau.
+        await db["users"].create_index([("google_sub", 1)], unique=True, sparse=True)
         await db["users"].create_index([("is_active", 1), ("created_at", -1)])
         await db["users"].create_index([("deleted_at", 1), ("created_at", -1)])
 

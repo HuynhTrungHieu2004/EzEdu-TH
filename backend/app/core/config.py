@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # thật. Chỉ bật cờ này khi cố ý phát triển ngoại tuyến.
     ALLOW_MOCK_DB_FALLBACK: bool = False
 
+    # OAuth Client ID của Google. KHÔNG phải bí mật — nó nằm công khai trong mã
+    # frontend. Backend cần nó để kiểm trường `aud` của ID token: thiếu bước đó
+    # thì một token Google hợp lệ cấp cho ứng dụng KHÁC cũng đăng nhập được vào đây.
+    GOOGLE_CLIENT_ID: str = ""
+
     # JWT configurations
     JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
     JWT_ALGORITHM: str = "HS256"

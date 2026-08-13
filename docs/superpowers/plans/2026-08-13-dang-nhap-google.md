@@ -1082,10 +1082,11 @@ git commit -m "refactor: tách luật điều hướng sau đăng nhập, thêm 
 - Create: `frontend/src/components/GoogleRoleDialog.tsx`
 
 **Interfaces:**
-- Consumes: `VITE_GOOGLE_CLIENT_ID`
+- Consumes: `VITE_GOOGLE_CLIENT_ID`; `authApi.loginWithGoogle`, `postLoginPath` (Task 5)
 - Produces:
   - `<GoogleSignInButton onCredential={(idToken: string) => void} disabled?: boolean />`
   - `<GoogleRoleDialog open email fullName onChoose={(role: 'student' | 'lecturer') => void} onCancel />`
+  - `useGoogleSignIn(): { onCredential, dialogProps, error }` — hook mang toàn bộ luồng
 
 - [ ] **Step 1: Viết component nút**
 
@@ -1209,16 +1210,89 @@ export function GoogleRoleDialog({ open, email, fullName, onChoose, onCancel }: 
 }
 ```
 
-- [ ] **Step 3: Kiểm kiểu**
+- [ ] **Step 3: Viết hook mang toàn bộ luồng**
+
+Tạo `frontend/src/hooks/useGoogleSignIn.ts`:
+
+```ts
+import { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { authApi } from '../api/authApi';
+import { postLoginPath, useAuth } from '../contexts/auth-context';
+import { getApiErrorDetail } from '../utils/apiError';
+
+/**
+ * Toàn bộ luồng đăng nhập Google, dùng chung cho trang Đăng nhập và Đăng ký.
+ *
+ * Với Google thì "đăng nhập" và "đăng ký" là một hành động, nên hai trang chạy
+ * đúng một luồng. Để logic này trong hook thay vì chép sang cả hai trang: hai
+ * bản sao sẽ lệch nhau ngay lần sửa đầu tiên.
+ */
+export function useGoogleSignIn(thongBaoLoiMacDinh = 'Đăng nhập bằng Google thất bại.') {
+  const navigate = useNavigate();
+  const { refresh } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [info, setInfo] = useState<{ email: string; fullName: string } | null>(null);
+
+  const dangNhap = useCallback(
+    async (idToken: string, role?: 'student' | 'lecturer') => {
+      setError(null);
+      try {
+        const kq = await authApi.loginWithGoogle({ id_token: idToken, role });
+        if (kq.needs_role) {
+          // Người mới: giữ token để gọi lần hai kèm vai vừa chọn.
+          setPendingToken(idToken);
+          setInfo({ email: kq.email ?? '', fullName: kq.full_name ?? '' });
+          return;
+        }
+        localStorage.setItem('access_token', kq.access_token as string);
+        const user = await authApi.getMe();
+        await refresh();
+        navigate(postLoginPath(user));
+      } catch (err: unknown) {
+        setPendingToken(null);
+        setInfo(null);
+        setError(getApiErrorDetail(err) ?? thongBaoLoiMacDinh);
+      }
+    },
+    [navigate, refresh, thongBaoLoiMacDinh],
+  );
+
+  const huy = useCallback(() => {
+    setPendingToken(null);
+    setInfo(null);
+  }, []);
+
+  return {
+    error,
+    onCredential: (idToken: string) => void dangNhap(idToken),
+    /** null khi chưa cần hỏi vai; ngược lại là props sẵn sàng cho GoogleRoleDialog. */
+    dialogProps:
+      pendingToken && info
+        ? {
+            open: true as const,
+            email: info.email,
+            fullName: info.fullName,
+            onChoose: (role: 'student' | 'lecturer') => void dangNhap(pendingToken, role),
+            onCancel: huy,
+          }
+        : null,
+  };
+}
+```
+
+- [ ] **Step 4: Kiểm kiểu**
 
 Run: `cd frontend && npx tsc --noEmit`
-Expected: không lỗi. Nếu `Dialog` yêu cầu props khác, mở `frontend/src/components/ui/Dialog.tsx` và chỉnh lời gọi cho khớp.
+Expected: không lỗi. Nếu `Dialog` yêu cầu props khác, mở `frontend/src/components/ui/Dialog.tsx` và chỉnh lời gọi cho khớp. Nếu `useAuth` không xuất từ `auth-context`, kiểm `frontend/src/contexts/AuthContext.tsx` để lấy đúng đường import.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/GoogleSignInButton.tsx frontend/src/components/GoogleRoleDialog.tsx
-git commit -m "feat: nút đăng nhập Google và hộp chọn vai"
+git add frontend/src/components/GoogleSignInButton.tsx frontend/src/components/GoogleRoleDialog.tsx frontend/src/hooks/useGoogleSignIn.ts
+git commit -m "feat: nút đăng nhập Google, hộp chọn vai và hook dùng chung"
 ```
 
 ---
@@ -1230,36 +1304,24 @@ git commit -m "feat: nút đăng nhập Google và hộp chọn vai"
 - Modify: `frontend/src/pages/RegisterPage.tsx`
 
 **Interfaces:**
-- Consumes: `GoogleSignInButton`, `GoogleRoleDialog` (Task 6), `authApi.loginWithGoogle`, `postLoginPath` (Task 5)
+- Consumes: `GoogleSignInButton`, `GoogleRoleDialog`, `useGoogleSignIn` (Task 6)
 
-- [ ] **Step 1: Thêm luồng Google vào LoginPage**
+Cả hai trang dùng **cùng một hook** — không chép logic sang trang thứ hai. Mỗi trang chỉ thêm đúng ba dòng gọi hook và một khối JSX.
 
-Trong `frontend/src/pages/LoginPage.tsx`, thêm state và hàm xử lý:
+- [ ] **Step 1: Gắn hook vào LoginPage**
+
+Trong `frontend/src/pages/LoginPage.tsx`, thêm import:
 
 ```tsx
-  const [googleToken, setGoogleToken] = useState<string | null>(null);
-  const [googleInfo, setGoogleInfo] = useState<{ email: string; fullName: string } | null>(null);
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import { GoogleRoleDialog } from '../components/GoogleRoleDialog';
+import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
+```
 
-  const dangNhapGoogle = async (idToken: string, role?: 'student' | 'lecturer') => {
-    setError(null);
-    try {
-      const kq = await authApi.loginWithGoogle({ id_token: idToken, role });
-      if (kq.needs_role) {
-        // Người mới: giữ lại token để gọi lần hai kèm vai vừa chọn.
-        setGoogleToken(idToken);
-        setGoogleInfo({ email: kq.email ?? '', fullName: kq.full_name ?? '' });
-        return;
-      }
-      localStorage.setItem('access_token', kq.access_token as string);
-      const user = await authApi.getMe();
-      await refresh();
-      navigate(postLoginPath(user));
-    } catch (err: unknown) {
-      setGoogleToken(null);
-      setGoogleInfo(null);
-      setError(getApiErrorDetail(err) ?? 'Đăng nhập bằng Google thất bại.');
-    }
-  };
+Thêm trong thân component, cạnh các state sẵn có:
+
+```tsx
+  const google = useGoogleSignIn('Đăng nhập bằng Google thất bại.');
 ```
 
 Thêm vào JSX, ngay dưới nút "Đăng nhập":
@@ -1267,25 +1329,21 @@ Thêm vào JSX, ngay dưới nút "Đăng nhập":
 ```tsx
         <div style={{ display: 'grid', gap: 12, justifyItems: 'center', marginTop: 16 }}>
           <span className="text-muted">hoặc</span>
-          <GoogleSignInButton onCredential={(t) => void dangNhapGoogle(t)} />
+          <GoogleSignInButton onCredential={google.onCredential} />
+          {google.error && <p className="text-danger">{google.error}</p>}
         </div>
-        {googleInfo && googleToken && (
-          <GoogleRoleDialog
-            open
-            email={googleInfo.email}
-            fullName={googleInfo.fullName}
-            onChoose={(role) => void dangNhapGoogle(googleToken, role)}
-            onCancel={() => {
-              setGoogleToken(null);
-              setGoogleInfo(null);
-            }}
-          />
-        )}
+        {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
 ```
 
-- [ ] **Step 2: Làm tương tự cho RegisterPage**
+- [ ] **Step 2: Gắn hook vào RegisterPage**
 
-Trong `frontend/src/pages/RegisterPage.tsx`, thêm đúng khối state, hàm `dangNhapGoogle` và JSX như Step 1 (chép nguyên, đổi thông báo lỗi mặc định thành `'Đăng ký bằng Google thất bại.'`). Với Google thì đăng nhập và đăng ký là một hành động, nên hai trang dùng chung luồng.
+Trong `frontend/src/pages/RegisterPage.tsx`, thêm **đúng ba import trên**, rồi:
+
+```tsx
+  const google = useGoogleSignIn('Đăng ký bằng Google thất bại.');
+```
+
+và **đúng khối JSX trên**, đặt dưới nút "Đăng ký". Chỉ khác nhau ở câu thông báo lỗi mặc định — toàn bộ logic nằm trong hook, không có bản sao thứ hai.
 
 - [ ] **Step 3: Kiểm kiểu**
 

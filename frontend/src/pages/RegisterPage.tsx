@@ -5,6 +5,9 @@ import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import { GoogleRoleDialog } from '../components/GoogleRoleDialog';
+import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
 
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -17,6 +20,7 @@ const RegisterPage = () => {
 
   const navigate = useNavigate();
   const { refresh } = useAuth();
+  const google = useGoogleSignIn('Đăng ký bằng Google thất bại.');
 
   useEffect(() => {
     // If already logged in, redirect to dashboard
@@ -158,6 +162,13 @@ const RegisterPage = () => {
             {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
           </Button>
         </form>
+
+        <div style={{ display: 'grid', gap: 12, justifyItems: 'center', marginTop: 16 }}>
+          <span className="text-muted">hoặc</span>
+          <GoogleSignInButton onCredential={google.onCredential} disabled={google.dangXuLy} />
+          {google.error && <p className="text-danger">{google.error}</p>}
+        </div>
+        {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
 
         <div className="auth-footer">
           Đã có tài khoản?{' '}

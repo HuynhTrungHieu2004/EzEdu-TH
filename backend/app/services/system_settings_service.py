@@ -76,6 +76,7 @@ FEATURE_FLAG_DEFINITIONS: dict[str, FeatureFlagDefinition] = {
     "enable_advanced_chat": FeatureFlagDefinition("enable_advanced_chat", True, "Bật/tắt hỏi đáp AI nâng cao."),
     "enable_user_registration": FeatureFlagDefinition("enable_user_registration", True, "Bật/tắt tự đăng ký tài khoản."),
     "enable_maintenance_mode": FeatureFlagDefinition("enable_maintenance_mode", False, "Chế độ bảo trì: admin vẫn truy cập, user thường bị chặn."),
+    "enable_google_login": FeatureFlagDefinition("enable_google_login", True, "Bật/tắt đăng nhập bằng tài khoản Google."),
 }
 
 SENSITIVE_KEY_PATTERN = re.compile(r"(api[_-]?key|password|secret|jwt|token|mongo|database|cloudinary)", re.IGNORECASE)

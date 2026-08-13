@@ -1,5 +1,5 @@
 import client from './client';
-import type { Token, UserResponse } from '../types/auth';
+import type { GoogleLoginResponse, Token, UserResponse } from '../types/auth';
 
 export interface RegisterPayload {
   email: string;
@@ -26,6 +26,14 @@ export const authApi = {
 
   getMe: async (): Promise<UserResponse> => {
     const response = await client.get<UserResponse>('/auth/me');
+    return response.data;
+  },
+
+  loginWithGoogle: async (payload: {
+    id_token: string;
+    role?: 'student' | 'lecturer';
+  }): Promise<GoogleLoginResponse> => {
+    const response = await client.post<GoogleLoginResponse>('/auth/google', payload);
     return response.data;
   },
 };

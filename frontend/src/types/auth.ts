@@ -17,3 +17,11 @@ export interface Token {
   access_token: string;
   token_type: string;
 }
+
+export interface GoogleLoginResponse {
+  needs_role: boolean;
+  access_token: string | null;
+  token_type: string;
+  email: string | null;
+  full_name: string | null;
+}
