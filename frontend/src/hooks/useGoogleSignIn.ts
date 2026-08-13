@@ -49,9 +49,11 @@ export function useGoogleSignIn(thongBaoLoiMacDinh = 'Đăng nhập bằng Googl
     setInfo(null);
   }, []);
 
+  const onCredential = useCallback((idToken: string) => void dangNhap(idToken), [dangNhap]);
+
   return {
     error,
-    onCredential: (idToken: string) => void dangNhap(idToken),
+    onCredential,
     /** null khi chưa cần hỏi vai; ngược lại là props sẵn sàng cho GoogleRoleDialog. */
     dialogProps:
       pendingToken && info
