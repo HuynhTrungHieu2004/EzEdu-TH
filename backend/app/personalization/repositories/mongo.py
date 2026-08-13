@@ -268,12 +268,14 @@ class PersonalizationMongoRepository:
                     "started_at": session.started_at,
                     "schema_version": session.schema_version,
                 },
+                # `schema_version` chỉ nằm ở $setOnInsert: ghi cùng một trường
+                # bằng hai toán tử làm MongoDB thật từ chối cả lệnh
+                # (ConflictingUpdateOperators), và mongomock không bắt được.
                 "$set": {
                     "document_id": session.document_id,
                     "subject": session.subject,
                     "last_activity_at": session.last_activity_at,
                     "metadata": session.metadata,
-                    "schema_version": session.schema_version,
                 },
             },
             upsert=True,

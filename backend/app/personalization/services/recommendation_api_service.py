@@ -209,9 +209,9 @@ async def _explain_recommendation(
     generator = ai_json_generator
     if generator is None:
         try:
-            from app.services.llm_service import generate_json, gemini_generate_json, is_gemini_available
+            from app.services.llm_service import generate_json_with_failover
 
-            generator = gemini_generate_json if is_gemini_available() else generate_json
+            generator = generate_json_with_failover
         except Exception:
             return fallback
     prompt = _build_explanation_prompt(

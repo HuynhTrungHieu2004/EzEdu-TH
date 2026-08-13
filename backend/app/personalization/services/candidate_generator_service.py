@@ -369,25 +369,31 @@ def _collect_learner_interest(
     để so nội dung với nhau.
     """
     preferred_types = set(twin.content_preferences.preferred_content_types)
-    added = 0
+
+    scored: list[tuple[float, dict]] = []
     for item in pool_by_id.values():
         type_match = not preferred_types or item.get("item_type") in preferred_types
         subject_match = any(
             _matches_goal(component_by_id.get(kc_id, {}), [], twin.content_preferences.preferred_subjects)
             for kc_id in _item_kcs(item)
         )
-        if type_match and subject_match:
-            if profile_vector:
-                # Trọng số 0.75 cho độ tương đồng nội dung, 0.25 cho chất lượng
-                # item — nội dung hợp gu là tiêu chí chính, chất lượng là phụ.
-                similarity = score_item_similarity(profile_vector, item)
-                score = 0.75 * similarity + 0.25 * (_quality(item) or 0.0)
-            else:
-                score = 0.5 + (_quality(item) or 0.0) * 0.25
-            accumulator.add(item, "learner_interest", score)
-            added += 1
-        if added >= per_source_limit:
-            break
+        if not (type_match and subject_match):
+            continue
+        if profile_vector:
+            # Trọng số 0.75 cho độ tương đồng nội dung, 0.25 cho chất lượng
+            # item — nội dung hợp gu là tiêu chí chính, chất lượng là phụ.
+            similarity = score_item_similarity(profile_vector, item)
+            score = 0.75 * similarity + 0.25 * (_quality(item) or 0.0)
+        else:
+            score = 0.5 + (_quality(item) or 0.0) * 0.25
+        scored.append((score, item))
+
+    # Chấm điểm hết rồi mới cắt. Cắt trong lúc duyệt thì item được chọn là item
+    # gặp trước chứ không phải item hợp gu nhất — nghĩa là tính xong độ tương
+    # đồng CBF rồi vứt đi, đúng phần việc mà nguồn này sinh ra để làm.
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    for score, item in scored[:per_source_limit]:
+        accumulator.add(item, "learner_interest", score)
 
 
 def _collect_cluster_match(

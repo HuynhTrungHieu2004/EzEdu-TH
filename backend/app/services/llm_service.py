@@ -96,6 +96,38 @@ def is_groq_available() -> bool:
     return bool(api_key and not api_key.startswith("your_") and not api_key.startswith("your-"))
 
 
+def generate_json_with_failover(prompt: str) -> str:
+    """Sinh JSON, thử lần lượt các nhà cung cấp đang cấu hình.
+
+    Chọn nhà cung cấp một lần rồi thôi có nghĩa là hạn mức của một bên quyết
+    định sống chết của cả tính năng: Gemini trả 429 thì luồng trích xuất tri
+    thức dừng hẳn, dù Groq vẫn đang chạy tốt. Hạn mức miễn phí hết hằng ngày
+    là chuyện thường, không phải sự cố hiếm.
+
+    Thứ tự giữ nguyên như cũ (Gemini trước) để không đổi hành vi ở đường
+    thuận lợi; chỉ khi Gemini hỏng mới chuyển sang Groq.
+    """
+    lastest_error: Exception | None = None
+
+    for ten, kha_dung, ham in (
+        ("Gemini", is_gemini_available, gemini_generate_json),
+        ("Groq", is_groq_available, generate_json),
+    ):
+        if not kha_dung():
+            continue
+        try:
+            return ham(prompt)
+        except Exception as exc:  # noqa: BLE001 - đổi nhà cung cấp với mọi lỗi
+            lastest_error = exc
+            logger.warning("%s sinh JSON thất bại, thử nhà cung cấp kế tiếp: %s", ten, exc)
+
+    if lastest_error is not None:
+        raise lastest_error
+    raise RuntimeError(
+        "Không có nhà cung cấp AI nào được cấu hình (cần GEMINI_API_KEY hoặc GROQ_API_KEY)."
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Cross-Evaluation logic (Dual AI Verification)
 # ═══════════════════════════════════════════════════════════════════════════
