@@ -190,7 +190,10 @@ async def login(user_in: UserLogin, request: Request):
     started = time.perf_counter()
     db = get_database()
     user = await db["users"].find_one({"email": user_in.email})
-    if not user or not verify_password(user_in.password, user["hashed_password"]):
+    mat_khau_bam = user.get("hashed_password") if user else None
+    # Tài khoản đăng ký bằng Google không có mật khẩu. Đọc thẳng khoá này làm
+    # cả endpoint trả HTTP 500 thay vì báo cho người dùng biết phải bấm nút nào.
+    if not user or not mat_khau_bam or not verify_password(user_in.password, mat_khau_bam):
         await record_activity(
             action="login_failed",
             category="auth",
@@ -206,7 +209,11 @@ async def login(user_in: UserLogin, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail=(
+                "Tài khoản này đăng nhập bằng Google. Hãy dùng nút \"Đăng nhập với Google\"."
+                if user and not mat_khau_bam
+                else "Email hoặc mật khẩu không đúng."
+            ),
         )
     user_status = _normalize_user_status(user)
     if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:
