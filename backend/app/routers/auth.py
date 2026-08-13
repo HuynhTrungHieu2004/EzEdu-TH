@@ -209,6 +209,9 @@ async def login(user_in: UserLogin, request: Request):
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            # Lộ "email này tồn tại và dùng Google" khi báo tài khoản chỉ-Google
+            # là đánh đổi có chủ đích: đổi lấy việc người dùng biết đúng nút cần
+            # bấm. Trang đăng ký đã lộ điều tương tự qua "Email already registered".
             detail=(
                 "Tài khoản này đăng nhập bằng Google. Hãy dùng nút \"Đăng nhập với Google\"."
                 if user and not mat_khau_bam
@@ -268,7 +271,10 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
     started = time.perf_counter()
     db = get_database()
     user = await db["users"].find_one({"email": form_data.username})
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
+    mat_khau_bam = user.get("hashed_password") if user else None
+    # Tài khoản đăng ký bằng Google không có mật khẩu. Đọc thẳng khoá này làm
+    # cả endpoint trả HTTP 500 thay vì báo cho người dùng biết phải bấm nút nào.
+    if not user or not mat_khau_bam or not verify_password(form_data.password, mat_khau_bam):
         await record_activity(
             action="login_failed",
             category="auth",
@@ -284,7 +290,14 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            # Lộ "email này tồn tại và dùng Google" khi báo tài khoản chỉ-Google
+            # là đánh đổi có chủ đích: đổi lấy việc người dùng biết đúng nút cần
+            # bấm. Trang đăng ký đã lộ điều tương tự qua "Email already registered".
+            detail=(
+                "Tài khoản này đăng nhập bằng Google. Hãy dùng nút \"Đăng nhập với Google\"."
+                if user and not mat_khau_bam
+                else "Email hoặc mật khẩu không đúng."
+            ),
             headers={"WWW-Authenticate": "Bearer"},
         )
     user_status = _normalize_user_status(user)
