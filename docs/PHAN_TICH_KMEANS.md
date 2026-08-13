@@ -16,6 +16,7 @@
 | Phân nhóm hành vi người dùng (quản trị) | **Đã chạy** | Phân khúc sử dụng + phát hiện tài khoản bất thường |
 | Gán nhãn cụm cho miền cá nhân hoá | **Đã chạy** | Gán 5 loại cụm về đúng đối tượng |
 | Ghép CBF × K-Means (chống bong bóng lọc) | **Đã chạy** | Cụm chỉ ra vùng nội dung người học chưa chạm |
+| Nhãn cụm tham gia điểm xếp hạng gợi ý | **Đã chạy** | `cluster_match` mang trọng số 0.05 (Phần 4.5) |
 
 Sáu chức năng K-Means đã chạy đều dùng chung `choose_k_and_fit` (chọn k đa chỉ số), ba
 trong số đó dùng thêm `flag_distance_outliers` (phát hiện ngoại lai bền vững).
@@ -25,8 +26,14 @@ Chia theo nguồn dữ liệu nuôi chúng:
 - **Năm chức năng chạy trên dữ liệu tự sinh từ luồng dùng bình thường** — giáo viên tạo
   đề, học sinh làm bài, người dùng thao tác. Không phụ thuộc gì thêm.
 - **Riêng "gán nhãn cụm cho miền cá nhân hoá"** cần `learning_items`, tức phụ thuộc mắt
-  xích knowledge extraction. Mắt xích đó **nay đã thông** (Phần 4.1), nhưng chỉ chạy khi
-  bật hai cờ `PERSONALIZATION_ENABLED` và `KNOWLEDGE_GRAPH_ENABLED` — mặc định vẫn tắt.
+  xích knowledge extraction. Mắt xích đó **nay đã thông** (Phần 4.1) và đã chạy thật
+  đầu-cuối trên MongoDB thật (Phần 4.4), nhưng chỉ hoạt động khi bật `PERSONALIZATION_ENABLED`
+  và `KNOWLEDGE_GRAPH_ENABLED` — mặc định vẫn tắt, và hiện đang tắt.
+
+> **Về trạng thái kiểm chứng.** Sáu chức năng đầu chạy được ngay, không phụ thuộc cờ nào.
+> Chúng đã được xác minh trên trình duyệt thật với bộ dữ liệu mẫu (`scripts/seed_kmeans_demo.py`).
+> Phân biệt rõ hai điều: *mã đúng và test xanh* khác với *chạy thật ra số trên màn hình* —
+> khoảng cách giữa hai điều đó là nơi Phần 4.4 và 4.5 tìm thấy lỗi.
 
 ---
 
@@ -141,6 +148,37 @@ Học sinh lệch nhất — gấp 2.7 lần em kế tiếp — lại lọt lư�
 **Cách sửa:** dùng median và MAD (median absolute deviation) thay cho trung bình và độ lệch chuẩn. Median/MAD không bị điểm cực trị kéo đi. Hệ số 0.6745 quy MAD về cùng thang sigma nên tham số ngưỡng vẫn đọc được như cũ. Sau khi sửa, em này bị bắt đúng, các em còn lại không bị báo nhầm.
 
 Helper dùng chung: `flag_distance_outliers` trong `kmeans_clustering.py`, dùng cho cả phát hiện câu hỏi lỗi lẫn học sinh cần quan tâm riêng.
+
+### 2.5. Nghịch lý: điểm ngoại lai tự phá hỏng phép phát hiện ngoại lai
+
+Lỗi này chỉ lộ ra sau khi có bộ dữ liệu mẫu đủ giống thật (Phần 4.4). Bộ dữ liệu cũ quá đều nên che mất nó.
+
+Bài toán phát hiện câu hỏi lỗi chấm điểm trên không gian (độ khó, độ phân biệt). Câu bị sai đáp án lệch hẳn khỏi phần còn lại — đó chính là thứ cần tìm. Nhưng lệch hẳn kéo theo **hai bậc thất bại nối nhau**:
+
+**Bậc 1 — guard `min_cluster_size ≥ 2` loại sạch mọi k.** Với 8 câu thật, câu hỏng là cụm một phần tử ở *mọi* k từ 2 đến 8:
+
+```
+k=2: [7, 1]   k=3: [5, 1, 2]   k=4: [3, 1, 2, 2]   k=5: [2, 1, 2, 2, 1]
+```
+
+Không k nào thoả, hàm ném `KMeansTrainingError`, API trả `clustering_unavailable`. Nghĩa là **đúng bộ đề có câu sai đáp án lại là bộ đề bị bỏ qua bước phân cụm**.
+
+Ngưỡng này sinh ra cho bài toán **phân khúc** — một nhóm chỉ có một học sinh thì không dạy phân hoá được nên phải loại. Ở bài toán **tìm ngoại lai** thì ngược lại: cụm một phần tử chính là kết quả.
+
+**Bậc 2 — cho phép cụm một phần tử thì khoảng cách bằng 0.** Sửa xong bậc 1, câu hỏng được cấp một cụm riêng, và khoảng cách từ nó tới tâm cụm của chính nó là 0.000. Phép đo ngoại lai theo khoảng cách nhìn thấy con số sạch nhất bảng. Câu đáng ngờ nhất trông vô hại nhất.
+
+**Cách sửa:** bài toán này dùng `min_cluster_size=1`, và gắn cờ ngoại lai theo **cả kích thước cụm lẫn khoảng cách** — cụm chỉ có một câu tự nó là dấu hiệu, xét độc lập với khoảng cách.
+
+Kết quả trên dữ liệu thật (12 lượt làm, 8 câu, câu 4 cố tình sai đáp án):
+
+| Câu | Độ khó | Độ phân biệt | Cờ |
+|---|---|---|---|
+| 4 | 0.33 | **−0.567** | `cluster_outlier`, `negative_discrimination` |
+| còn lại | 0.25–0.83 | +0.26 … +0.72 | — |
+
+k = 2, kích thước cụm `[7, 1]`, Silhouette 0.60. Cả hai lớp — quy tắc đo lường giáo dục và K-Means — cùng chỉ vào một câu.
+
+**Bài học chung với lỗi che lấp ở 2.4:** cả hai đều là *phép phát hiện ngoại lai bị chính điểm ngoại lai vô hiệu hoá*. Một lần qua độ lệch chuẩn bị thổi phồng, một lần qua ràng buộc kích thước cụm và khoảng cách bằng 0. Cùng một cái bẫy, hai hình dạng.
 
 ---
 
@@ -290,6 +328,8 @@ Một quyết định đáng nêu: mẫu quá xa mọi tâm cụm được ghi `
 | 7 | Thông tắc đường cá nhân hoá: tự động chạy knowledge extraction sau khi sinh câu hỏi | ✅ xong — BKT/IRT nay chạy được |
 | 8 | Gán nhãn cụm cho miền cá nhân hoá | ✅ xong — khâu [2] hoàn thiện |
 | 9 | Ghép CBF × K-Means chống bong bóng lọc | ✅ xong |
+| 10 | Nạp dữ liệu mẫu rồi chạy thật toàn chuỗi trên MongoDB thật | ✅ xong — xem 4.4 |
+| 11 | Nhãn cụm tham gia vào điểm xếp hạng gợi ý | ✅ xong — xem 4.5 |
 
 ### 4.3. Chi tiết năm chức năng K-Means đã triển khai
 
@@ -328,6 +368,27 @@ Biết khi nào *nên* và khi nào *không nên* chuẩn hoá — kèm cách b�
 
 ---
 
+### 4.4. Chạy thật mới biết: sáu chức năng đúng mã nhưng không có gì để nhai
+
+Tới bước 9, cả sáu chức năng K-Means đều có mã đúng, test xanh, và **màn hình trống**. Trên máy sạch, `documents`, `questions`, `question_attempts` đều bằng 0 sau khi dọn dữ liệu kiểm chứng — mà màn hình trống trông y hệt tính năng hỏng.
+
+`backend/scripts/seed_kmeans_demo.py` dựng đủ dữ liệu cho từng mô-đun: 12 học sinh theo ba chân dung năng lực, 3 bộ đề × 8 câu, 36 lượt làm bài, một cặp học liệu gần trùng, 246 nhật ký theo ba mức cường độ. Gỡ sạch bằng `--purge`.
+
+Một chi tiết nhỏ nhưng quyết định: đáp án được sinh bằng **lấy mẫu theo trọng số** (Gumbel top-k), không phải chọn thẳng các câu dễ nhất. Cách sau khiến ba câu dễ có tỉ lệ đúng đúng 1.00 tròn trịa — nhìn là biết dàn dựng, và quan trọng hơn: nó **che mất** lỗi ở mục 2.5. Dữ liệu mẫu quá đẹp thì kiểm chứng không có giá trị.
+
+### 4.5. Nhãn cụm được tính, được gán, rồi không ai dùng
+
+Khâu [1] huấn luyện và khâu [2] gán nhãn đã xong từ bước 8. Nhưng khi chạy thật, `cluster_match` bằng 0 ở mọi gợi ý. Hai nguyên nhân độc lập, phải gỡ cả hai:
+
+- **Trọng số bằng 0.** `RANKER_WEIGHT_CLUSTER_MATCH = 0.0` — thành phần được tính rồi nhân với 0. Đã chuyển 0.05 từ `weakness_match` (0.25 → 0.20) sang; tổng mười trọng số vẫn đúng 1.0 theo ràng buộc `validate_ranker_weights`.
+- **Đọc nhầm trường.** Nguồn ứng viên `cluster_match` chỉ đọc `content_cluster_id`, trong khi **câu hỏi** — loại item chiếm gần hết kho — mang nhãn `question_cluster_id`. Mô hình cụm nội dung lại bị bỏ qua vì không đủ mẫu, nên trường kia rỗng hoàn toàn. Nay dùng chung `_cluster_of` với phần ghép CBF × K-Means: một định nghĩa duy nhất cho câu hỏi "item này thuộc cụm nào".
+
+Đo trên tài khoản học sinh thật: ứng viên 3 → 7, gợi ý 3 → 6, `cluster_match` 0.000 → 0.730.
+
+Đây là khâu [3] — **tiêu thụ** — mà ba khâu trước phục vụ. Huấn luyện tốt, gán nhãn đúng, nhưng nếu khâu cuối tra nhầm trường thì toàn bộ công sức phân cụm không chạm tới người dùng. Cùng loại với phát hiện ở Phần 2.1, chỉ khác chỗ đứt.
+
+---
+
 ## Phần 5 — Ghi chú cho báo cáo chuyên đề
 
 Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh học thuật của cài đặt hiện tại:
@@ -337,12 +398,15 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 3. **Ràng buộc loại bỏ đặc trưng định danh** trước khi huấn luyện — thể hiện ý thức về quyền riêng tư và tránh rò rỉ nhãn (label leakage) trong mô hình học máy.
 4. **Phát hiện ngoại lai bằng median/MAD thay vì trung bình/độ lệch chuẩn** — có số liệu thật chứng minh cách cũ bỏ sót đúng trường hợp cần bắt nhất do hiệu ứng che lấp (Phần 2.4). Đây là loại chi tiết cho thấy đã thực sự chạy và kiểm chứng, không chỉ cài công thức sách.
 5. **Quyết định KHÔNG chuẩn hoá đặc trưng ở bài toán phân nhóm lớp**, có lý do rõ ràng: giữ thang phần trăm để toạ độ tâm cụm diễn giải được. Biết khi nào *không* nên áp dụng một bước tiền xử lý cũng là hiểu thuật toán.
+6. **Ngưỡng kích thước cụm tối thiểu phải đổi theo bài toán** (Phần 2.5). Cùng một tham số `min_cluster_size`: ở bài toán phân khúc thì cụm một phần tử là vô dụng nên phải loại; ở bài toán tìm ngoại lai thì cụm một phần tử **chính là kết quả**. Đặt cùng một giá trị cho cả hai làm chức năng phát hiện câu hỏi lỗi tự tắt đúng lúc cần nhất. Đây là ví dụ cụ thể cho việc *một tham số của K-Means không có giá trị "đúng" tuyệt đối, chỉ có đúng với mục đích*.
 
 ### Hai điểm nên thẳng thắn nêu là hạn chế
 
 - **Quy tắc "độ phân biệt âm" không phải phát hiện của K-Means** — đó là quy tắc xác định trong đo lường giáo dục. Trong mã, hai lớp này được tách riêng (`_apply_rule_based_flags` và `_apply_outlier_flags`); trình bày lẫn lộn là không trung thực. K-Means đóng góp phần phát hiện bất thường theo khoảng cách tâm cụm.
-- **Miền cá nhân hoá (5 loại cụm gốc) vẫn chưa gán nhãn cụm**, dù mắt xích knowledge extraction nay đã thông. Đây là việc còn lại rõ ràng nhất, và nêu thẳng sẽ được đánh giá cao hơn là né tránh.
-- **Một lỗi chỉ lộ ra khi chạy với MongoDB thật** (`ConflictingUpdateOperators` trong `upsert_graph_edge`) mà 500+ test dùng `mongomock` không bắt được — vì mongomock chấp nhận lệnh mà MongoDB thật từ chối. Nêu điểm này cho thấy hiểu giới hạn của việc giả lập cơ sở dữ liệu trong kiểm thử.
+- **Miền cá nhân hoá nay đã gán nhãn cụm và chạy thật đầu-cuối** trên MongoDB thật: 3/5 loại cụm huấn luyện được với dữ liệu hiện có (`question` k=2, `learner_ability` k=2, `learner_behavior` k=3), gán nhãn cho 15 câu hỏi và 12 người học. Hai loại còn lại (`content`, `learner_interest`) tự báo `no_active_model` vì chưa đủ mẫu — **hệ thống nói rõ lý do thay vì im lặng**, đó mới là hành vi đúng.
+- **Cùng một loại lỗi MongoDB thật, dính hai lần** — và lần thứ hai nghiêm trọng hơn hẳn. `ConflictingUpdateOperators` xảy ra khi một lệnh update ghi cùng một trường bằng hai toán tử (`$set` và `$setOnInsert`). Lần đầu ở `upsert_graph_edge`; lần hai ở `upsert_learning_session`, chặn **mọi** sự kiện học tập — tức chặn cả chuỗi cá nhân hoá ngay mắt xích đầu tiên. Cả hai lần, 580+ test dùng `mongomock` đều xanh, vì mongomock chấp nhận lệnh mà MongoDB thật từ chối.
+
+  Thay vì chờ lần thứ ba, nay có một test **quét tĩnh toàn bộ `app/`** bằng `ast`, tìm mọi dict literal có khoá trùng giữa các cặp toán tử xung khắc, và chỉ thẳng ra `file:dòng`. Bài học đáng nêu: khi một loại lỗi tái phát, sửa từng chỗ là chưa đủ — phải dựng cái lưới bắt được cả loại.
 - **Một lỗi im lặng do giá trị mặc định**: `learning_items` chưa từng lưu `semantic_embedding`, mà cụm `content` và `question` dành 70% trọng số cho trường này. Hàm đọc có sẵn fallback cứng `[0,0,0,0]` nên phân cụm vẫn chạy, vẫn ra kết quả — chỉ là 70% trọng số đổ vào một vector hằng. Sau khi sửa, độ tách không gian đặc trưng tăng từ **0.0000 lên 0.9899**. Bài học: một giá trị mặc định "cho an toàn" có thể che giấu việc cả một khối đặc trưng không bao giờ có dữ liệu.
 - **Chọn không gian vector theo bản chất bài toán, không theo công cụ sẵn có**: chức năng "học liệu liên quan" dùng embedding vì *liên quan* là quan hệ ngữ nghĩa; chức năng "cảnh báo học liệu gần trùng" dùng TF-IDF vì *trùng lặp* là quan hệ từ vựng. Cùng một phép đo cosine, hai không gian khác nhau. Dùng embedding cho bài toán trùng lặp sẽ báo nhầm mọi bài cùng chủ đề. Chi tiết và số đo ở `PHAN_TICH_ML_CBF.md`.
 - **Không phải nghi ngờ nào cũng là lỗi.** Ở phần Thompson Sampling, một dòng
@@ -355,6 +419,8 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 
 ### Số liệu kiểm chứng có thể trích vào báo cáo
 
+**Phát hiện câu hỏi lỗi — bộ số mới, chạy trên dữ liệu mẫu 12 học sinh × 8 câu:** xem bảng ở Phần 2.5. Bộ số dưới đây là lần kiểm chứng đầu, giữ lại vì nó minh hoạ đủ hai lớp phát hiện trên một ví dụ nhỏ dễ đọc.
+
 **Phát hiện câu hỏi lỗi** — 6 học sinh, 5 câu, câu số 2 cố tình đặt sai đáp án:
 
 | Câu | Độ khó | Độ phân biệt | Cụm | Kết luận |
@@ -366,25 +432,32 @@ Khi trình bày, nên nêu rõ năm điểm sau vì chúng là thế mạnh họ
 
 k = 2 (tự chọn), Silhouette = 0.683 — K-Means tách sạch nhóm câu bình thường khỏi nhóm câu có vấn đề.
 
-**Phân nhóm năng lực lớp** — 8 học sinh, 3 chủ đề:
+**Phân nhóm năng lực lớp** — 12 học sinh, 3 bộ đề, chạy trên dữ liệu mẫu qua giao diện thật (lớp "Toán 10A1"):
 
-| Nhóm | Số em | Hàm số | Lượng giác | Đạo hàm | Cần phụ đạo |
-|---|---|---|---|---|---|
-| 1 | 4 | **39%** | 76% | 58% | Hàm số |
-| 2 | 4 | 89% | **42%** | 70% | Lượng giác |
+| Nhóm | Số em | Hàm số | Lượng giác | Tổ hợp | TB | Cần phụ đạo nhất |
+|---|---|---|---|---|---|---|
+| 1 | 2 | 75.0% | **37.5%** | 62.5% | 58.3% | Lượng giác |
+| 2 | 4 | **59.4%** | 68.8% | 71.9% | 66.7% | Hàm số |
+| 3 | 4 | **50.0%** | 93.8% | 59.4% | 67.7% | Hàm số |
+| 4 | 2 | **62.5%** | 87.5% | 75.0% | 75.0% | Hàm số |
 
-k = 2 (tự chọn), Silhouette = 0.679. Một em yếu đều (33%) bị gắn cờ "cần xem riêng" nhờ khoảng cách tới tâm nhóm — thông tin mà bảng xếp hạng điểm trung bình không cho được.
+k = 4 (tự chọn), Silhouette = 0.53. Giao diện hiện thẳng câu *"Cần phụ đạo nhất: Kiểm tra Hàm số bậc hai (43.75%) · Vững nhất: Kiểm tra Phương trình lượng giác (87.5%)"* kèm danh sách tên học sinh từng nhóm.
 
-**Phân nhóm hành vi người dùng** — 16 người dùng, cửa sổ 90 ngày. **Đây là bộ số duy nhất chạy trên dữ liệu thật đang có trong hệ thống**, hai bảng trên dùng dữ liệu dựng để kiểm chứng:
+Điểm đáng nhấn: nhóm 2 và nhóm 3 có **điểm trung bình gần bằng nhau** (66.7% và 67.7%) nhưng chân dung khác hẳn — nhóm 3 giỏi Lượng giác hơn hẳn (93.8% so với 68.8%) và yếu Hàm số hơn. Bảng xếp hạng theo điểm trung bình xếp hai nhóm này cạnh nhau và coi như giống nhau; K-Means tách được vì nó nhìn **vector điểm theo từng bộ đề**, không nhìn một con số gộp. Đây chính là lập luận trả lời câu hỏi *"sao không dùng GROUP BY cho nhanh?"*.
 
-| Nhóm | Số người | Lượt hoạt động | Số loại thao tác | Tỉ lệ lỗi | Thời gian phản hồi TB |
-|---|---|---|---|---|---|
-| 1 | 2 | 6.0 | 4.5 | **17%** | 532 ms |
-| 2 | 14 | 3.4 | 2.3 | 0% | 294 ms |
+**Phân nhóm hành vi người dùng** — 34 người dùng, cửa sổ 90 ngày, chạy trên dữ liệu thật trong `chuyende02` sau khi nạp bộ mẫu (Phần 4.4):
 
-k = 2 (tự chọn), Silhouette = 0.58. Hai đặc trưng về AI tự bị loại vì `ai_usage_events` chưa có dữ liệu — hệ thống nêu rõ điều này ra giao diện. Năm tài khoản bị gắn cờ lệch hẳn mọi nhóm.
+| Nhóm | Số người | Lượt hoạt động | Số ngày hoạt động | Số loại thao tác | Tỉ lệ lỗi | Phản hồi TB |
+|---|---|---|---|---|---|---|
+| 3 | 5 | 34.2 | 12.0 | 5.2 | 3% | 656 ms |
+| 1 | 11 | 8.5 | 3.3 | 4.7 | **14%** | 442 ms |
+| 2 | 18 | 2.9 | 1.1 | 1.9 | 0% | 286 ms |
 
-> **Lưu ý khi trình bày:** dữ liệu hoạt động hiện tại chủ yếu là sự kiện đăng nhập (51/58 bản ghi), nên phân khúc thu được còn thô. Nêu rõ hạn chế này — kết quả sẽ giàu ý nghĩa hơn khi hệ thống tích luỹ đủ thao tác thật.
+k = 3 (tự chọn), Silhouette = 0.54. Một tài khoản bị gắn cờ lệch hẳn mọi nhóm. Hai đặc trưng về AI tự bị loại vì `ai_usage_events` không biến thiên — hệ thống **nêu rõ tên hai đặc trưng bị bỏ ra giao diện**, không âm thầm bỏ.
+
+Trước khi có dữ liệu mẫu, cùng chức năng này trả về `clustering_unavailable` với 16 người dùng: mức sử dụng lệch tới mức mọi k từ 2 đến 8 đều sinh ra cụm một người. Guard chạy đúng — nhưng giao diện khi đó **không hiện gì cả**, kể cả lý do, nên người quản trị không phân biệt được "dữ liệu chưa đủ" với "tính năng hỏng". Nay khối luôn hiện, kèm câu giải thích và điều kiện để nó tự đầy lại.
+
+> **Lưu ý khi trình bày:** đây là kết quả trên dữ liệu mẫu có kiểm soát. Nêu rõ điều đó — kèm cả trạng thái "không đủ dữ liệu để phân cụm" ở trên, vì biết khi nào thuật toán *không* nên đưa ra kết luận cũng là một kết quả.
 
 **Ràng buộc đa dạng nội dung khi sinh đề** — 9 câu hỏi tiếng Việt thuộc 3 chủ đề (bề lõm parabol / toạ độ đỉnh / trục đối xứng), tất cả cùng chủ đề, cùng mức Bloom, cùng độ khó nên ma trận truyền thống **không phân biệt được**:
 
@@ -409,6 +482,7 @@ Năm chức năng dùng K-Means, mỗi chức năng khai thác một năng lực
 | Diễn giải qua toạ độ tâm cụm | Phân nhóm học sinh ("nhóm này yếu Hàm số"), phân nhóm hành vi |
 | Đo khoảng cách tới tâm cụm | Phát hiện câu hỏi lỗi, học sinh cần quan tâm riêng, tài khoản bất thường |
 | Chọn tập con đại diện | Lọc câu hỏi trùng ý khi sinh đề |
-| Sinh nhãn làm đầu vào cho thuật toán khác | Ràng buộc đa dạng nội dung (đầu vào cho CP-SAT) |
+| Sinh nhãn làm đầu vào cho thuật toán khác | Ràng buộc đa dạng nội dung (đầu vào cho CP-SAT), và `cluster_match` trong công thức xếp hạng gợi ý |
+| Nhận diện vùng chưa chạm tới | Chống bong bóng lọc: đề một item thuộc cụm người học chưa từng học lên top |
 
 Điều đáng nói không phải số lượng chức năng, mà là **năm cách dùng khác nhau của cùng một thuật toán** — từ phân nhóm thuần tuý, tới phát hiện bất thường, tới chọn mẫu đại diện, tới làm bước tiền xử lý cho một bộ giải ràng buộc. Đó là bằng chứng cho việc hiểu thuật toán đủ sâu để đặt nó đúng chỗ, thay vì áp một khuôn duy nhất cho mọi bài toán.

@@ -12,12 +12,17 @@ Kho thuật toán trong `backend/app/personalization/algorithms/` **đã có s�
 
 | File | Thuật toán | Trạng thái |
 |---|---|---|
-| `bkt.py` | Bayesian Knowledge Tracing | Viết xong, chưa chạy dữ liệu thật |
-| `irt.py` | Item Response Theory (Rasch) | Viết xong, chưa chạy dữ liệu thật |
-| `akt_sequences.py` | Attention-based Knowledge Tracing | Viết xong, chưa chạy dữ liệu thật |
-| `neural_cognitive_diagnosis.py` | Neural Cognitive Diagnosis | Viết xong, chưa chạy dữ liệu thật |
-| `contextual_bandit.py` | Thompson Sampling | Viết xong, **bị tắt cứng** (`BANDIT_KILL_SWITCH = True`) |
-| `kmeans_clustering.py` | K-Means | Viết xong, chưa gán nhãn (xem `PHAN_TICH_KMEANS.md`) |
+| `bkt.py` | Bayesian Knowledge Tracing | ✅ **đã chạy dữ liệu thật** — 168 trạng thái, mastery 0.155–0.648 |
+| `irt.py` | Item Response Theory (Rasch) | ✅ **đã chạy dữ liệu thật** — có theta và beta trên từng trạng thái |
+| `akt_sequences.py` | Attention-based Knowledge Tracing | Viết xong, chưa chạy dữ liệu thật (cần quy mô lớn hơn nhiều) |
+| `neural_cognitive_diagnosis.py` | Neural Cognitive Diagnosis | Viết xong, chưa chạy dữ liệu thật (cần quy mô lớn hơn nhiều) |
+| `contextual_bandit.py` | Thompson Sampling | Viết xong, đã kiểm chứng ba chế độ, **cờ vẫn tắt** (`BANDIT_KILL_SWITCH = True`) |
+| `kmeans_clustering.py` | K-Means | ✅ **đã gán nhãn và vào điểm xếp hạng** (xem `PHAN_TICH_KMEANS.md`) |
+
+> **Cập nhật sau lần chạy thật đầu-cuối.** Toàn chuỗi đã chạy trên MongoDB thật:
+> 4 học liệu lập chỉ mục → 16 thành phần tri thức + 17 learning item → 108 sự kiện
+> học tập → 168 trạng thái BKT/IRT → 3 mô hình cụm huấn luyện → gán nhãn 15 câu hỏi
+> và 12 người học → 6 gợi ý hiện trên màn hình học sinh. Xem Phần 3, bước 15.
 
 Tất cả đều mắc **cùng một bệnh**: được gọi qua `learner_model_service.process_learning_event`, mà hàm này chỉ chạy khi có `learning_event` được ghi.
 
@@ -54,6 +59,30 @@ Ngay lần chạy thật đầu tiên, bước trích xuất chết hoàn toàn 
 Vì sao 500+ test không bắt được: test dùng `mongomock`, mà mongomock **chấp nhận** lệnh này. Đây là giới hạn cố hữu của việc giả lập cơ sở dữ liệu — hành vi giả lập lỏng hơn hành vi thật.
 
 Cách khắc phục ở tầng test: thay vì dựa vào driver phát hiện, thêm test **soi cấu trúc lệnh update** và khẳng định không trường nào xuất hiện ở hai toán tử. Đã xác minh test này thật sự bắt được lỗi (bỏ bản sửa thì test đỏ, khôi phục thì xanh).
+
+#### Lần thứ hai — và lần này chặn cả chuỗi
+
+Khi bật cờ để chạy thật đầu-cuối, đúng loại lỗi đó tái phát ở `upsert_learning_session`: `schema_version` nằm cả trong `$set` lẫn `$setOnInsert`.
+
+Hệ quả nặng hơn hẳn lần đầu: **không một sự kiện học tập nào ghi được**. Mà sự kiện học tập là mắt xích đầu của cả chuỗi — không có nó thì không có hồ sơ người học, không BKT/IRT, không đặc trưng để phân cụm, không CBF, không gợi ý. Toàn bộ miền cá nhân hoá chết ngay bước một, trong khi 586 test vẫn xanh.
+
+Sửa từng chỗ rõ ràng là không đủ. Nay có test **quét tĩnh** dùng `ast` duyệt mọi file trong `app/`, tìm dict literal có khoá trùng giữa các cặp toán tử xung khắc (`$set`/`$setOnInsert`, `$set`/`$addToSet`, `$set`/`$inc`, …) và in ra `file:dòng`. Test tự nó cũng được kiểm: có một ca khẳng định bộ quét thật sự phát hiện được mẫu lỗi đã biết — một bộ quét không bắt được gì thì vô dụng mà vẫn xanh.
+
+Quét lần đầu ra đúng một chỗ còn lại, chính là chỗ đang hỏng.
+
+### Một nhà cung cấp hết hạn mức, cả tính năng chết theo
+
+Bước trích xuất tri thức chọn nhà cung cấp AI **một lần rồi thôi**:
+
+```python
+ai_json_generator = gemini_generate_json if is_gemini_available() else generate_json
+```
+
+Gemini trả `429 RESOURCE_EXHAUSTED` (hạn mức miễn phí 20 lượt/ngày) là toàn bộ luồng dừng — dù Groq đã cấu hình đủ và đang chạy tốt. Cấu hình hai nhà cung cấp mà chỉ dùng được một.
+
+`generate_json_with_failover` thử lần lượt, giữ nguyên thứ tự ưu tiên cũ nên đường thuận lợi không đổi hành vi. Chạy lại: Gemini 429 → Groq tiếp quản → 3/4 tài liệu trích xuất thành công. Tài liệu thứ tư bị `KnowledgeExtractionValidationError` vì Groq gán quá 4 thành phần tri thức cho một item — **guard chạy đúng**, không phải lỗi.
+
+Điểm đáng nêu: hạn mức miễn phí hết hằng ngày là chuyện thường, không phải sự cố hiếm. Một hệ thống phụ thuộc AI nên coi đó là trạng thái vận hành bình thường chứ không phải ngoại lệ.
 
 ---
 
@@ -115,6 +144,37 @@ thứ tự gần gũi về nội dung.
   Lẫn hai khái niệm này là lỗi thiết kế thường gặp.
 - **Suy giảm theo thời gian**, chu kỳ bán rã 30 ngày. Không có bước này thì hồ sơ
   bị đóng băng theo những gì học sinh học từ đầu năm.
+
+### 1.2b. Nối xong vẫn chưa có nghĩa là chạy: bốn tầng chặn nối tiếp
+
+Bảng số ở trên đo **hàm CBF chạy độc lập**. Khi bật cờ và chạy thật trên đường sản phẩm, `interest_match` vẫn bằng **0.000** ở mọi gợi ý. Bốn tầng chặn nối tiếp nhau, gỡ một tầng vẫn không thấy gì — đây là phần đáng giá nhất của lần chạy thật này.
+
+**Tầng 1 — học sinh không nhìn thấy học liệu nào.** `list_accessible_learning_items_for_user` định nghĩa "truy cập được" là **tài liệu do chính mình tải lên**. Học sinh không tải tài liệu nào, nên trả về danh sách rỗng và **không học sinh nào từng nhận được một gợi ý** — trong khi tính năng cá nhân hoá sinh ra chính cho họ. Đo được: cùng một API, tài khoản học sinh trả 0 ứng viên, tài khoản giảng viên trả 7.
+
+Cách sửa không phải dựng luật mới. Hệ thống đã có luật hiển thị cho học sinh ở trang "Bài thi của bạn": bộ đề có câu đã ban hành, ban hành cho tất cả hoặc cho lớp mà em đó thuộc về. Luật đó được tách sang `question_visibility_service` để router cũ và miền cá nhân hoá dùng chung **một định nghĩa** — hai bản sao sẽ lệch nhau, và lệch theo hướng nguy hiểm: một bên siết, một bên hở. Lọc tới từng câu chứ không chỉ từng bộ đề, vì một bộ đã ban hành vẫn có thể còn câu nháp.
+
+Bốn accessor cùng phải đổi. Ba cái đầu quyết định *có ứng viên hay không*; riêng `get_accessible_learning_item_for_user` chạy ở **bước dựng phản hồi**, nên khi nó lệch luật thì gợi ý đã xếp hạng xong vẫn rơi mất và màn hình vẫn rỗng. Nếu chỉ kiểm bằng API xếp hạng thì đã kết luận nhầm là xong.
+
+**Tầng 2 — nguồn CBF đòi khai môn trước mới chạy.** `_matches_goal` trả `False` khi danh sách môn rỗng, nên học sinh chưa qua onboarding thì vĩnh viễn không có nguồn này. Nghịch lý: CBF sinh ra chính để **suy ra** sở thích từ hành vi. Nay danh sách rỗng nghĩa là không ràng buộc — đúng như cách cùng hàm đó vẫn xử lý `preferred_content_types`.
+
+**Tầng 3 — điểm CBF tính xong rồi vứt.** Bộ thu chấm cosine cho từng item, rồi chọn item theo **thứ tự duyệt** và `break` khi đủ số lượng. Item được chọn là item *gặp trước*, không phải item *hợp gu nhất*. Bộ thu láng giềng `_collect_appropriate_difficulty` ngay bên cạnh thì sắp xếp rồi lấy top-N — cùng một file, hai cách làm khác nhau.
+
+**Tầng 4 — hạn ngạch tiêu vào item vừa làm xong.** CBF chấm cao nhất đúng những item giống thứ người học vừa tương tác, mà chúng bị bộ lọc "đã xem gần đây" bỏ ngay sau đó. Đo được: 4/5 lựa chọn của CBF rơi vào diện này. Loại chúng từ đầu.
+
+**Một lỗ lộ ra khi gỡ tầng 2.** Nới ràng buộc môn làm một test sẵn có đỏ ngay: nguồn này **không có chốt an toàn** theo độ khó và chất lượng như nguồn `exploration` bên cạnh, nên đẩy được cả câu quá sức lên đầu chỉ vì đúng chủ đề. Lỗ này bị che suốt vì nguồn chưa từng chạy. Hợp gu không có nghĩa là làm được — nay dùng chung ngưỡng với `exploration`.
+
+**Kết quả sau khi gỡ đủ bốn tầng**, tài khoản học sinh thật:
+
+| | Trước | Sau |
+|---|---|---|
+| Learning item nhìn thấy | 0 | 16 |
+| Thành phần tri thức | 0 | 14 |
+| Ứng viên | 0 | 7 |
+| Gợi ý hiện trên màn hình | 0 | 6 |
+| `interest_match` | 0.000 | 0.392 / 0.456 |
+| `cluster_match` | 0.000 | 0.730 |
+
+**Bài học đáng nêu khi bảo vệ:** "đã cài đặt" và "đang chạy" là hai trạng thái khác nhau, và khoảng cách giữa chúng có thể chứa bốn lỗi độc lập. Test đơn vị xác nhận hàm CBF đúng — bảng số ở mục 1.2 là thật. Nhưng hàm đúng nằm sau bốn lớp chặn thì người dùng vẫn nhận được đúng con số 0.
 
 ### 1.4. Điều kiện ẩn: `learning_items` chưa từng lưu vector nội dung
 
@@ -342,10 +402,31 @@ Bảng dưới đã cập nhật theo thực tế đã đi. Bước "nối learn
 | 12 | Ghép CBF × K-Means | ✅ cách 3 đã nối; cách 1 đo xong chưa nối; cách 2 chưa làm | Bước 10 + 11 |
 | 13 | B1, B2 — BKT & IRT | ✅ **đã chạy được** | cần bật cờ + đủ lượt làm bài |
 | 14 | B3 — Thompson Sampling | ✅ đã kiểm chứng, chờ quyết định bật | Bước 11 |
+| 15 | **Bật cờ, chạy thật đầu-cuối trên MongoDB thật** | ✅ xong — lộ ra 6 lỗi, xem dưới | Bước 1-14 |
+| 16 | Mở quyền truy cập học liệu cho học sinh | ✅ xong | Bước 15 |
+| 17 | Nhãn cụm vào điểm xếp hạng (`cluster_match` 0.0 → 0.05) | ✅ xong | Bước 15 |
+| 18 | Tiêu đề gợi ý lấy từ nội dung câu hỏi | ✅ xong | Bước 15 |
 
 **Thay đổi quan trọng so với bản đầu:** bước 8 (tự động chạy knowledge extraction) trước đây không có trong kế hoạch, nhưng nó mới là **điều kiện thật sự** để mở đường cá nhân hoá — không phải bước "nối learning event" như đã tưởng. Bước 9 hoá ra đã có sẵn từ trước.
 
-**Toàn bộ 14 bước đã xong.** Ba phần còn lại đều là *quyết định có chủ đích*, không phải việc bỏ dở:
+### Bước 15 đáng một mục riêng
+
+Sau bước 14, mọi thứ "đã xong": 586 test xanh, mọi mô-đun có nơi gọi thật, tài liệu này ghi ✅ khắp nơi. Bật cờ chạy thật một lần thì lộ ra **sáu lỗi**, không lỗi nào bị test bắt:
+
+| # | Lỗi | Hệ quả |
+|---|---|---|
+| 1 | `ConflictingUpdateOperators` ở `upsert_learning_session` | Không sự kiện học tập nào ghi được — chặn cả chuỗi |
+| 2 | Chọn nhà cung cấp AI cứng, không failover | Gemini hết hạn mức là trích xuất tri thức chết |
+| 3 | Luật truy cập loại học sinh khỏi kho học liệu | Không học sinh nào nhận được gợi ý |
+| 4 | Nguồn CBF đòi khai môn trước mới chạy | CBF không đóng góp cho ai chưa onboarding |
+| 5 | Điểm CBF tính xong rồi chọn theo thứ tự duyệt | Phần Content-Based Filtering không ảnh hưởng kết quả |
+| 6 | Nguồn `cluster_match` đọc nhầm trường nhãn cụm | Nhãn K-Means không chạm tới thứ hạng |
+
+Ba lỗi đầu chặn cứng, ba lỗi sau làm thuật toán chạy mà không có tác dụng — loại thứ hai nguy hiểm hơn vì nhìn từ ngoài mọi thứ đều bình thường.
+
+**Đây là điểm nên nêu thẳng khi bảo vệ.** Nó cho thấy quy trình kiểm chứng có tầng: test đơn vị bắt lỗi logic, nhưng chỉ chạy thật với cơ sở dữ liệu thật và trên trình duyệt mới bắt được lỗi tích hợp và lỗi "chạy mà vô dụng". Một hệ thống 600 test xanh vẫn có thể có sáu chỗ hỏng nếu chưa ai bật nó lên chạy.
+
+**Toàn bộ 18 bước đã xong.** Ba phần còn lại đều là *quyết định có chủ đích*, không phải việc bỏ dở:
 
 | Phần | Trạng thái | Lý do |
 |---|---|---|
