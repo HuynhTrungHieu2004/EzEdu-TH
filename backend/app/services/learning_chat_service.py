@@ -10,7 +10,12 @@ from pymongo.errors import DuplicateKeyError
 
 from app.core.config import settings
 from app.database.mongodb import get_database
-from app.services.llm_service import get_gemini_client, get_groq_client
+from app.services.llm_service import (
+    generate_content,
+    generate_json_with_failover,
+    get_gemini_client,
+    get_groq_client,
+)
 from app.services.rag_service import search_user_chunks_advanced
 from app.services.system_settings_service import get_setting_value
 from app.schemas.chat import (
@@ -196,8 +201,6 @@ async def classify_query(question: str, history_messages: List[Dict[str, Any]], 
             return "clarification_required"
 
     try:
-        client = get_gemini_client()
-        model = settings.GEMINI_MODEL or "gemini-2.5-flash"
         
         history_context = ""
         for msg in history_messages[-3:]:
@@ -222,15 +225,9 @@ Trả về duy nhất chuỗi JSON sau:
 {{"retrieval_mode": "internal_only" | "web_only" | "hybrid" | "model_knowledge" | "clarification_required"}}
 Chỉ trả về JSON."""
         
-        def _call():
-            return client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config={"response_mime_type": "application/json"}
-            )
-            
-        response = await asyncio.to_thread(_call)
-        res_text = (response.text or "").strip()
+        # Thử lần lượt các nhà cung cấp: hạn mức miễn phí của Gemini là 20
+        # lượt/ngày, hết là cả trang hỏi đáp chết trong khi Groq vẫn chạy tốt.
+        res_text = (await asyncio.to_thread(generate_json_with_failover, prompt) or "").strip()
         res_data = json.loads(res_text)
         mode = res_data.get("retrieval_mode", "internal_only")
         if mode in ["internal_only", "web_only", "hybrid", "model_knowledge", "clarification_required"]:
@@ -596,11 +593,24 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
                 }
             )
 
-        response = await asyncio.to_thread(_call_ai)
-        response_text = response.text or ""
+        # Gemini là đường chính vì chỉ nó có công cụ tìm kiếm, số liệu token và
+        # dữ liệu trích dẫn. Nhưng hạn mức miễn phí chỉ 20 lượt/ngày, và hết
+        # hạn mức thì cả trang hỏi đáp chết trong khi Groq vẫn chạy tốt.
+        try:
+            response = await asyncio.to_thread(_call_ai)
+            response_text = response.text or ""
+        except Exception as exc:  # noqa: BLE001 - đổi nhà cung cấp với mọi lỗi
+            logger.warning("Gemini trả lời thất bại, chuyển sang Groq: %s", exc)
+            response = None
+            response_text = await asyncio.to_thread(generate_content, prompt) or ""
+            # Groq không tra được Internet. Giữ nguyên "success" ở đây là nói với
+            # người học rằng câu trả lời có đối chiếu nguồn ngoài, trong khi thực
+            # tế nó chỉ dựa vào kiến thức sẵn có của mô hình.
+            if external_search_status == "success":
+                external_search_status = "unavailable"
 
         # Extract token usage metadata (only record when SDK provides it)
-        _usage = getattr(response, "usage_metadata", None)
+        _usage = getattr(response, "usage_metadata", None) if response is not None else None
         if _usage is not None:
             _input_tokens = getattr(_usage, "prompt_token_count", None)
             _output_tokens = getattr(_usage, "candidates_token_count", None)
@@ -608,7 +618,11 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
 
 
         web_citations = []
-        grounding_metadata = getattr(response.candidates[0], "grounding_metadata", None)
+        grounding_metadata = (
+            getattr(response.candidates[0], "grounding_metadata", None)
+            if response is not None and getattr(response, "candidates", None)
+            else None
+        )
         
         if grounding_metadata:
             g_chunks = getattr(grounding_metadata, "grounding_chunks", [])
