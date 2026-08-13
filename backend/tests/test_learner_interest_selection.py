@@ -51,12 +51,15 @@ def make_items() -> dict:
     }
 
 
-def make_twin():
+def make_twin(subjects=("Toán",), types=("question",), low=0.0, high=1.0):
     return SimpleNamespace(
         content_preferences=SimpleNamespace(
-            preferred_content_types=["question"],
-            preferred_subjects=["Toán"],
-        )
+            preferred_content_types=list(types),
+            preferred_subjects=list(subjects),
+        ),
+        recommended_difficulty_range=SimpleNamespace(
+            min_difficulty=low, max_difficulty=high
+        ),
     )
 
 
@@ -106,6 +109,73 @@ class LearnerInterestSelectionTests(unittest.TestCase):
         )
 
         self.assertEqual(len(accumulator.items), 3)
+
+    def test_works_for_a_learner_who_never_declared_a_subject(self):
+        """CBF sinh ra để **suy ra** sở thích từ hành vi, đúng cho người chưa
+        khai gì. Bắt khai môn trước mới cho chạy là tự vô hiệu hoá nó: học sinh
+        không qua onboarding thì vĩnh viễn không có nguồn này.
+
+        Cùng hàm đã xử lý `preferred_content_types` theo đúng cách này rồi —
+        danh sách rỗng nghĩa là không ràng buộc, không phải loại tất cả.
+        """
+        twin = make_twin(subjects=(), types=())
+        accumulator = _Accumulator(NOW)
+
+        _collect_learner_interest(
+            accumulator, make_items(), twin, COMPONENTS,
+            per_source_limit=3, profile_vector=PROFILE_VECTOR,
+        )
+
+        self.assertEqual(len(accumulator.items), 3)
+        self.assertIn("item-6", accumulator.items)
+
+    def test_does_not_spend_its_quota_on_items_just_answered(self):
+        """Item hợp gu nhất thường là item vừa làm xong — CBF chấm cao đúng
+        những thứ giống thứ đã học. Nếu không loại chúng ở đây thì cả hạn ngạch
+        của nguồn này tiêu vào các item mà bộ lọc phía sau chắc chắn bỏ đi, và
+        CBF coi như không đóng góp gì.
+        """
+        accumulator = _Accumulator(NOW)
+
+        _collect_learner_interest(
+            accumulator, make_items(), make_twin(), COMPONENTS,
+            per_source_limit=3, profile_vector=PROFILE_VECTOR,
+            recent_item_ids={"item-6", "item-5"},
+        )
+
+        self.assertNotIn("item-6", accumulator.items)
+        self.assertNotIn("item-5", accumulator.items)
+        self.assertEqual(len(accumulator.items), 3)
+
+    def test_never_recommends_items_outside_the_safe_difficulty_range(self):
+        """Hợp gu không có nghĩa là làm được. Nguồn `exploration` đã có chốt an
+        toàn theo độ khó và chất lượng; nguồn này chấm nội dung nên càng dễ đẩy
+        một câu quá sức lên đầu chỉ vì nó đúng chủ đề."""
+        items = make_items()
+        items["item-6"]["difficulty"] = 0.98      # hop gu nhat nhung qua suc
+        items["item-0"]["difficulty"] = 0.45
+        twin = make_twin(subjects=(), types=(), low=0.3, high=0.6)
+        accumulator = _Accumulator(NOW)
+
+        _collect_learner_interest(
+            accumulator, items, twin, COMPONENTS,
+            per_source_limit=3, profile_vector=PROFILE_VECTOR,
+        )
+
+        self.assertNotIn("item-6", accumulator.items)
+
+    def test_never_recommends_low_quality_items(self):
+        items = make_items()
+        items["item-6"]["quality_score"] = 0.05
+        twin = make_twin(subjects=(), types=())
+        accumulator = _Accumulator(NOW)
+
+        _collect_learner_interest(
+            accumulator, items, twin, COMPONENTS,
+            per_source_limit=3, profile_vector=PROFILE_VECTOR,
+        )
+
+        self.assertNotIn("item-6", accumulator.items)
 
     def test_respects_the_per_source_limit(self):
         accumulator = _Accumulator(NOW)
