@@ -565,6 +565,41 @@ class PersonalizationMongoRepository:
         )
         return [_with_string_id(item) async for item in cursor]
 
+    async def get_question_texts_by_set(self, question_set_ids: list[str]) -> dict[str, list[str]]:
+        """Nội dung các câu hỏi của từng bộ đề, đọc một lần cho cả lô."""
+        if not question_set_ids:
+            return {}
+        ids: list[Any] = []
+        for value in dict.fromkeys(question_set_ids):
+            ids.append(ObjectId(value) if ObjectId.is_valid(value) else value)
+            ids.append(value)
+        cursor = self.db["question_sets"].find({"_id": {"$in": ids}}, {"questions": 1})
+        return {
+            str(document["_id"]): [
+                str(question.get("question") or "")
+                for question in (document.get("questions") or [])
+            ]
+            async for document in cursor
+        }
+
+    async def get_chunk_texts(self, chunk_ids: list[str]) -> dict[str, str]:
+        """Nội dung các đoạn học liệu, đọc một lần cho cả lô."""
+        if not chunk_ids:
+            return {}
+        ids: list[Any] = []
+        for value in dict.fromkeys(chunk_ids):
+            ids.append(ObjectId(value) if ObjectId.is_valid(value) else value)
+            ids.append(value)
+        cursor = self.db["document_chunks"].find(
+            {"_id": {"$in": ids}}, {"content": 1, "text_preview": 1}
+        )
+        return {
+            str(document["_id"]): str(
+                document.get("content") or document.get("text_preview") or ""
+            )
+            async for document in cursor
+        }
+
     async def get_learning_item_by_id(self, item_id: str) -> Optional[dict]:
         item_id = _require_non_empty(item_id, "item_id")
         return _with_string_id(await self.db[LEARNING_ITEMS].find_one({"_id": item_id}))

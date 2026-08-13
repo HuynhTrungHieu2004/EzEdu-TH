@@ -77,10 +77,19 @@ async def get_recommendations_for_current_user(
     ranked = await recommend_for_user(user_id, limit=limit, repository=repo, log_recommendations=True)
     twin = await get_current_user_digital_twin(user_id, repository=repo, use_cache=False)
     items: list[RecommendationAPIItemResponse] = []
+    accessible: list[tuple] = []
     for recommendation in ranked.recommendations:
         item = await repo.get_accessible_learning_item_for_user(user_id, recommendation.item_id)
-        if not item:
-            continue
+        if item:
+            accessible.append((recommendation, item))
+
+    # Tra tên gọi cho cả lô, trước vòng lặp: mỗi bộ đề đọc một lần thay vì một
+    # lần cho mỗi câu được gợi ý.
+    titles = await resolve_item_titles(repo, [item for _, item in accessible])
+
+    for recommendation, item in accessible:
+        if titles.get(str(item.get("id") or item.get("_id") or "")):
+            item = {**item, "title": titles[str(item.get("id") or item.get("_id"))]}
         components = await repo.list_knowledge_components_by_ids_for_user(
             user_id,
             recommendation.knowledge_component_ids,
@@ -334,6 +343,52 @@ def _fallback_explanation(recommendation: RecommendationItemResponse, *, item: d
         suggested_action="Hãy hoàn thành nội dung này rồi xem giải thích sau khi trả lời." if language.startswith("vi") else "Complete this item, then review the explanation after answering.",
         confidence=0.5,
     )
+
+
+async def resolve_item_titles(
+    repository: PersonalizationMongoRepository, items: list[dict]
+) -> dict[str, str]:
+    """Tra tên gọi cho từng học liệu từ chính nội dung của nó.
+
+    `learning_items` không lưu chữ nào: câu hỏi chỉ có `question_set_id` +
+    `question_index`, đoạn học liệu chỉ có `source_chunk_ids`. Không tra thì
+    người học nhìn thấy một dãy id và không biết nên bấm vào đâu.
+
+    Gom theo lô: mỗi bộ đề và mỗi đoạn chỉ đọc một lần, dù có bao nhiêu item
+    cùng trỏ vào. Thiếu nguồn thì không trả gì cho item đó — để nhánh dự phòng
+    cũ xử lý, chứ không gán nhầm chữ của câu khác.
+    """
+    if not items:
+        return {}
+
+    set_ids = {
+        str(item["question_set_id"]) for item in items
+        if item.get("question_set_id") and item.get("question_index") is not None
+    }
+    chunk_ids = {
+        str(chunk_id) for item in items
+        for chunk_id in (item.get("source_chunk_ids") or [])[:1]
+    }
+
+    questions_by_set = await repository.get_question_texts_by_set(sorted(set_ids))
+    texts_by_chunk = await repository.get_chunk_texts(sorted(chunk_ids))
+
+    titles: dict[str, str] = {}
+    for item in items:
+        item_id = str(item.get("id") or item.get("_id") or "")
+        if not item_id:
+            continue
+        index = item.get("question_index")
+        if item.get("question_set_id") and index is not None:
+            questions = questions_by_set.get(str(item["question_set_id"])) or []
+            if 0 <= int(index) < len(questions) and questions[int(index)]:
+                titles[item_id] = str(questions[int(index)])[:240]
+                continue
+        for chunk_id in (item.get("source_chunk_ids") or [])[:1]:
+            text = texts_by_chunk.get(str(chunk_id))
+            if text:
+                titles[item_id] = str(text)[:240]
+    return titles
 
 
 def _item_title(item: dict) -> str:
