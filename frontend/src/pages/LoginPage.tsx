@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
+import { postLoginPath } from '../contexts/auth-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui';
 
@@ -44,10 +45,7 @@ const LoginPage = () => {
       // nhập và đưa họ quay lại /login — trong khi trang này thấy token vẫn
       // còn nên lại điều hướng đi, tạo vòng lặp chuyển hướng vô tận.
       await refresh();
-      if (user.role === 'student' && !user.student_profile_completed) navigate('/student-onboarding');
-      else if (user.role === 'student') navigate('/published-questions');
-      else if (user.role === 'admin') navigate('/admin/dashboard');
-      else navigate('/dashboard');
+      navigate(postLoginPath(user));
     } catch (err: unknown) {
       const detail = getApiErrorDetail(err);
       setError(
