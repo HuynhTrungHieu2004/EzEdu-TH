@@ -145,6 +145,70 @@ class GoogleLoginEndpointTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(ctx.exception.status_code, 403)
 
+    async def test_deleted_account_cannot_be_recreated_via_google(self):
+        """C1: tài khoản đã bị quản trị xoá mềm phải bị chặn 403, không được
+        đăng nhập lại và tuyệt đối không được tạo thành một tài khoản thứ hai
+        cùng email (đường vòng qua lệnh xoá của quản trị)."""
+        await self.db["users"].insert_one({
+            "_id": ObjectId(), "email": "an@example.com", "full_name": "An",
+            "role": "student", "status": "deleted", "is_active": False,
+            "deleted_at": datetime.now(timezone.utc), "created_at": datetime.now(timezone.utc),
+        })
+
+        with self.assertRaises(HTTPException) as ctx:
+            await self._goi()
+
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertEqual(
+            await self.db["users"].count_documents({}), 1,
+            "không được tạo tài khoản thứ hai cho email đã bị xoá",
+        )
+
+    async def test_default_role_setting_overrides_chosen_role(self):
+        """I2: default_role phải khoá vai tự chọn ở đăng nhập Google, giống
+        hệt luồng /register — nếu không, quản trị đặt default_role=student
+        vẫn không ngăn được người mới tự phong lecturer qua nút Google."""
+        from app.services.system_settings_service import update_setting
+
+        await update_setting("default_role", "student", admin_user_id="admin-test", database=self.db)
+
+        kq = await self._goi(role="lecturer")
+
+        self.assertTrue(kq.access_token)
+        trong_db = await self.db["users"].find_one({"email": "an@example.com"})
+        self.assertEqual(trong_db["role"], "student")
+
+    async def test_maintenance_mode_blocks_regular_users(self):
+        await self.db["feature_flags"].insert_one({
+            "key": "enable_maintenance_mode", "enabled": True, "rollout_percentage": 100,
+            "allowed_roles": [],
+        })
+        await self.db["users"].insert_one({
+            "_id": ObjectId(), "email": "an@example.com", "full_name": "An",
+            "role": "student", "google_sub": "google-sub-1", "status": "active",
+            "is_active": True, "deleted_at": None, "created_at": datetime.now(timezone.utc),
+        })
+
+        with self.assertRaises(HTTPException) as ctx:
+            await self._goi()
+
+        self.assertEqual(ctx.exception.status_code, 503)
+
+    async def test_maintenance_mode_still_allows_admins(self):
+        await self.db["feature_flags"].insert_one({
+            "key": "enable_maintenance_mode", "enabled": True, "rollout_percentage": 100,
+            "allowed_roles": [],
+        })
+        await self.db["users"].insert_one({
+            "_id": ObjectId(), "email": "an@example.com", "full_name": "An",
+            "role": "admin", "google_sub": "google-sub-1", "status": "active",
+            "is_active": True, "deleted_at": None, "created_at": datetime.now(timezone.utc),
+        })
+
+        kq = await self._goi()
+
+        self.assertTrue(kq.access_token)
+
     async def test_activity_log_records_the_provider(self):
         await self._goi(role="student")
 

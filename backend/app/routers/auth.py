@@ -400,7 +400,12 @@ async def google_login(payload: GoogleLoginRequest, request: Request):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Đăng ký tài khoản hiện đang tạm tắt.",
             )
-        user = await create_google_user(db, identity, role=payload.role)
+        # Cài đặt default_role khoá vai tự chọn, giống hệt luồng /register —
+        # thiếu chốt này thì quản trị đặt default_role=student vẫn không ngăn
+        # được người mới tự phong lecturer qua nút Google.
+        forced_role = str(await get_setting_value("default_role", "", database=db))
+        vai = forced_role if forced_role in {"student", "lecturer"} else payload.role
+        user = await create_google_user(db, identity, role=vai)
 
     user_status = _normalize_user_status(user)
     if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:

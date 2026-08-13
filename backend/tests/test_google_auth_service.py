@@ -91,6 +91,21 @@ class VerifyTokenTests(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status_code, 403)
 
+    def test_missing_sub_is_rejected_with_401_not_500(self):
+        """`sub` thiếu hẳn khỏi payload từng ném KeyError trần (HTTP 500), phá
+        hợp đồng "mọi từ chối đều là GoogleAuthError". Phải là 401 như khi
+        thiếu email."""
+        khong_co_sub = payload()
+        del khong_co_sub["sub"]
+        with patch.object(svc.settings, "GOOGLE_CLIENT_ID", CLIENT_ID), \
+             patch.object(svc.id_token, "verify_oauth2_token",
+                          return_value=khong_co_sub):
+
+            with self.assertRaises(GoogleAuthError) as ctx:
+                verify_google_id_token("token-thieu-sub")
+
+        self.assertEqual(ctx.exception.status_code, 401)
+
     def test_missing_client_id_config_is_503(self):
         with patch.object(svc.settings, "GOOGLE_CLIENT_ID", ""):
             with self.assertRaises(GoogleAuthError) as ctx:
@@ -139,7 +154,11 @@ class FindOrLinkTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(da_gan)
         self.assertEqual(await self.db["users"].count_documents({}), 0)
 
-    async def test_deleted_account_is_not_reused(self):
+    async def test_deleted_account_is_found_not_recreated(self):
+        """Tài khoản đã bị quản trị xoá mềm phải được TÌM THẤY và trả về
+        nguyên trạng (để router từ chối bằng 403 "đã bị khoá"), KHÔNG được
+        coi là người dùng mới. Coi là mới sẽ tạo ra một doc thứ hai cùng
+        email — lách thẳng qua lệnh xoá của quản trị."""
         await self.db["users"].insert_one({
             "_id": ObjectId(), "email": "an@example.com", "full_name": "An",
             "role": "student", "hashed_password": "bam",
@@ -147,9 +166,15 @@ class FindOrLinkTests(unittest.IsolatedAsyncioTestCase):
             "created_at": datetime.now(timezone.utc),
         })
 
-        user, _ = await find_or_link_google_user(self.db, identity())
+        user, da_gan = await find_or_link_google_user(self.db, identity())
 
-        self.assertIsNone(user)
+        self.assertIsNotNone(user)
+        self.assertIsNotNone(user.get("deleted_at"))
+        self.assertFalse(da_gan, "không được gắn google_sub vào tài khoản đã xoá")
+        self.assertEqual(
+            await self.db["users"].count_documents({}), 1,
+            "không được tạo thêm doc thứ hai cùng email",
+        )
 
 
 class CreateGoogleUserTests(unittest.IsolatedAsyncioTestCase):

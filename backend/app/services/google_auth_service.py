@@ -61,8 +61,12 @@ def verify_google_id_token(raw_token: str) -> GoogleIdentity:
     if not bool(thong_tin.get("email_verified")):
         raise GoogleAuthError(403, "Email Google này chưa được xác minh.")
 
+    sub = thong_tin.get("sub")
+    if not sub:
+        raise GoogleAuthError(401, "Không đăng nhập được bằng Google. Vui lòng thử lại.")
+
     return GoogleIdentity(
-        sub=str(thong_tin["sub"]),
+        sub=str(sub),
         email=str(thong_tin["email"]).lower(),
         email_verified=True,
         full_name=str(thong_tin.get("name") or thong_tin["email"]),
@@ -76,13 +80,24 @@ async def find_or_link_google_user(db, identity: GoogleIdentity) -> tuple[Option
     Trả `(tài_khoản, vừa_gắn_mới)`. `(None, False)` nghĩa là người dùng hoàn
     toàn mới — hàm này KHÔNG tạo tài khoản, vì việc tạo còn phải qua cổng chặn
     đăng ký và cần biết vai người dùng chọn.
+
+    Cố ý KHÔNG lọc `deleted_at: None`: một tài khoản đã bị quản trị xoá mềm
+    vẫn phải được TÌM THẤY ở đây. Lọc nó ra sẽ khiến router coi chủ email đó
+    là người hoàn toàn mới và tạo một doc thứ hai cùng email — lách thẳng qua
+    lệnh xoá của quản trị (chỉ mục email cố ý non-unique nên Mongo không chặn
+    việc này).
     """
-    theo_sub = await db["users"].find_one({"google_sub": identity.sub, "deleted_at": None})
+    theo_sub = await db["users"].find_one({"google_sub": identity.sub})
     if theo_sub:
         return theo_sub, False
 
-    theo_email = await db["users"].find_one({"email": identity.email, "deleted_at": None})
+    theo_email = await db["users"].find_one({"email": identity.email})
     if theo_email:
+        if theo_email.get("deleted_at") is not None:
+            # Không gắn google_sub vào tài khoản đã xoá, không tạo gì thêm —
+            # chỉ trả về nguyên trạng để router tự chặn bằng 403 (thông qua
+            # _normalize_user_status trả "deleted").
+            return theo_email, False
         # Gắn thêm, không ghi đè: giữ nguyên vai, mật khẩu cũ và mọi dữ liệu.
         moc_thoi_gian = datetime.now(timezone.utc)
         await db["users"].update_one(
