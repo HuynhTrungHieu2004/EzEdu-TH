@@ -6,6 +6,9 @@ import { getApiErrorDetail } from '../api/errors';
 import { postLoginPath } from '../contexts/auth-context';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import { GoogleRoleDialog } from '../components/GoogleRoleDialog';
+import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -18,6 +21,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(locationMessage);
+  const google = useGoogleSignIn('Đăng nhập bằng Google thất bại.');
 
   useEffect(() => {
     if (locationMessage) {
@@ -101,6 +105,13 @@ const LoginPage = () => {
             {loading ? 'Đang xác thực...' : 'Đăng nhập'}
           </Button>
         </form>
+
+        <div style={{ display: 'grid', gap: 12, justifyItems: 'center', marginTop: 16 }}>
+          <span className="text-muted">hoặc</span>
+          <GoogleSignInButton onCredential={google.onCredential} />
+          {google.error && <p className="text-danger">{google.error}</p>}
+        </div>
+        {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
 
         <div className="auth-footer">
           Chưa có tài khoản?{' '}
