@@ -163,7 +163,13 @@ def analyze_question_set_quality(
             matrix,
             min_k=settings.KMEANS_MIN_K,
             max_k=settings.KMEANS_MAX_K,
-            min_cluster_size=settings.KMEANS_MIN_CLUSTER_SIZE,
+            # Cụm một câu ở đây là kết quả, không phải cấu hình hỏng. Ngưỡng
+            # KMEANS_MIN_CLUSTER_SIZE sinh ra cho bài toán phân khúc — một nhóm
+            # một học sinh thì không dạy phân hoá được nên phải loại. Ở đây thì
+            # ngược lại: câu hỏng thường lệch hẳn nên nằm lẻ ở mọi k, và nếu
+            # đòi mỗi cụm từ hai câu trở lên thì đúng bộ đề có câu sai đáp án
+            # lại là bộ đề bị bỏ qua phân cụm.
+            min_cluster_size=1,
             random_state=settings.KMEANS_RANDOM_STATE,
             n_init=settings.KMEANS_N_INIT,
             max_iter=settings.KMEANS_MAX_ITER,
@@ -176,7 +182,7 @@ def analyze_question_set_quality(
             item["distance_to_centroid"] = round(distance, 6)
             distances.append(distance)
 
-        _apply_outlier_flags(usable, distances)
+        _apply_outlier_flags(usable, distances, cluster_sizes=metrics.get("cluster_sizes") or [])
         base["clustering"] = {**metrics, "centroids": centroids,
                               "features": ["p_value", "discrimination"]}
     except (KMeansTrainingError, ValueError) as exc:
@@ -189,13 +195,29 @@ def analyze_question_set_quality(
     return {**base, "items": graded, "status": status, "flagged": _collect_flagged(graded)}
 
 
-def _apply_outlier_flags(items: List[Dict[str, Any]], distances: List[float]) -> None:
-    """Gắn cờ câu nằm quá xa tâm cụm so với mặt bằng chung của bộ đề."""
+def _apply_outlier_flags(
+    items: List[Dict[str, Any]],
+    distances: List[float],
+    cluster_sizes: List[int],
+) -> None:
+    """Gắn cờ câu bất thường theo hai dấu hiệu bổ sung nhau.
+
+    Đo khoảng cách tới tâm cụm bắt được câu nằm rìa một cụm đông. Nhưng câu
+    lệch mạnh nhất thường được K-Means cấp hẳn một cụm riêng, và khi đó khoảng
+    cách tới tâm bằng 0 — đúng câu đáng ngờ nhất lại trông sạch nhất. Nên cụm
+    chỉ có một câu tự nó là dấu hiệu, xét độc lập với khoảng cách.
+    """
     flags = flag_distance_outliers(
         distances, multiplier=settings.KMEANS_OUTLIER_DISTANCE_STD_MULTIPLIER
     )
-    for item, is_outlier in zip(items, flags):
-        if is_outlier:
+    for item, is_far in zip(items, flags):
+        cluster_id = item.get("cluster_id")
+        alone = (
+            cluster_id is not None
+            and 0 <= cluster_id < len(cluster_sizes)
+            and cluster_sizes[cluster_id] == 1
+        )
+        if is_far or alone:
             item.setdefault("reasons", []).append("cluster_outlier")
 
 

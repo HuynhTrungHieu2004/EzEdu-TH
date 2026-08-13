@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # MongoDB configurations
     MONGODB_URI: str = ""
     MONGODB_DB_NAME: str = "ai_question_generator"
+    # Khi không kết nối được MongoDB, mặc định là dừng hẳn thay vì âm thầm chạy
+    # trên bộ nhớ giả — một trang web chạy dữ liệu bịa trông y hệt trang chạy
+    # thật. Chỉ bật cờ này khi cố ý phát triển ngoại tuyến.
+    ALLOW_MOCK_DB_FALLBACK: bool = False
 
     # JWT configurations
     JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
@@ -155,13 +159,17 @@ class Settings(BaseSettings):
     CANDIDATE_EXPLORATION_RATIO: float = 0.1
     CANDIDATE_APPROPRIATE_DIFFICULTY_MARGIN: float = 0.15
     CANDIDATE_FORGETTING_MIN_MASTERY: float = 0.65
-    RANKER_WEIGHT_WEAKNESS_MATCH: float = 0.25
+    # 0.05 chuyển từ weakness_match sang cluster_match: nhãn cụm K-Means được
+    # tính và gán đầy đủ nhưng trọng số 0 nghĩa là tính xong rồi vứt. Mức 0.05
+    # đủ để cụm có tiếng nói mà không lật ưu tiên "học chỗ đang yếu".
+    # Tổng mười trọng số phải đúng 1.0 — `validate_ranker_weights` bắt buộc.
+    RANKER_WEIGHT_WEAKNESS_MATCH: float = 0.20
     RANKER_WEIGHT_DIFFICULTY_FIT: float = 0.20
     RANKER_WEIGHT_PREREQUISITE_READINESS: float = 0.15
     RANKER_WEIGHT_FORGETTING_NEED: float = 0.15
     RANKER_WEIGHT_GOAL_MATCH: float = 0.10
     RANKER_WEIGHT_INTEREST_MATCH: float = 0.05
-    RANKER_WEIGHT_CLUSTER_MATCH: float = 0.0
+    RANKER_WEIGHT_CLUSTER_MATCH: float = 0.05
     RANKER_WEIGHT_QUALITY_SCORE: float = 0.10
     RANKER_WEIGHT_NOVELTY_SCORE: float = 0.0
     RANKER_WEIGHT_CONTINUITY_SCORE: float = 0.0

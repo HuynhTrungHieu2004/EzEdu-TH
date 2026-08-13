@@ -289,9 +289,9 @@ async def process_document_knowledge_graph(
     if ai_response is None:
         prompt = build_knowledge_extraction_prompt(chunks, list(available_items.values()))
         if ai_json_generator is None:
-            from app.services.llm_service import generate_json, gemini_generate_json, is_gemini_available
+            from app.services.llm_service import generate_json_with_failover
 
-            ai_json_generator = gemini_generate_json if is_gemini_available() else generate_json
+            ai_json_generator = generate_json_with_failover
         ai_response = ai_json_generator(prompt)
 
     parsed = _parse_ai_response(ai_response)

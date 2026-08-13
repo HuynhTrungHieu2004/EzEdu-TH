@@ -51,6 +51,19 @@ function fmtNumber(value: number | undefined) {
   return (value ?? 0).toLocaleString('vi-VN');
 }
 
+/**
+ * Vì sao chưa có nhóm hành vi nào. Không có dòng này thì khối biến mất hoàn
+ * toàn, và người quản trị không phân biệt được "dữ liệu chưa đủ" với "hỏng".
+ */
+function behaviorUnavailableReason(behavior: UserBehaviorGroupsResponse): string {
+  const scope = `Đang có ${behavior.user_count} người dùng hoạt động trong ${behavior.window_days} ngày.`;
+
+  if (behavior.status === 'insufficient_users') {
+    return `${scope} Cần tối thiểu ${behavior.min_users_required ?? 4} người mới phân nhóm được.`;
+  }
+  return `${scope} Mức sử dụng giữa họ còn quá chênh lệch nên mọi cách chia đều tạo ra nhóm chỉ một người — K-Means không đưa ra phân nhóm đáng tin. Khối này sẽ tự hiện khi hoạt động dày hơn.`;
+}
+
 /** Thứ tự và nhãn cho các chỉ số hành vi — tên kỹ thuật không hiện ra giao diện. */
 const BEHAVIOR_METRIC_ORDER = [
   'activity_count',
@@ -250,6 +263,17 @@ export default function AdminActivityLogsPage() {
           <StatTile label="Bị từ chối quyền" value={fmtNumber(stats.permission_denied_count)} />
           <StatTile label="Vượt quota" value={fmtNumber(stats.quota_exceeded_count)} />
         </StatGrid>
+      )}
+
+      {behavior && !(behavior.status === 'ok' && behavior.groups.length > 0) && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle as="h2">Nhóm hành vi người dùng</CardTitle>
+              <p className="ez-muted-note">{behaviorUnavailableReason(behavior)}</p>
+            </div>
+          </CardHeader>
+        </Card>
       )}
 
       {behavior && behavior.status === 'ok' && behavior.groups.length > 0 && (

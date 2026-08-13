@@ -155,7 +155,8 @@ async def generate_candidates_for_user(
     _collect_similar_to_recent_error(accumulator, pool_by_id, recent_error_events, per_source_limit)
     _collect_appropriate_difficulty(accumulator, pool_by_id, twin, per_source_limit)
     _collect_learner_interest(
-        accumulator, pool_by_id, twin, component_by_id, per_source_limit, learner_profile_vector
+        accumulator, pool_by_id, twin, component_by_id, per_source_limit,
+        learner_profile_vector, recent_item_ids,
     )
     _collect_cluster_match(accumulator, pool_by_id, recent_events, per_source_limit)
     _collect_continue_current_path(accumulator, pool_by_id, recent_events, per_source_limit)
@@ -360,6 +361,7 @@ def _collect_learner_interest(
     component_by_id: dict[str, dict],
     per_source_limit: int,
     profile_vector: list[float] | None = None,
+    recent_item_ids: set[str] | None = None,
 ) -> None:
     """Nguồn ứng viên theo sở thích nội dung.
 
@@ -369,25 +371,53 @@ def _collect_learner_interest(
     để so nội dung với nhau.
     """
     preferred_types = set(twin.content_preferences.preferred_content_types)
-    added = 0
+    preferred_subjects = list(twin.content_preferences.preferred_subjects)
+    seen = recent_item_ids or set()
+
+    # Cùng chốt an toàn với nguồn `exploration`. Hợp gu không có nghĩa là làm
+    # được: nguồn này chấm theo nội dung nên rất dễ đẩy một câu quá sức lên đầu
+    # chỉ vì nó đúng chủ đề người học đang quan tâm.
+    low = max(0.0, twin.recommended_difficulty_range.min_difficulty - settings.CANDIDATE_APPROPRIATE_DIFFICULTY_MARGIN)
+    high = min(1.0, twin.recommended_difficulty_range.max_difficulty + settings.CANDIDATE_APPROPRIATE_DIFFICULTY_MARGIN)
+
+    scored: list[tuple[float, dict]] = []
     for item in pool_by_id.values():
+        quality = _quality(item)
+        difficulty = _difficulty(item)
+        if quality is not None and quality < settings.CANDIDATE_MIN_QUALITY_SCORE:
+            continue
+        if difficulty is not None and not (low <= difficulty <= high):
+            continue
+        # Item vừa làm xong sẽ bị lọc bỏ ở bước sau, mà CBF lại chấm chúng cao
+        # nhất (chúng giống hệt thứ người học vừa tương tác). Không loại ở đây
+        # thì cả hạn ngạch của nguồn này tiêu vào những item chắc chắn bị bỏ.
+        if _item_id(item) in seen:
+            continue
         type_match = not preferred_types or item.get("item_type") in preferred_types
-        subject_match = any(
-            _matches_goal(component_by_id.get(kc_id, {}), [], twin.content_preferences.preferred_subjects)
+        # Chưa khai môn nào thì không ràng buộc môn — giống hệt cách xử lý
+        # `preferred_types` ngay trên. CBF sinh ra để SUY RA sở thích từ hành
+        # vi, nên đòi khai trước mới cho chạy là tự vô hiệu hoá nó.
+        subject_match = not preferred_subjects or any(
+            _matches_goal(component_by_id.get(kc_id, {}), [], preferred_subjects)
             for kc_id in _item_kcs(item)
         )
-        if type_match and subject_match:
-            if profile_vector:
-                # Trọng số 0.75 cho độ tương đồng nội dung, 0.25 cho chất lượng
-                # item — nội dung hợp gu là tiêu chí chính, chất lượng là phụ.
-                similarity = score_item_similarity(profile_vector, item)
-                score = 0.75 * similarity + 0.25 * (_quality(item) or 0.0)
-            else:
-                score = 0.5 + (_quality(item) or 0.0) * 0.25
-            accumulator.add(item, "learner_interest", score)
-            added += 1
-        if added >= per_source_limit:
-            break
+        if not (type_match and subject_match):
+            continue
+        if profile_vector:
+            # Trọng số 0.75 cho độ tương đồng nội dung, 0.25 cho chất lượng
+            # item — nội dung hợp gu là tiêu chí chính, chất lượng là phụ.
+            similarity = score_item_similarity(profile_vector, item)
+            score = 0.75 * similarity + 0.25 * (_quality(item) or 0.0)
+        else:
+            score = 0.5 + (_quality(item) or 0.0) * 0.25
+        scored.append((score, item))
+
+    # Chấm điểm hết rồi mới cắt. Cắt trong lúc duyệt thì item được chọn là item
+    # gặp trước chứ không phải item hợp gu nhất — nghĩa là tính xong độ tương
+    # đồng CBF rồi vứt đi, đúng phần việc mà nguồn này sinh ra để làm.
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    for score, item in scored[:per_source_limit]:
+        accumulator.add(item, "learner_interest", score)
 
 
 def _collect_cluster_match(
@@ -396,8 +426,13 @@ def _collect_cluster_match(
     recent_events: list[dict],
     per_source_limit: int,
 ) -> None:
+    # Dùng chung định nghĩa "item này thuộc cụm nào" với phần ghép CBF×K-Means.
+    # Chỉ đọc `content_cluster_id` thì bỏ sót toàn bộ câu hỏi — loại item chiếm
+    # đa số — vì chúng mang nhãn `question_cluster_id`, và nguồn này im lặng.
+    from app.personalization.services.cbf_kmeans_hybrid_service import _cluster_of
+
     recent_clusters = {
-        pool_by_id[str(event["item_id"])].get("content_cluster_id")
+        _cluster_of(pool_by_id[str(event["item_id"])])
         for event in recent_events
         if event.get("item_id") and str(event["item_id"]) in pool_by_id
     }
@@ -406,7 +441,7 @@ def _collect_cluster_match(
         return
     added = 0
     for item in pool_by_id.values():
-        if item.get("content_cluster_id") in recent_clusters:
+        if _cluster_of(item) in recent_clusters:
             accumulator.add(item, "cluster_match", 0.55 + (_quality(item) or 0.0) * 0.2)
             added += 1
         if added >= per_source_limit:

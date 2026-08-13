@@ -268,12 +268,14 @@ class PersonalizationMongoRepository:
                     "started_at": session.started_at,
                     "schema_version": session.schema_version,
                 },
+                # `schema_version` chỉ nằm ở $setOnInsert: ghi cùng một trường
+                # bằng hai toán tử làm MongoDB thật từ chối cả lệnh
+                # (ConflictingUpdateOperators), và mongomock không bắt được.
                 "$set": {
                     "document_id": session.document_id,
                     "subject": session.subject,
                     "last_activity_at": session.last_activity_at,
                     "metadata": session.metadata,
-                    "schema_version": session.schema_version,
                 },
             },
             upsert=True,
@@ -440,10 +442,34 @@ class PersonalizationMongoRepository:
         return [_with_string_id(item) async for item in cursor]
 
     async def list_knowledge_components_for_user(self, user_id: str, *, limit: int = 500) -> list[dict]:
+        """Thành phần tri thức người này được đọc.
+
+        Của chính mình, cộng thêm những thành phần gắn với học liệu đã ban hành
+        cho mình. Mở learning item mà quên mở phần này thì bộ sinh ứng viên vẫn
+        rỗng: các nguồn theo điểm yếu và theo sở thích đều tra tên môn, tên chủ
+        đề từ đây.
+        """
         user_id = _require_non_empty(user_id, "user_id")
+        clauses: list[dict] = [{"created_by": user_id}]
+
+        item_filter = await self._accessible_item_filter(user_id)
+        if item_filter is not None:
+            component_ids = {
+                str(component_id)
+                async for item in self.db[LEARNING_ITEMS].find(
+                    item_filter, {"knowledge_component_ids": 1}
+                )
+                for component_id in (item.get("knowledge_component_ids") or [])
+            }
+            if component_ids:
+                clauses.append({"_id": {"$in": [
+                    ObjectId(value) if ObjectId.is_valid(value) else value
+                    for value in component_ids
+                ]}})
+
         cursor = (
             self.db[KNOWLEDGE_COMPONENTS]
-            .find({"created_by": user_id, "status": {"$ne": "archived"}})
+            .find({"$or": clauses, "status": {"$ne": "archived"}})
             .sort("updated_at", -1)
             .limit(max(1, min(limit, 1000)))
         )
@@ -472,14 +498,42 @@ class PersonalizationMongoRepository:
         )
         return [_with_string_id(item) async for item in cursor]
 
+    async def _accessible_item_filter(self, user_id: str) -> Optional[dict]:
+        """Học liệu người này được tiếp cận: của chính mình, hoặc đã ban hành cho mình.
+
+        Chỉ tính tài liệu do mình tải lên thì giáo viên dùng được còn học sinh
+        thì không — mà cá nhân hoá sinh ra cho học sinh. Nhánh thứ hai dùng lại
+        đúng luật hiển thị của trang "Bài thi của bạn", tới từng câu chứ không
+        chỉ tới từng bộ đề.
+        """
+        from app.services.question_visibility_service import (
+            list_visible_published_question_indexes,
+        )
+
+        clauses: list[dict] = []
+        document_ids = await self.list_owned_document_ids(user_id)
+        if document_ids:
+            clauses.append({"document_id": {"$in": document_ids}})
+
+        visible = await list_visible_published_question_indexes(self.db, user_id)
+        for question_set_id, indexes in visible.items():
+            clauses.append({
+                "question_set_id": question_set_id,
+                "question_index": {"$in": sorted(indexes)},
+            })
+
+        if not clauses:
+            return None
+        return clauses[0] if len(clauses) == 1 else {"$or": clauses}
+
     async def list_accessible_learning_items_for_user(self, user_id: str, *, limit: int = 500) -> list[dict]:
         user_id = _require_non_empty(user_id, "user_id")
-        document_ids = await self.list_owned_document_ids(user_id)
-        if not document_ids:
+        item_filter = await self._accessible_item_filter(user_id)
+        if item_filter is None:
             return []
         cursor = (
             self.db[LEARNING_ITEMS]
-            .find({"document_id": {"$in": document_ids}})
+            .find(item_filter)
             .sort("updated_at", -1)
             .limit(max(1, min(limit, 1000)))
         )
@@ -495,14 +549,14 @@ class PersonalizationMongoRepository:
         user_id = _require_non_empty(user_id, "user_id")
         if not knowledge_component_ids:
             return []
-        document_ids = await self.list_owned_document_ids(user_id)
-        if not document_ids:
+        item_filter = await self._accessible_item_filter(user_id)
+        if item_filter is None:
             return []
         cursor = (
             self.db[LEARNING_ITEMS]
             .find(
                 {
-                    "document_id": {"$in": document_ids},
+                    **item_filter,
                     "knowledge_component_ids": {"$in": list(dict.fromkeys(knowledge_component_ids))},
                 }
             )
@@ -511,19 +565,63 @@ class PersonalizationMongoRepository:
         )
         return [_with_string_id(item) async for item in cursor]
 
+    async def get_question_texts_by_set(self, question_set_ids: list[str]) -> dict[str, list[str]]:
+        """Nội dung các câu hỏi của từng bộ đề, đọc một lần cho cả lô."""
+        if not question_set_ids:
+            return {}
+        ids: list[Any] = []
+        for value in dict.fromkeys(question_set_ids):
+            ids.append(ObjectId(value) if ObjectId.is_valid(value) else value)
+            ids.append(value)
+        cursor = self.db["question_sets"].find({"_id": {"$in": ids}}, {"questions": 1})
+        return {
+            str(document["_id"]): [
+                str(question.get("question") or "")
+                for question in (document.get("questions") or [])
+            ]
+            async for document in cursor
+        }
+
+    async def get_chunk_texts(self, chunk_ids: list[str]) -> dict[str, str]:
+        """Nội dung các đoạn học liệu, đọc một lần cho cả lô."""
+        if not chunk_ids:
+            return {}
+        ids: list[Any] = []
+        for value in dict.fromkeys(chunk_ids):
+            ids.append(ObjectId(value) if ObjectId.is_valid(value) else value)
+            ids.append(value)
+        cursor = self.db["document_chunks"].find(
+            {"_id": {"$in": ids}}, {"content": 1, "text_preview": 1}
+        )
+        return {
+            str(document["_id"]): str(
+                document.get("content") or document.get("text_preview") or ""
+            )
+            async for document in cursor
+        }
+
     async def get_learning_item_by_id(self, item_id: str) -> Optional[dict]:
         item_id = _require_non_empty(item_id, "item_id")
         return _with_string_id(await self.db[LEARNING_ITEMS].find_one({"_id": item_id}))
 
     async def get_accessible_learning_item_for_user(self, user_id: str, item_id: str) -> Optional[dict]:
+        """Lấy một học liệu, dùng đúng luật của `list_accessible_learning_items_for_user`.
+
+        Hai luật lệch nhau thì gợi ý được xếp hạng xong lại rơi mất ở bước dựng
+        phản hồi: hệ thống đã chọn nội dung cho người học, mà màn hình vẫn rỗng.
+        """
         user_id = _require_non_empty(user_id, "user_id")
         item = await self.get_learning_item_by_id(item_id)
         if not item:
             return None
-        document_id = item.get("document_id")
-        if not document_id or not await self.get_owned_document(str(document_id), user_id):
+        item_filter = await self._accessible_item_filter(user_id)
+        if item_filter is None:
             return None
-        return item
+        found = await self.db[LEARNING_ITEMS].find_one(
+            {"$and": [{"_id": item["_id"] if "_id" in item else item_id}, item_filter]},
+            {"_id": 1},
+        )
+        return item if found else None
 
     async def list_knowledge_components_by_ids_for_user(self, user_id: str, knowledge_component_ids: list[str]) -> list[dict]:
         user_id = _require_non_empty(user_id, "user_id")
@@ -532,8 +630,18 @@ class PersonalizationMongoRepository:
         ids: list[Any] = []
         for value in dict.fromkeys(str(item) for item in knowledge_component_ids):
             ids.append(ObjectId(value) if ObjectId.is_valid(value) else value)
-        cursor = self.db[KNOWLEDGE_COMPONENTS].find({"_id": {"$in": ids}, "created_by": user_id})
-        return [_with_string_id(item) async for item in cursor]
+        # Cùng luật với `list_knowledge_components_for_user`: của mình, hoặc
+        # gắn với học liệu đã ban hành cho mình.
+        visible = {
+            str(component["id"])
+            for component in await self.list_knowledge_components_for_user(user_id, limit=1000)
+        }
+        cursor = self.db[KNOWLEDGE_COMPONENTS].find({"_id": {"$in": ids}})
+        return [
+            _with_string_id(item)
+            async for item in cursor
+            if str(item["_id"]) in visible
+        ]
 
     async def set_learning_item_irt_state(self, item_id: str, irt_state: dict, difficulty: Optional[float] = None) -> None:
         item_id = _require_non_empty(item_id, "item_id")

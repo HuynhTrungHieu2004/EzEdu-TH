@@ -25,6 +25,7 @@ from app.schemas.question import (
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
 from app.services.question_quality_service import analyze_question_set_quality
+from app.services.question_visibility_service import build_visible_question_set_filter
 from app.personalization.services.knowledge_extraction_job import enqueue_knowledge_extraction
 from app.services.export_service import (
     build_export_filename,
@@ -703,28 +704,14 @@ async def get_questions_by_document(
 
 # ─── 4. Published question sets for learners ─────────────────────────────────
 
-async def _student_class_ids(current_user: UserResponse, db) -> list[str]:
-    cursor = db["classes"].find(
-        {"student_ids": current_user.id, "deleted_at": None}, {"_id": 1}
-    )
-    return [str(doc["_id"]) async for doc in cursor]
-
-
 async def _visible_published_filter(current_user: UserResponse, db) -> dict:
-    """Question sets visible to the current student: published to "all", or
-    published to a class the student belongs to. Sets published before this
-    feature existed have no audience_type field and are treated as "all" for
-    backward compatibility."""
-    my_class_ids = await _student_class_ids(current_user, db)
-    return {
-        "deleted_at": None,
-        "published_question_count": {"$gt": 0},
-        "$or": [
-            {"audience_type": "all"},
-            {"audience_type": {"$exists": False}},
-            {"audience_type": "classes", "target_class_ids": {"$in": my_class_ids}},
-        ],
-    }
+    """Bộ đề học sinh này được xem.
+
+    Luật nằm ở `question_visibility_service` vì miền cá nhân hoá cũng cần đúng
+    luật này để biết học sinh tiếp cận được học liệu nào; giữ hai bản sao thì
+    sớm muộn chúng lệch nhau.
+    """
+    return await build_visible_question_set_filter(db, current_user.id)
 
 
 @router.get("/published", response_model=HistoryListResponse)

@@ -7,6 +7,7 @@ from app.personalization.constants.collections import LEARNING_ITEMS, RECOMMENDA
 from app.personalization.repositories.mongo import PersonalizationMongoRepository
 from app.personalization.schemas.candidates import CandidateResponse
 from app.personalization.services.recommendation_ranking_service import (
+    ranker_weights,
     recommend_for_user,
     validate_ranker_weights,
 )
@@ -63,6 +64,17 @@ class RecommendationRankingTests(unittest.IsolatedAsyncioTestCase):
         }
         payload.update(overrides)
         return CandidateResponse(**payload)
+
+    async def test_default_weights_are_valid(self):
+        """Trọng số mặc định phải tự nó hợp lệ — nếu không thì mọi lần xếp hạng
+        thật đều chạy trên một cấu hình mà chính hệ thống từ chối."""
+        validate_ranker_weights(ranker_weights())
+
+    async def test_cluster_match_carries_weight(self):
+        """Nhãn cụm K-Means được tính, được gán, rồi chấm thành `cluster_match`.
+        Để trọng số bằng 0 nghĩa là tính xong rồi vứt: công sức phân cụm không
+        ảnh hưởng gì tới thứ tự người học nhìn thấy."""
+        self.assertGreater(ranker_weights()["cluster_match"], 0)
 
     async def test_ranker_weights_must_sum_to_one(self):
         with self.assertRaises(ValueError):

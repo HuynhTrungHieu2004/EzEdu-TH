@@ -112,6 +112,36 @@ class AnalyzeQuestionSetQualityTests(unittest.TestCase):
         self.assertEqual(len(result["items"]), 2)
         self.assertIsNone(result["clustering"])
 
+    def test_a_single_broken_item_does_not_disable_clustering(self):
+        """Câu hỏng nằm lẻ một mình là chuyện bình thường — và nó chính là thứ
+        cần tìm. Nếu đòi mọi cụm phải có từ hai câu trở lên thì đúng ca đáng
+        quan tâm nhất lại làm cả bước phân cụm bị loại, và giáo viên mất hẳn
+        lớp cảnh báo thứ hai."""
+        # Lấy nguyên từ một bộ đề thật (12 lượt làm, 8 câu). Câu 4 sai đáp án
+        # nên rơi hẳn ra góc (p thấp, phân biệt âm) và là cụm một phần tử ở mọi
+        # k — dữ liệu tự nghĩ ra không tái hiện được tình huống này.
+        lech = [
+            attempt(pattern) for pattern in [
+                [1, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 0],
+                [1, 1, 1, 0, 1, 1, 1, 0], [0, 1, 1, 0, 1, 1, 1, 1],
+                [1, 1, 1, 0, 1, 0, 1, 1], [1, 1, 0, 0, 1, 1, 0, 1],
+                [1, 1, 1, 0, 1, 1, 0, 0], [0, 1, 0, 1, 1, 0, 1, 0],
+                [1, 0, 0, 1, 1, 1, 0, 0], [0, 1, 0, 1, 0, 0, 0, 1],
+                [1, 0, 1, 1, 1, 0, 0, 0], [0, 1, 0, 1, 0, 0, 1, 1],
+            ]
+        ]
+
+        result = analyze_question_set_quality(lech, 8)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertIsNotNone(result["clustering"])
+        broken = result["items"][3]
+        self.assertLess(broken["discrimination"], 0)
+        self.assertIsNotNone(broken["cluster_id"])
+        # Câu lẻ một mình phải bị lớp K-Means gắn cờ. Đo theo khoảng cách tới
+        # tâm cụm không bắt được nó — cụm chỉ có nó nên khoảng cách bằng 0.
+        self.assertIn("cluster_outlier", broken["reasons"])
+
     def test_clustering_failure_still_returns_statistics(self):
         # Mọi câu có thống kê giống hệt nhau -> không tách được cụm hợp lệ.
         identical = [attempt([True, True, True, True]) for _ in range(6)]
