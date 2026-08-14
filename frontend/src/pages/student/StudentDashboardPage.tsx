@@ -20,9 +20,12 @@ import type { LearningHistoryItem, QuestionSetSummary } from '../../api/question
 import CharacterIllustration from '../../components/public/CharacterIllustration';
 import { useAuth } from '../../hooks/useAuth';
 import { toolsForRole } from '../../data/toolRegistry';
+import { AnimatedCounter, StaggerGroup } from '../../motion';
 import '../dashboard.css';
 
 type LoadState = 'loading' | 'ready' | 'error';
+
+const percentFormatter = (value: number) => `${value}%`;
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -101,13 +104,15 @@ export default function StudentDashboardPage() {
         />
       </div>
 
-      <div className="dash-quick-actions" style={{ marginBottom: 'var(--ez-space-8)' }}>
-        {quickActions.map(({ to, label, icon: Icon }) => (
-          <Link key={label} to={to} className="dash-quick-action">
-            <Icon size={18} aria-hidden="true" />
-            <span>{label}</span>
-          </Link>
-        ))}
+      <div style={{ marginBottom: 'var(--ez-space-8)' }}>
+        <StaggerGroup className="dash-quick-actions" selector=".dash-quick-action">
+          {quickActions.map(({ to, label, icon: Icon }) => (
+            <Link key={label} to={to} className="dash-quick-action">
+              <Icon size={18} aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </StaggerGroup>
       </div>
 
       {/* Nhắc thiết lập, nhưng không chặn — học sinh vẫn dùng được mọi thứ */}
@@ -223,19 +228,29 @@ export default function StudentDashboardPage() {
 
       {state === 'ready' && !isNewcomer && (
         <>
-          <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
-            <StatTile label="Bài đã hoàn thành" value={completedCount} />
-            <StatTile label="Bài chưa làm" value={pending.length} />
-            <StatTile
-              label="Điểm trung bình"
-              value={averagePercent === null ? '—' : `${averagePercent}%`}
-              hint={history.length > 0 ? `Từ ${history.length} lượt làm` : undefined}
-            />
-            <StatTile
-              label="Kết quả cao nhất"
-              value={bestPercent === null ? '—' : `${bestPercent}%`}
-            />
-          </StatGrid>
+          <StaggerGroup selector=".ez-stat">
+            <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
+              <StatTile label="Bài đã hoàn thành" value={<AnimatedCounter value={completedCount} />} />
+              <StatTile label="Bài chưa làm" value={<AnimatedCounter value={pending.length} />} />
+              <StatTile
+                label="Điểm trung bình"
+                value={
+                  averagePercent === null
+                    ? '—'
+                    : <AnimatedCounter value={averagePercent} formatter={percentFormatter} />
+                }
+                hint={history.length > 0 ? `Từ ${history.length} lượt làm` : undefined}
+              />
+              <StatTile
+                label="Kết quả cao nhất"
+                value={
+                  bestPercent === null
+                    ? '—'
+                    : <AnimatedCounter value={bestPercent} formatter={percentFormatter} />
+                }
+              />
+            </StatGrid>
+          </StaggerGroup>
 
           <div className="dash-columns">
             <div>

@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 import { AlertCircle, BookOpen, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../../api/chatApi';
+import { useMotion } from '../../motion';
 import type {
   StudyDifficulty,
   StudyExamConfig,
@@ -35,7 +38,8 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [request, setRequest] = useState<StudyExamRequest | null>(initialRequest || null);
   const [error, setError] = useState<string | null>(null);
-  const pollTimerRef = useRef<number | null>(null);
+  const rootRef = useRef<HTMLElement>(null);
+  const { reducedMotion } = useMotion();
 
   const subjectOptions = useMemo(
     () => config.subjects.map((subject) => ({ value: subject.id, label: subject.label })),
@@ -48,13 +52,17 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
   const selectedSubject = config.subjects.find((subject) => subject.id === subjectId);
   const selectedTopic = availableTopics.find((topic) => topic.id === topicId);
   const isProcessing = request?.status === 'pending' || request?.status === 'running';
+  const requestId = request?.id;
+  const requestStatus = request?.status ?? 'configure';
 
+  // Phụ thuộc vào id thay vì cả object: mỗi lần poll cập nhật state, nếu phụ
+  // thuộc object thì interval bị hủy và tạo lại sau từng nhịp.
   useEffect(() => {
-    if (!isProcessing || !request) return undefined;
+    if (!isProcessing || !requestId) return undefined;
 
-    pollTimerRef.current = window.setInterval(async () => {
+    const timer = window.setInterval(async () => {
       try {
-        const updated = await chatApi.getStudyExamRequest(request.id);
+        const updated = await chatApi.getStudyExamRequest(requestId);
         setRequest(updated);
         setError(null);
       } catch {
@@ -62,10 +70,43 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
       }
     }, POLL_INTERVAL_MS);
 
-    return () => {
-      if (pollTimerRef.current !== null) window.clearInterval(pollTimerRef.current);
-    };
-  }, [isProcessing, request]);
+    return () => window.clearInterval(timer);
+  }, [isProcessing, requestId]);
+
+  // Thẻ cấu hình xuất hiện theo timeline: khối thẻ vào trước, các trường chọn
+  // vào sau theo stagger. Reduced motion hiển thị ngay, không đặt transform.
+  useGSAP(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const items = root.querySelectorAll<HTMLElement>('[data-motion-item]');
+
+    if (reducedMotion) {
+      gsap.set([root, ...items], { clearProps: 'all' });
+      return;
+    }
+
+    const timeline = gsap.timeline();
+    timeline.fromTo(
+      root,
+      { autoAlpha: 0, y: 14 },
+      { autoAlpha: 1, y: 0, duration: 0.42, ease: 'power3.out', clearProps: 'transform,opacity,visibility' },
+    );
+    if (items.length > 0) {
+      timeline.fromTo(
+        items,
+        { autoAlpha: 0, y: 10 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.34,
+          stagger: 0.06,
+          ease: 'power2.out',
+          clearProps: 'transform,opacity,visibility',
+        },
+        '-=0.18',
+      );
+    }
+  }, { scope: rootRef, dependencies: [reducedMotion, requestStatus], revertOnUpdate: true });
 
   const handleSubjectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSubjectId(event.target.value);
@@ -98,8 +139,8 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
 
   if (request?.status === 'completed' && request.exam_id) {
     return (
-      <section style={styles.card} aria-live="polite">
-        <div style={styles.headingRow}>
+      <section ref={rootRef} style={styles.card} aria-live="polite" data-study-exam-card>
+        <div style={styles.headingRow} data-motion-item>
           <span style={styles.icon}><BookOpen size={18} /></span>
           <div>
             <strong>Đề ôn tập đã sẵn sàng</strong>
@@ -107,7 +148,7 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
           </div>
         </div>
         {request.shortfall_count > 0 && (
-          <div style={styles.notice}>
+          <div style={styles.notice} data-motion-item>
             Ngân hàng hiện chưa đủ số câu đã chọn. Hệ thống đã tạo đề ngắn hơn với
             {' '}{request.selected_count} câu đã được kiểm tra.
           </div>
@@ -125,8 +166,8 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
   }
 
   return (
-    <section style={styles.card} aria-label="Thiết lập đề ôn tập">
-      <div style={styles.headingRow}>
+    <section ref={rootRef} style={styles.card} aria-label="Thiết lập đề ôn tập" data-study-exam-card>
+      <div style={styles.headingRow} data-motion-item>
         <span style={styles.icon}><BookOpen size={18} /></span>
         <div>
           <strong>Tạo đề ôn tập lớp {config.grade}</strong>
@@ -134,14 +175,16 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
         </div>
       </div>
 
-      {config.suggestion_reason && <div style={styles.suggestion}>{config.suggestion_reason}</div>}
+      {config.suggestion_reason && (
+        <div style={styles.suggestion} data-motion-item>{config.suggestion_reason}</div>
+      )}
 
       <div style={styles.grid}>
-        <label style={styles.field}>
+        <label style={styles.field} data-motion-item>
           <span style={styles.label}>Môn học</span>
           <Select value={subjectId} options={subjectOptions} onChange={handleSubjectChange} />
         </label>
-        <label style={styles.field}>
+        <label style={styles.field} data-motion-item>
           <span style={styles.label}>Chủ đề</span>
           <Select value={topicId} onChange={(event) => setTopicId(event.target.value)}>
             <option value="">Tất cả chủ đề</option>
@@ -150,7 +193,7 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
             ))}
           </Select>
         </label>
-        <label style={styles.field}>
+        <label style={styles.field} data-motion-item>
           <span style={styles.label}>Độ khó</span>
           <Select
             value={difficulty}
@@ -158,7 +201,7 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
             onChange={(event) => setDifficulty(event.target.value as StudyDifficulty)}
           />
         </label>
-        <label style={styles.field}>
+        <label style={styles.field} data-motion-item>
           <span style={styles.label}>Số câu hỏi</span>
           <Select value={String(questionCount)} onChange={(event) => setQuestionCount(Number(event.target.value))}>
             {STUDY_QUESTION_COUNTS.map((count) => (
