@@ -25,7 +25,7 @@ body {
   line-height: var(--ez-leading-body);
   font-weight: var(--ez-weight-regular);
   color: var(--ez-text);
-  background-color: var(--ez-bg);
+  background: var(--ez-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Chặn cuộn ngang toàn trang. Nội dung rộng phải tự cuộn trong khối riêng
@@ -263,15 +263,10 @@ th {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  scroll-behavior: auto !important;
 }
 
 /* ───────────────────────────────────────────────────────────────────────

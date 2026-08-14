@@ -22,6 +22,18 @@
    (xem ghi chú tương phản ở tầng SEMANTIC bên dưới).
    ─────────────────────────────────────────────────────────────────────── */
 :root {
+  /* Academic foundation primitives — giữ các thang legacy bên dưới để các
+     trang chưa di trú tiếp tục hoạt động qua lớp alias. */
+  --ez-ink-950: #0b202b;
+  --ez-ink-900: #123241;
+  --ez-ink-800: #1a4352;
+  --ez-mineral-700: #0f6f68;
+  --ez-mineral-600: #177d73;
+  --ez-mineral-100: #dcefeb;
+  --ez-gold-500: #e5b85b;
+  --ez-paper-50: #f3f7f7;
+  --ez-paper-100: #eaf1f0;
+
   /* Indigo/Violet — primary (MagicSchool #6D5DFB) */
   --ez-indigo-50:  #f1f0ff;
   --ez-indigo-100: #dfdcfe;
@@ -307,11 +319,15 @@
    ─────────────────────────────────────────────────────────────────────── */
 :root {
   --ez-duration-instant: 100ms;
-  --ez-duration-fast:    150ms; /* hover, màu, viền */
-  --ez-duration-base:    200ms; /* mặc định */
-  --ez-duration-slow:    300ms; /* dialog, drawer trượt */
+  --ez-motion-fast: 160ms;
+  --ez-motion-base: 280ms;
+  --ez-motion-slow: 520ms;
+  --ez-duration-fast: var(--ez-motion-fast);
+  --ez-duration-base: var(--ez-motion-base);
+  --ez-duration-slow: var(--ez-motion-slow);
 
-  --ez-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ez-ease-standard: cubic-bezier(.22, 1, .36, 1);
+  --ez-ease-emphasized: cubic-bezier(.16, 1, .3, 1);
   --ez-ease-out:      cubic-bezier(0, 0, 0.2, 1);
   --ez-ease-in:       cubic-bezier(0.4, 0, 1, 1);
 
@@ -337,40 +353,44 @@
    Đây là tầng component được phép dùng. Không dùng trực tiếp primitive.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Nền: trắng phấn ấm (redesign "Bảng đen & Bút đỏ") */
-  --ez-bg:            #faf9f6;
-  --ez-bg-subtle:     var(--ez-neutral-100);
-  --ez-bg-inverse:    var(--ez-neutral-900);
+  --ez-nav-bg:         var(--ez-ink-900);
+  --ez-nav-text:       #dceae8;
+  --ez-nav-text-muted: #9fb7b5;
+
+  /* Nền học thuật */
+  --ez-bg:            var(--ez-paper-50);
+  --ez-bg-subtle:     var(--ez-paper-100);
+  --ez-bg-inverse:    var(--ez-ink-950);
 
   /* Surface */
-  --ez-surface:          var(--ez-neutral-0);
-  --ez-surface-subtle:   var(--ez-neutral-25);
-  --ez-surface-muted:    #eef3ef;
-  --ez-surface-hover:    var(--ez-neutral-100);
-  --ez-surface-active:   var(--ez-neutral-200);
-  --ez-surface-inverse:  var(--ez-neutral-900);
+  --ez-surface:          #ffffff;
+  --ez-surface-subtle:   var(--ez-paper-50);
+  --ez-surface-muted:    var(--ez-paper-100);
+  --ez-surface-hover:    var(--ez-paper-100);
+  --ez-surface-active:   var(--ez-mineral-100);
+  --ez-surface-inverse:  var(--ez-ink-900);
 
   /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên --ez-surface */
-  --ez-text:           #23262b;
-  --ez-text-secondary: var(--ez-neutral-600);
-  --ez-text-muted:     var(--ez-neutral-500);
+  --ez-text:           #122d3a;
+  --ez-text-secondary: var(--ez-ink-800);
+  --ez-text-muted:     #617b82;
   --ez-text-inverse:   var(--ez-neutral-0);
   --ez-text-on-brand:  var(--ez-neutral-0);
-  --ez-text-link:      var(--ez-forest-700);
+  --ez-text-link:      var(--ez-mineral-700);
 
   /* Viền */
-  --ez-border:        var(--ez-neutral-200);
-  --ez-border-subtle: var(--ez-neutral-100);
-  --ez-border-strong: var(--ez-neutral-300);
-  --ez-border-focus:  var(--ez-forest-500);
+  --ez-border:        #dce6e5;
+  --ez-border-subtle: var(--ez-paper-100);
+  --ez-border-strong: #b9cecb;
+  --ez-border-focus:  var(--ez-mineral-600);
 
-  /* Primary — Forest green thay Indigo */
-  --ez-primary:         var(--ez-forest-600);
-  --ez-primary-hover:   var(--ez-forest-700);
-  --ez-primary-active:  var(--ez-forest-800);
-  --ez-primary-subtle:  var(--ez-forest-50);
-  --ez-primary-border:  var(--ez-forest-200);
-  --ez-primary-text:    var(--ez-forest-700);
+  /* Primary — mineral teal */
+  --ez-primary:         var(--ez-mineral-600);
+  --ez-primary-hover:   var(--ez-mineral-700);
+  --ez-primary-active:  var(--ez-mineral-700);
+  --ez-primary-subtle:  var(--ez-mineral-100);
+  --ez-primary-border:  var(--ez-mineral-100);
+  --ez-primary-text:    var(--ez-mineral-700);
 
   /* Secondary */
   --ez-secondary:        var(--ez-sky-500);
@@ -380,9 +400,8 @@
   --ez-secondary-border: var(--ez-sky-200);
   --ez-secondary-text:   var(--ez-sky-700);
 
-  /* Accent — Coral "bút đỏ" thay Amber. Amber vẫn giữ cho --ez-warning
-     (vai trò cảnh báo, không liên quan tới màu nhấn thương hiệu). */
-  --ez-accent:        var(--ez-coral-500);
+  /* Accent — gold */
+  --ez-accent:        var(--ez-gold-500);
   --ez-accent-hover:  var(--ez-coral-600);
   --ez-accent-subtle: var(--ez-coral-50);
   --ez-accent-border: var(--ez-coral-200);
