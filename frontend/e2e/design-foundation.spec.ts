@@ -40,6 +40,14 @@ test('admin navigation toggles every group and reopens the active group after ro
   await expect(contentPanel).toBeHidden();
 
   await page.evaluate(() => {
+    window.history.pushState({ key: 'admin-dashboard-query-e2e' }, '', '/admin/dashboard?tab=content#summary');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  await expect(contentTrigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(contentPanel).toBeHidden();
+
+  await page.evaluate(() => {
     window.history.pushState({ key: 'admin-documents-e2e' }, '', '/admin/documents');
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
@@ -66,7 +74,7 @@ test('admin sidebar keeps focus on the active link after SPA navigation', async 
   await expect(usersLink).toBeFocused();
 });
 
-test('admin navigation opens groups again after returning to a prior pathname', async ({ page }) => {
+test('admin navigation opens groups after fast Back from suspended content navigation', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
   await page.goto('/admin/dashboard');
 
@@ -75,13 +83,32 @@ test('admin navigation opens groups again after returning to a prior pathname', 
   await overviewTrigger.click();
   await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
 
-  await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/documents$/);
-  await page.goBack();
+  let releaseUsersChunk = () => {};
+  const usersChunkReleased = new Promise<void>((resolve) => {
+    releaseUsersChunk = resolve;
+  });
+  let markUsersChunkRequested = () => {};
+  const usersChunkRequested = new Promise<void>((resolve) => {
+    markUsersChunkRequested = resolve;
+  });
+  await page.route('**/src/pages/AdminUsersPage.tsx*', async (route) => {
+    markUsersChunkRequested();
+    await usersChunkReleased;
+    await route.continue();
+  });
 
-  await expect(page).toHaveURL(/\/admin\/dashboard$/);
-  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('#nav-group-admin-overview')).toBeVisible();
+  try {
+    await page.getByRole('link', { name: 'Quản lý người dùng chi tiết' }).click();
+    await expect(page).toHaveURL(/\/admin\/users$/);
+    await usersChunkRequested;
+    await page.goBack();
+
+    await expect(page).toHaveURL(/\/admin\/dashboard$/);
+    await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#nav-group-admin-overview')).toBeVisible();
+  } finally {
+    releaseUsersChunk();
+  }
 });
 
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {
