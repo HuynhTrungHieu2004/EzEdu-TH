@@ -26,7 +26,9 @@ async def start_attempt(exam_id: str, current_user: UserResponse = Depends(requi
 @router.get("/exams/{exam_id}/questions", response_model=ExamPreviewResponse)
 async def get_exam_questions(exam_id: str, current_user: UserResponse = Depends(require_student_actor)):
     db = get_database()
-    return await exam_service.get_exam_questions_for_student(db, exam_id)
+    return await exam_service.get_exam_questions_for_student(
+        db, exam_id, student_id=current_user.id
+    )
 
 
 @router.get("/exam-attempts/{attempt_id}", response_model=AttemptResponse)

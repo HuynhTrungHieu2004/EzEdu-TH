@@ -294,7 +294,9 @@ async def preview_exam(db, exam_id: str, *, actor_id: str, is_admin: bool, hide_
     return ExamPreviewResponse(exam=_to_response(exam_doc), questions=items, hide_answers=hide_answers)
 
 
-async def get_exam_questions_for_student(db, exam_id: str) -> ExamPreviewResponse:
+async def get_exam_questions_for_student(
+    db, exam_id: str, *, student_id: Optional[str] = None
+) -> ExamPreviewResponse:
     """Câu hỏi của đề thi cho học sinh làm bài — LUÔN ẩn đáp án/giải thích
     (khác `preview_exam` dành cho giáo viên, nơi có thể chọn hiện đáp án).
     Chỉ đề đã publish mới xem được."""
@@ -303,6 +305,14 @@ async def get_exam_questions_for_student(db, exam_id: str) -> ExamPreviewRespons
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đề thi.")
     if exam_doc["status"] != "published":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Đề thi chưa được publish.")
+    if (
+        exam_doc.get("purpose") == "student_review"
+        and exam_doc.get("target_student_id") != student_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đề ôn tập này thuộc về học sinh khác.",
+        )
 
     questions_by_id = await _questions_by_id(db, exam_doc["question_ids"])
     option_shuffle = exam_doc.get("option_shuffle", {})

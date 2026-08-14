@@ -102,6 +102,14 @@ async def start_attempt(db, exam_id: str, *, student_id: str) -> AttemptStartRes
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy đề thi.")
     if exam["status"] != "published":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Đề thi chưa được publish.")
+    if (
+        exam.get("purpose") == "student_review"
+        and exam.get("target_student_id") != student_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đề ôn tập này thuộc về học sinh khác.",
+        )
 
     latest = await db[EXAM_ATTEMPTS].find_one(
         {"exam_id": exam_id, "student_id": student_id}, sort=[("attempt_number", -1)]
