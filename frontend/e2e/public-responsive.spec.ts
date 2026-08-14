@@ -11,8 +11,8 @@ const PUBLIC_ROUTES = [
   { path: '/how-it-works', heading: 'Cách EzEdu AI hoạt động' },
   { path: '/features', heading: 'Tính năng chính' },
   { path: '/faq', heading: 'Câu hỏi thường gặp' },
-  { path: '/login', heading: 'Đăng nhập EzEdu AI' },
-  { path: '/register', heading: 'Đăng ký EzEdu AI' },
+  { path: '/login', heading: 'Đăng nhập' },
+  { path: '/register', heading: 'Đăng ký' },
   { path: '/maintenance', heading: 'Hệ thống đang bảo trì' },
   { path: '/duong-dan-khong-ton-tai', heading: 'Không tìm thấy trang này' },
 ];
@@ -35,7 +35,7 @@ test('route bảo vệ chuyển về login và vẫn đúng sau refresh', async 
   await stubApi(page);
   await page.goto('/admin/users');
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole('heading', { name: 'Đăng nhập EzEdu AI' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Đăng nhập', level: 1 })).toBeVisible();
   await page.reload();
   await expect(page).toHaveURL(/\/login$/);
   await expectNoPageOverflow(page);
