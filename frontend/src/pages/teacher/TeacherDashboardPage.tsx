@@ -36,6 +36,7 @@ import type { QuestionSetSummary } from '../../api/questionApi';
 import { classesApi } from '../../api/classesApi';
 import { useAuth } from '../../hooks/useAuth';
 import { toolsForRole } from '../../data/toolRegistry';
+import { AnimatedCounter, StaggerGroup } from '../../motion';
 import '../dashboard.css';
 
 const QUICK_ACTIONS = [
@@ -125,13 +126,15 @@ export default function TeacherDashboardPage() {
         />
       </div>
 
-      <div className="dash-quick-actions" style={{ marginBottom: 'var(--ez-space-8)' }}>
-        {QUICK_ACTIONS.map(({ to, label, icon: Icon }) => (
-          <Link key={to} to={to} className="dash-quick-action">
-            <Icon size={18} aria-hidden="true" />
-            <span>{label}</span>
-          </Link>
-        ))}
+      <div style={{ marginBottom: 'var(--ez-space-8)' }}>
+        <StaggerGroup className="dash-quick-actions" selector=".dash-quick-action">
+          {QUICK_ACTIONS.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} className="dash-quick-action">
+              <Icon size={18} aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </StaggerGroup>
       </div>
 
       {state === 'error' && (
@@ -208,12 +211,17 @@ export default function TeacherDashboardPage() {
 
       {state === 'ready' && !isNewcomer && (
         <>
-          <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
-            <StatTile label="Học liệu" value={documents.length} />
-            <StatTile label="Sẵn sàng dùng" value={readyDocs.length} />
-            <StatTile label="Bộ đề đã tạo" value={questionSets.length} />
-            <StatTile label="Lớp học" value={classCount === null ? '—' : classCount} />
-          </StatGrid>
+          <StaggerGroup selector=".ez-stat">
+            <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
+              <StatTile label="Học liệu" value={<AnimatedCounter value={documents.length} />} />
+              <StatTile label="Sẵn sàng dùng" value={<AnimatedCounter value={readyDocs.length} />} />
+              <StatTile label="Bộ đề đã tạo" value={<AnimatedCounter value={questionSets.length} />} />
+              <StatTile
+                label="Lớp học"
+                value={classCount === null ? '—' : <AnimatedCounter value={classCount} />}
+              />
+            </StatGrid>
+          </StaggerGroup>
 
           <div className="dash-columns">
             <div>
