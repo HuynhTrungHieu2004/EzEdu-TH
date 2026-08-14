@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Ellipsis,
@@ -102,8 +102,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [collapsedNavigation, setCollapsedNavigation] = useState(() => ({
     pathname: location.pathname,
+    routeEpoch: 0,
     groupIds: new Set<string>(),
   }));
+
+  if (collapsedNavigation.pathname !== location.pathname) {
+    setCollapsedNavigation({
+      pathname: location.pathname,
+      routeEpoch: collapsedNavigation.routeEpoch + 1,
+      groupIds: new Set<string>(),
+    });
+  }
 
   const permissions = user?.permissions_override ?? [];
   const pendingBadgeCount = area === 'student' ? pendingExams : 0;
@@ -152,6 +161,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const overflowItems = allItems.slice(4);
 
   const displayName = user?.full_name || 'Người dùng';
+
+  function preparePathnameNavigation(event: MouseEvent<HTMLAnchorElement>, to: string) {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const nextPathname = new URL(to, window.location.href).pathname;
+    if (nextPathname === location.pathname) return;
+
+    setCollapsedNavigation((current) => ({
+      ...current,
+      routeEpoch: current.routeEpoch + 1,
+      groupIds: new Set<string>(),
+    }));
+  }
 
   const userMenu = (
     <>
@@ -207,7 +236,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         to={item.to}
         className={active ? 'ez-nav-item ez-nav-item-active' : 'ez-nav-item'}
         aria-current={active ? 'page' : undefined}
-        onClick={onNavigate}
+        onClick={(event) => {
+          onNavigate?.();
+          preparePathnameNavigation(event, item.to);
+        }}
       >
         <span className="ez-nav-icon" aria-hidden="true">
           {item.icon}
@@ -232,7 +264,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </a>
 
       <aside className="ez-sidebar">
-        <Link to={area === 'admin' ? '/admin/dashboard' : '/dashboard'} className="ez-brand">
+        <Link
+          to={area === 'admin' ? '/admin/dashboard' : '/dashboard'}
+          className="ez-brand"
+          onClick={(event) => preparePathnameNavigation(
+            event,
+            area === 'admin' ? '/admin/dashboard' : '/dashboard',
+          )}
+        >
           <span className="ez-brand-mark" aria-hidden="true" translate="no">
             Ez
           </span>
@@ -263,7 +302,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       : new Set<string>();
                     if (groupIds.has(group.id)) groupIds.delete(group.id);
                     else groupIds.add(group.id);
-                    return { pathname: location.pathname, groupIds };
+                    return {
+                      pathname: location.pathname,
+                      routeEpoch: current.routeEpoch,
+                      groupIds,
+                    };
                   });
                 }}
                 renderNavLink={renderNavLink}
@@ -329,6 +372,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   to={item.to}
                   className={active ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
                   aria-current={active ? 'page' : undefined}
+                  onClick={(event) => preparePathnameNavigation(event, item.to)}
                 >
                   <span className="ez-tab-icon" aria-hidden="true">
                     {item.icon}

@@ -66,6 +66,24 @@ test('admin sidebar keeps focus on the active link after SPA navigation', async 
   await expect(usersLink).toBeFocused();
 });
 
+test('admin navigation opens groups again after returning to a prior pathname', async ({ page }) => {
+  await stubApi(page, ADMIN_USER);
+  await page.goto('/admin/dashboard');
+
+  const sidebar = page.locator('nav.ez-sidebar-nav');
+  const overviewTrigger = sidebar.getByRole('button', { name: 'Tổng quan' });
+  await overviewTrigger.click();
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
+
+  await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/documents$/);
+  await page.goBack();
+
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#nav-group-admin-overview')).toBeVisible();
+});
+
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
