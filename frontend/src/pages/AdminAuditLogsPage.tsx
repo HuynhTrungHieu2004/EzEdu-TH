@@ -212,8 +212,9 @@ export default function AdminAuditLogsPage() {
           <StatTile label="Tổng bản ghi" value={fmtNumber(stats.total)} />
           <StatTile label="Thành công" value={fmtNumber(stats.success_count)} />
           <StatTile label="Thất bại" value={fmtNumber(stats.failure_count)} />
-          <StatTile label="Loại hành động" value={fmtNumber(Object.keys(stats.by_action).length)} />
-          <StatTile label="Loại đối tượng" value={fmtNumber(Object.keys(stats.by_target_type).length)} />
+          {/* `?? {}`: backend trả thiếu field thì trang vẫn đọc được, không trắng màn hình */}
+          <StatTile label="Loại hành động" value={fmtNumber(Object.keys(stats.by_action ?? {}).length)} />
+          <StatTile label="Loại đối tượng" value={fmtNumber(Object.keys(stats.by_target_type ?? {}).length)} />
         </StatGrid>
       )}
 

@@ -348,7 +348,7 @@ export default function AdminAIPage() {
           <p className="ez-muted">Áp dụng ngay không cần khởi động lại server, ghi đè lên giá trị mặc định trong code.</p>
           {roleDefaultsError && <p className="ez-muted">{roleDefaultsError}</p>}
           <div className="ez-grid ez-grid-3">
-            {Object.keys(roleDefaults).sort().map((role) => (
+            {Object.keys(roleDefaults ?? {}).sort().map((role) => (
               <Card key={role} variant="muted">
                 <CardHeader><CardTitle as="h3">{role}</CardTitle></CardHeader>
                 <CardBody>
