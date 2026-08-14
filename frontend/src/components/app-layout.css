@@ -399,6 +399,16 @@
     min-width: var(--ez-touch-min);
     min-height: var(--ez-touch-min);
   }
+
+  .ez-shell-account-menu .ez-dropdown-item {
+    min-height: var(--ez-touch-min);
+  }
+
+  .ez-more-drawer .ez-btn-icon {
+    width: var(--ez-touch-min);
+    min-width: var(--ez-touch-min);
+    min-height: var(--ez-touch-min);
+  }
 }
 
 @media (max-width: 639px) {

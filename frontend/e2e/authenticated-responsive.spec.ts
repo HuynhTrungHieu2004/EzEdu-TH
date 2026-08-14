@@ -118,20 +118,51 @@ test('AppShell giữ khoảng cách nhóm và touch target ở breakpoint mobile
   await expect(navigationPanel).toHaveCSS('display', 'flex');
   await expect(navigationPanel).toHaveCSS('gap', '2px');
 
-  await page.setViewportSize({ width: 1023, height: 768 });
-  await expect(page.locator('.ez-sidebar')).toBeHidden();
-  await expect(page.locator('.ez-topbar')).toBeVisible();
-  await expect(page.locator('.ez-tabbar')).toBeVisible();
+  const undersizedTargets: Array<{ viewport: number; control: string; width: number; height: number }> = [];
+  for (const viewport of [1023, 390]) {
+    await page.setViewportSize({ width: viewport, height: viewport === 390 ? 844 : 768 });
+    await expect(page.locator('.ez-sidebar')).toBeHidden();
+    await expect(page.locator('.ez-topbar')).toBeVisible();
+    await expect(page.locator('.ez-tabbar')).toBeVisible();
 
-  const touchTargets = await page.locator('.ez-topbar button, .ez-tab-item').evaluateAll((items) =>
-    items.map((item) => {
-      const rect = item.getBoundingClientRect();
-      return { width: rect.width, height: rect.height };
-    }),
-  );
-  expect(touchTargets.length).toBeGreaterThan(0);
-  expect(touchTargets.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
-  await expectNoPageOverflow(page);
+    const accountTrigger = page.getByRole('button', { name: 'Mở menu tài khoản' });
+    await accountTrigger.click();
+    const accountMenu = page.getByRole('menu', { name: 'Tài khoản và cài đặt' });
+    await expect(accountMenu).toBeVisible();
+    const accountSizes = await accountMenu.getByRole('menuitem').evaluateAll((items) =>
+      items.map((item) => {
+        const rect = item.getBoundingClientRect();
+        return { control: item.textContent?.trim() || 'account item', width: rect.width, height: rect.height };
+      }),
+    );
+    await page.keyboard.press('Escape');
+
+    const moreButton = page.locator('.ez-tabbar').getByRole('button', { name: 'Thêm' });
+    await moreButton.click();
+    const moreDrawer = page.getByRole('dialog', { name: 'Thêm' });
+    await expect(moreDrawer).toBeVisible();
+    const drawerSizes = await moreDrawer.locator('button, a[href]').evaluateAll((items) =>
+      items.map((item) => {
+        const rect = item.getBoundingClientRect();
+        return {
+          control: item.getAttribute('aria-label') || item.textContent?.trim() || 'drawer control',
+          width: rect.width,
+          height: rect.height,
+        };
+      }),
+    );
+    await moreDrawer.getByRole('button', { name: 'Đóng' }).click();
+
+    for (const target of [...accountSizes, ...drawerSizes]) {
+      const measurementTolerance = 0.001;
+      if (target.width < 44 - measurementTolerance || target.height < 44 - measurementTolerance) {
+        undersizedTargets.push({ viewport, ...target });
+      }
+    }
+    await expectNoPageOverflow(page);
+  }
+
+  expect(undersizedTargets, JSON.stringify(undersizedTargets, null, 2)).toEqual([]);
 });
 
 for (const path of STUDENT_ROUTES) {

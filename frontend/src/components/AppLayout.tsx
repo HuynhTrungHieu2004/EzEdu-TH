@@ -152,6 +152,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
   const overflowItems = allItems.slice(4);
+  const overflowActiveItem = overflowItems.find((item) => isActive(item.to));
+  const overflowActive = Boolean(overflowActiveItem);
 
   const displayName = user?.full_name || 'Người dùng';
 
@@ -283,6 +285,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             align="start"
             direction="up"
             menuLabel="Tài khoản và cài đặt"
+            className="ez-shell-account-menu"
             trigger={
               <button type="button" className="ez-user-chip">
                 <span className="ez-avatar" aria-hidden="true">
@@ -307,6 +310,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <span className="ez-topbar-title">{activeItem?.label ?? 'EzEdu AI'}</span>
           <Dropdown
             menuLabel="Tài khoản và cài đặt"
+            className="ez-shell-account-menu"
             trigger={
               <Button variant="ghost" size="sm" iconOnly aria-label="Mở menu tài khoản">
                 <span className="ez-avatar ez-avatar-sm" aria-hidden="true">
@@ -359,14 +363,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {overflowItems.length > 0 ? (
               <button
                 type="button"
-                className="ez-tab-item"
+                className={overflowActive ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
                 onClick={() => setMoreOpen(true)}
                 aria-expanded={moreOpen}
+                aria-current={overflowActive ? 'page' : undefined}
               >
+                {overflowActive ? (
+                  <span
+                    className="ez-nav-active-indicator ez-tab-active-indicator"
+                    data-active-indicator
+                    aria-hidden="true"
+                  />
+                ) : null}
                 <span className="ez-tab-icon" aria-hidden="true">
                   <Ellipsis size={ICON} />
                 </span>
                 <span className="ez-tab-label">Thêm</span>
+                {overflowActiveItem ? (
+                  <span className="ez-sr-only">Đang xem {overflowActiveItem.label}</span>
+                ) : null}
               </button>
             ) : null}
           </nav>
@@ -378,6 +393,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         onClose={() => setMoreOpen(false)}
         side="bottom"
         title="Thêm"
+        className="ez-more-drawer"
       >
         <div className="ez-nav-group">
           {overflowItems.map((item) => renderNavLink(item, () => setMoreOpen(false)))}

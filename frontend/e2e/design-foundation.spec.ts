@@ -52,6 +52,29 @@ test('active navigation không chỉ dựa vào màu', async ({ page }) => {
   await expect(active.locator('[data-active-indicator]')).toBeVisible();
 });
 
+for (const { user, path, label } of [
+  { user: TEACHER_USER, path: '/question-history', label: 'Đề & câu hỏi' },
+  { user: ADMIN_USER, path: '/admin/settings', label: 'Cấu hình' },
+]) {
+  test(`mobile overflow navigation phản ánh route ${path} đang mở`, async ({ page }) => {
+    await stubApi(page, user);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(path);
+
+    const tabbar = page.locator('.ez-tabbar');
+    const moreButton = tabbar.getByRole('button', { name: /Thêm/ });
+    await expect(moreButton).toHaveAttribute('aria-current', 'page');
+    await expect(moreButton).toContainText(`Đang xem ${label}`);
+    await expect(moreButton.locator('[data-active-indicator]')).toBeVisible();
+
+    await moreButton.click();
+    const drawer = page.getByRole('dialog', { name: 'Thêm' });
+    const activeOverflowLink = drawer.getByRole('link', { name: label, exact: true });
+    await expect(activeOverflowLink).toHaveAttribute('aria-current', 'page');
+    await expect(activeOverflowLink.locator('[data-active-indicator]')).toBeVisible();
+  });
+}
+
 test('admin navigation toggles every group and reopens the active group after routing', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
   await page.setViewportSize({ width: 1440, height: 900 });
