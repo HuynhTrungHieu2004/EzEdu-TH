@@ -196,6 +196,14 @@ async def ask_advanced_question_api(
     Advanced learning Q&A with document RAG context and Internet Search Grounding.
     """
     await require_feature_enabled_flag("enable_advanced_chat", user_role=current_user.role, user_id=current_user.id)
+    if current_user.role == "student":
+        from app.exam_bank.services.study_chat_service import create_study_exam_chat_response
+
+        structured_response = await create_study_exam_chat_response(
+            get_database(), user_id=current_user.id, payload=payload
+        )
+        if structured_response is not None:
+            return AdvancedChatResponse(**structured_response)
     if payload.use_web_search:
         await require_feature_enabled_flag("enable_web_search", user_role=current_user.role, user_id=current_user.id)
     await enforce_ai_quota(

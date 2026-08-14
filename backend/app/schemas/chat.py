@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field
 from app.schemas.feedback import FeedbackResponse
@@ -67,7 +67,7 @@ class AdvancedChatResponse(BaseModel):
     examples: Optional[List[str]] = None
     internal_citations: List[SourceChunkResponse]
     web_citations: List[WebCitation]
-    retrieval_mode: Literal["internal_only", "web_only", "hybrid", "model_knowledge", "clarification_required"]
+    retrieval_mode: Literal["internal_only", "web_only", "hybrid", "model_knowledge", "clarification_required", "study_exam"]
     evidence_status: Literal["well_supported", "partially_supported", "insufficient_evidence", "conflicting_sources", "unverified"]
     confidence: float
     external_search_status: str
@@ -75,6 +75,9 @@ class AdvancedChatResponse(BaseModel):
     message_id: str
     model_name: str
     follow_up_suggestions: List[str]
+    message_kind: Literal["answer", "study_exam_config"] = "answer"
+    study_exam_config: Optional[dict[str, Any]] = None
+    study_exam_request: Optional[dict[str, Any]] = None
 
 
 import re
@@ -137,11 +140,12 @@ class MessageResponse(BaseModel):
     status: str
     created_at: datetime
     user_feedback: Optional[FeedbackResponse] = None
+    message_kind: Literal["answer", "study_exam_config"] = "answer"
+    study_exam_config: Optional[dict[str, Any]] = None
+    study_exam_request: Optional[dict[str, Any]] = None
 
 
 class ConversationMessagesListResponse(BaseModel):
     messages: List[MessageResponse]
     next_cursor: Optional[str] = None
     has_more: bool = False
-
-

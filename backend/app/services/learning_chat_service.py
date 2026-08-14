@@ -1021,6 +1021,9 @@ async def get_conversation_history(
             "confidence": m.get("confidence"),
             "internal_citations": m.get("internal_citations", []),
             "web_citations": m.get("web_citations", []),
+            "message_kind": m.get("message_kind", "answer"),
+            "study_exam_config": m.get("study_exam_config"),
+            "study_exam_request": m.get("study_exam_request"),
             "status": m.get("status", "completed"),
             "created_at": m["created_at"]
         })
