@@ -33,13 +33,14 @@ interface AppLayoutProps {
 
 interface SidebarNavigationGroupProps {
   group: NavGroup;
+  isOpen: boolean;
+  onToggle: () => void;
   renderNavLink: (item: NavItem) => ReactNode;
 }
 
 const ICON = 18;
 
-function SidebarNavigationGroup({ group, renderNavLink }: SidebarNavigationGroupProps) {
-  const [isOpen, setIsOpen] = useState(true);
+function SidebarNavigationGroup({ group, isOpen, onToggle, renderNavLink }: SidebarNavigationGroupProps) {
   const panelId = `nav-group-${group.id}`;
 
   return (
@@ -50,7 +51,7 @@ function SidebarNavigationGroup({ group, renderNavLink }: SidebarNavigationGroup
           className="ez-nav-group-label"
           aria-expanded={isOpen}
           aria-controls={panelId}
-          onClick={() => setIsOpen((open) => !open)}
+          onClick={onToggle}
         >
           {group.label ?? group.id}
         </button>
@@ -99,6 +100,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { preference, setPreference } = useTheme();
   const [pendingExams, setPendingExams] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [collapsedNavigation, setCollapsedNavigation] = useState(() => ({
+    pathname: location.pathname,
+    groupIds: new Set<string>(),
+  }));
 
   const permissions = user?.permissions_override ?? [];
   const pendingBadgeCount = area === 'student' ? pendingExams : 0;
@@ -138,6 +143,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
     : [];
   const allItems = groups.flatMap((g) => g.items);
   const activeItem = allItems.find((item) => isActive(item.to));
+  const collapsedGroupIds = collapsedNavigation.pathname === location.pathname
+    ? collapsedNavigation.groupIds
+    : new Set<string>();
 
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
@@ -245,8 +253,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
           ) : (
             groups.map((group) => (
               <SidebarNavigationGroup
-                key={`${location.key}-${group.id}`}
+                key={group.id}
                 group={group}
+                isOpen={!group.collapsible || !collapsedGroupIds.has(group.id)}
+                onToggle={() => {
+                  setCollapsedNavigation((current) => {
+                    const groupIds = current.pathname === location.pathname
+                      ? new Set(current.groupIds)
+                      : new Set<string>();
+                    if (groupIds.has(group.id)) groupIds.delete(group.id);
+                    else groupIds.add(group.id);
+                    return { pathname: location.pathname, groupIds };
+                  });
+                }}
                 renderNavLink={renderNavLink}
               />
             ))

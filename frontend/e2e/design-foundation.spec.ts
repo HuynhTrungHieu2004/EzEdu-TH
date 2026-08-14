@@ -51,6 +51,21 @@ test('admin navigation toggles every group and reopens the active group after ro
   await expect(contentPanel).toBeHidden();
 });
 
+test('admin sidebar keeps focus on the active link after SPA navigation', async ({ page }) => {
+  await stubApi(page, ADMIN_USER);
+  await page.goto('/admin/dashboard');
+
+  const sidebar = page.locator('nav.ez-sidebar-nav');
+  const usersLink = sidebar.getByRole('link', { name: 'Người dùng', exact: true });
+  await usersLink.focus();
+  await expect(usersLink).toBeFocused();
+
+  await usersLink.click();
+
+  await expect(usersLink).toHaveAttribute('aria-current', 'page');
+  await expect(usersLink).toBeFocused();
+});
+
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
