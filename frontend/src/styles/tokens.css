@@ -133,6 +133,9 @@
   --ez-green-500: #19cc5b;
   --ez-green-600: #16a34a;
   --ez-green-700: #10843b;
+  /* Bậc 800 cho chữ trên nền success nhạt: bậc 700 chỉ đạt 4.38:1 trên
+     --ez-green-50 và 4.44:1 trên --ez-bg, chưa đủ AA. Bậc này đạt 5.39:1/5.46:1. */
+  --ez-green-800: #0d7434;
 
   --ez-red-50:  #fdecec;
   --ez-red-100: #fad1d1;
@@ -375,10 +378,13 @@
   --ez-surface-active:   var(--ez-mineral-100);
   --ez-surface-inverse:  var(--ez-ink-900);
 
-  /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên --ez-surface */
+  /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên cả --ez-surface (#fff) lẫn
+     --ez-bg (#f3f7f7). `--ez-text-muted` từng là #617b82: đạt 4.5:1 trên trắng
+     nhưng chỉ 4.17:1 trên nền trang, nên eyebrow/caption đặt trực tiếp trên nền
+     trang bị axe báo lỗi. #5a747b đạt 4.61:1 trên nền trang và 4.98:1 trên trắng. */
   --ez-text:           #122d3a;
   --ez-text-secondary: var(--ez-ink-800);
-  --ez-text-muted:     #617b82;
+  --ez-text-muted:     #5a747b;
   --ez-text-inverse:   var(--ez-neutral-0);
   --ez-text-on-brand:  var(--ez-neutral-0);
   --ez-text-link:      var(--ez-mineral-700);
@@ -416,7 +422,7 @@
   --ez-success:        var(--ez-green-600);
   --ez-success-subtle: var(--ez-green-50);
   --ez-success-border: var(--ez-green-100);
-  --ez-success-text:   var(--ez-green-700);
+  --ez-success-text:   var(--ez-green-800);
 
   --ez-warning:        var(--ez-amber-600);
   --ez-warning-subtle: var(--ez-amber-50);
