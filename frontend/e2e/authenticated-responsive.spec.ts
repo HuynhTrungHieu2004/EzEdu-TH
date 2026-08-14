@@ -109,6 +109,31 @@ const STUDENT_USER = {
   student_profile_completed: true,
 };
 
+test('AppShell giữ khoảng cách nhóm và touch target ở breakpoint mobile', async ({ page }) => {
+  await stubApi(page, TEACHER_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/dashboard');
+
+  const navigationPanel = page.locator('.ez-sidebar-nav .ez-nav-group-panel').first();
+  await expect(navigationPanel).toHaveCSS('display', 'flex');
+  await expect(navigationPanel).toHaveCSS('gap', '2px');
+
+  await page.setViewportSize({ width: 1023, height: 768 });
+  await expect(page.locator('.ez-sidebar')).toBeHidden();
+  await expect(page.locator('.ez-topbar')).toBeVisible();
+  await expect(page.locator('.ez-tabbar')).toBeVisible();
+
+  const touchTargets = await page.locator('.ez-topbar button, .ez-tab-item').evaluateAll((items) =>
+    items.map((item) => {
+      const rect = item.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+  );
+  expect(touchTargets.length).toBeGreaterThan(0);
+  expect(touchTargets.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
+  await expectNoPageOverflow(page);
+});
+
 for (const path of STUDENT_ROUTES) {
   test(`Student ${path} render state an toàn và không tràn trang`, async ({ page }) => {
     const browserErrors = captureBrowserErrors(page);

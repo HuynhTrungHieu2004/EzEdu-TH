@@ -57,7 +57,7 @@ function SidebarNavigationGroup({ group, isOpen, onToggle, renderNavLink }: Side
           {group.label ?? group.id}
         </button>
       ) : group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
-      <div id={panelId} hidden={!isOpen}>
+      <div id={panelId} className="ez-nav-group-panel" hidden={!isOpen}>
         {group.items.map((item) => renderNavLink(item))}
       </div>
     </div>
@@ -211,6 +211,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         aria-current={active ? 'page' : undefined}
         onClick={onNavigate}
       >
+        {active ? <span className="ez-nav-active-indicator" data-active-indicator aria-hidden="true" /> : null}
         <span className="ez-nav-icon" aria-hidden="true">
           {item.icon}
         </span>
@@ -228,7 +229,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="ez-shell">
+    <div className="ez-shell" data-app-shell data-role-area={area}>
       <a className="ez-skip-link" href="#main">
         Bỏ qua tới nội dung chính
       </a>
@@ -335,6 +336,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   className={active ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
                   aria-current={active ? 'page' : undefined}
                 >
+                  {active ? (
+                    <span
+                      className="ez-nav-active-indicator ez-tab-active-indicator"
+                      data-active-indicator
+                      aria-hidden="true"
+                    />
+                  ) : null}
                   <span className="ez-tab-icon" aria-hidden="true">
                     {item.icon}
                   </span>

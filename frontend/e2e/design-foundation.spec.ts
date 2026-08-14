@@ -12,6 +12,7 @@ test('student shell chỉ hiện hành trình học sinh', async ({ page }) => {
 
 test('teacher shell hiện nhóm nghiệp vụ giáo viên', async ({ page }) => {
   await stubApi(page, TEACHER_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/dashboard');
 
   const navigation = page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -19,8 +20,41 @@ test('teacher shell hiện nhóm nghiệp vụ giáo viên', async ({ page }) =>
   await expect(navigation.getByRole('link', { name: 'Ma trận đề', exact: true })).toBeVisible();
 });
 
+test('desktop dùng navy sidebar và mobile dùng bottom navigation', async ({ page }) => {
+  await stubApi(page, TEACHER_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/dashboard');
+
+  const shell = page.locator('[data-app-shell]');
+  await expect(shell).toHaveAttribute('data-role-area', 'teacher');
+  await expect(page.locator('.ez-sidebar')).toBeVisible();
+  await expect(page.locator('.ez-tabbar')).toBeHidden();
+  await expect(page.locator('.ez-sidebar')).toHaveCSS('width', '272px');
+  await expect(page.locator('.ez-sidebar')).toHaveCSS('background-color', 'rgb(18, 50, 65)');
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(page.locator('.ez-sidebar')).toBeVisible();
+  await expect(page.locator('.ez-topbar')).toBeHidden();
+  await expect(page.locator('.ez-tabbar')).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.ez-sidebar')).toBeHidden();
+  await expect(page.locator('.ez-topbar')).toBeVisible();
+  await expect(page.locator('.ez-tabbar')).toBeVisible();
+});
+
+test('active navigation không chỉ dựa vào màu', async ({ page }) => {
+  await stubApi(page, TEACHER_USER);
+  await page.goto('/documents');
+
+  const active = page.getByRole('link', { name: 'Học liệu', exact: true }).first();
+  await expect(active).toHaveAttribute('aria-current', 'page');
+  await expect(active.locator('[data-active-indicator]')).toBeVisible();
+});
+
 test('admin navigation toggles every group and reopens the active group after routing', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/admin/dashboard');
 
   const overviewTrigger = page.getByRole('button', { name: 'Tổng quan' });
@@ -61,6 +95,7 @@ test('admin navigation toggles every group and reopens the active group after ro
 
 test('admin sidebar keeps focus on the active link after SPA navigation', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/admin/dashboard');
 
   const sidebar = page.locator('nav.ez-sidebar-nav');
@@ -76,6 +111,7 @@ test('admin sidebar keeps focus on the active link after SPA navigation', async 
 
 test('admin navigation opens groups after fast Back from suspended content navigation', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/admin/dashboard');
 
   const sidebar = page.locator('nav.ez-sidebar-nav');

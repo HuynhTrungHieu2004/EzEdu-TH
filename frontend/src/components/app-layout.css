@@ -6,6 +6,7 @@
 .ez-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--ez-bg);
   /* `#root` là flex row: khung phải tự khai báo chiều rộng, nếu không nó co lại
      theo nội dung và để hở dải trắng bên phải trên màn hình rộng. */
@@ -18,6 +19,8 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
   /* min-width: 0 để nội dung rộng (bảng, khối code) không đẩy shell rộng ra */
   min-width: 0;
 }
@@ -25,9 +28,9 @@
 .ez-main {
   flex: 1;
   width: 100%;
-  max-width: var(--ez-container-lg);
+  max-width: 1560px;
   margin-inline: auto;
-  padding: var(--ez-space-8) var(--ez-space-6);
+  padding: 32px clamp(20px, 3vw, 48px);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -37,14 +40,16 @@
   display: none;
   flex-direction: column;
   flex: none;
-  width: 260px;
+  width: 272px;
   height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
   z-index: var(--ez-z-sidebar);
-  padding: var(--ez-space-4) var(--ez-space-3);
-  background-color: var(--ez-surface);
-  border-right: 1px solid var(--ez-border);
+  padding: 20px 16px 16px;
+  background-color: var(--ez-nav-bg);
+  color: var(--ez-nav-text);
+  border-right: 0;
 }
 
 @media (min-width: 1024px) {
@@ -56,19 +61,21 @@
   display: flex;
   align-items: center;
   gap: var(--ez-space-3);
-  padding: var(--ez-space-2);
-  margin-bottom: var(--ez-space-4);
+  min-height: 48px;
+  padding: 6px 8px;
+  margin-bottom: var(--ez-space-6);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-text);
+  color: var(--ez-nav-text);
   transition: var(--ez-transition-colors);
 }
 
 .ez-brand:hover {
-  background-color: var(--ez-surface-hover);
+  background-color: rgb(255 255 255 / 8%);
   text-decoration: none;
 }
 
 .ez-brand-mark {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
@@ -76,11 +83,21 @@
   width: 32px;
   height: 32px;
   border-radius: var(--ez-radius-sm);
-  background: var(--ez-gradient-cta);
+  background: var(--ez-primary);
   color: var(--ez-text-on-brand);
   font-size: var(--ez-text-body-sm);
   font-weight: var(--ez-weight-bold);
   letter-spacing: var(--ez-tracking-tight);
+}
+
+.ez-brand-mark::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  background: var(--ez-accent);
 }
 
 .ez-brand-text {
@@ -100,7 +117,7 @@
 .ez-brand-area {
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-semibold);
-  color: var(--ez-text-muted);
+  color: var(--ez-nav-text-muted);
   text-transform: uppercase;
   letter-spacing: var(--ez-tracking-caps);
   line-height: 1.3;
@@ -115,6 +132,7 @@
   min-height: 0;
   overflow-y: auto;
   padding-bottom: var(--ez-space-4);
+  scrollbar-color: rgb(220 234 232 / 28%) transparent;
 }
 
 .ez-nav-group {
@@ -123,13 +141,24 @@
   gap: 2px;
 }
 
+.ez-nav-group-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ez-nav-group-panel[hidden] {
+  display: none;
+}
+
 .ez-nav-group-label {
   padding: var(--ez-space-2) var(--ez-space-3) var(--ez-space-1);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-semibold);
-  color: var(--ez-text-muted);
+  color: var(--ez-nav-text-muted);
   text-transform: uppercase;
   letter-spacing: var(--ez-tracking-caps);
+  text-align: left;
 }
 
 .ez-nav-item {
@@ -137,43 +166,42 @@
   display: flex;
   align-items: center;
   gap: var(--ez-space-3);
-  min-height: var(--ez-control-md);
+  min-height: 44px;
   padding: var(--ez-space-2) var(--ez-space-3);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-text-secondary);
+  color: var(--ez-nav-text-muted);
   font-size: var(--ez-text-body-sm);
   font-weight: var(--ez-weight-medium);
   transition: var(--ez-transition-colors);
 }
 
 .ez-nav-item:hover {
-  background-color: var(--ez-surface-hover);
-  color: var(--ez-text);
+  background-color: rgb(255 255 255 / 8%);
+  color: var(--ez-nav-text);
   text-decoration: none;
 }
 
 /* Trạng thái đang xem: không chỉ dựa vào màu — có thêm thanh dọc bên trái */
 .ez-nav-item-active {
-  background-color: var(--ez-primary-subtle);
-  color: var(--ez-primary-text);
+  background-color: rgb(23 125 115 / 42%);
+  color: #fff;
   font-weight: var(--ez-weight-semibold);
 }
 
-.ez-nav-item-active::before {
-  content: '';
+.ez-nav-active-indicator {
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 5px;
+  width: 3px;
   height: 24px;
-  clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+  border-radius: 0 2px 2px 0;
   background-color: var(--ez-accent);
 }
 
 .ez-nav-item-active:hover {
-  background-color: var(--ez-primary-subtle);
-  color: var(--ez-primary-text);
+  background-color: rgb(23 125 115 / 52%);
+  color: #fff;
 }
 
 .ez-nav-icon {
@@ -197,7 +225,7 @@
 .ez-sidebar-footer {
   flex: none;
   padding-top: var(--ez-space-3);
-  border-top: 1px solid var(--ez-border-subtle);
+  border-top: 1px solid rgb(220 234 232 / 16%);
 }
 
 .ez-user-chip {
@@ -208,12 +236,12 @@
   min-height: var(--ez-control-lg);
   padding: var(--ez-space-2);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-text);
+  color: var(--ez-nav-text);
   text-align: left;
   transition: var(--ez-transition-colors);
 }
 
-.ez-user-chip:hover { background-color: var(--ez-surface-hover); }
+.ez-user-chip:hover { background-color: rgb(255 255 255 / 8%); }
 
 .ez-avatar {
   display: flex;
@@ -223,8 +251,8 @@
   width: 32px;
   height: 32px;
   border-radius: var(--ez-radius-full);
-  background-color: var(--ez-secondary-subtle);
-  color: var(--ez-secondary-text);
+  background-color: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-bold);
 }
@@ -249,7 +277,7 @@
 
 .ez-user-role {
   font-size: var(--ez-text-caption);
-  color: var(--ez-text-muted);
+  color: var(--ez-nav-text-muted);
   line-height: 1.3;
 }
 
@@ -264,8 +292,8 @@
   position: sticky;
   top: 0;
   z-index: var(--ez-z-sticky);
-  min-height: 56px;
-  padding: var(--ez-space-2) var(--ez-space-4);
+  min-height: 64px;
+  padding: var(--ez-space-2) clamp(16px, 3vw, 24px);
   background-color: var(--ez-surface);
   border-bottom: 1px solid var(--ez-border);
 }
@@ -295,6 +323,7 @@
   border-top: 1px solid var(--ez-border);
   /* Chừa vùng an toàn dưới màn hình iPhone */
   padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -8px 24px rgb(18 50 65 / 7%);
 }
 
 @media (min-width: 1024px) {
@@ -310,7 +339,8 @@
   justify-content: center;
   gap: 2px;
   /* Touch target tối thiểu 44px */
-  min-height: 56px;
+  min-width: var(--ez-touch-min);
+  min-height: 60px;
   padding: var(--ez-space-1) var(--ez-space-1);
   color: var(--ez-text-muted);
   font-size: 11px;
@@ -327,8 +357,7 @@
 }
 
 /* Chỉ báo hình dạng cho tab đang mở, không chỉ dựa vào màu */
-.ez-tab-item-active::before {
-  content: '';
+.ez-tab-active-indicator {
   position: absolute;
   top: 0;
   left: 50%;
@@ -336,7 +365,7 @@
   width: 24px;
   height: 3px;
   border-radius: 0 0 var(--ez-radius-full) var(--ez-radius-full);
-  background-color: var(--ez-primary);
+  background-color: var(--ez-accent);
 }
 
 .ez-tab-icon { display: flex; }
@@ -362,12 +391,18 @@
 /* ───────────────────────────────────────────────────────────────────────
    Nội dung chính co lại trên màn hình nhỏ
    ─────────────────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .ez-main { padding: var(--ez-space-5) var(--ez-space-4); }
+@media (max-width: 1023px) {
+  .ez-main { padding: 28px clamp(16px, 4vw, 32px); }
+
+  .ez-topbar .ez-btn-icon {
+    width: var(--ez-touch-min);
+    min-width: var(--ez-touch-min);
+    min-height: var(--ez-touch-min);
+  }
 }
 
-@media (max-width: 480px) {
-  .ez-main { padding: var(--ez-space-4) var(--ez-space-4); }
+@media (max-width: 639px) {
+  .ez-main { padding: 20px 16px 24px; }
 }
 
 /* ───────────────────────────────────────────────────────────────────────
