@@ -111,6 +111,11 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
                 </div>
+              ) : msg.status === 'pending' ? (
+                <div style={styles.assistantLoading} role="status" aria-live="polite">
+                  <span className="spinner" style={styles.spinner} />
+                  <span style={styles.loadingText}>Hệ thống đang chuẩn bị câu trả lời...</span>
+                </div>
               ) : (
                 <AssistantMessage
                   message={msg}

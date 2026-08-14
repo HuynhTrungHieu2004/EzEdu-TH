@@ -1,4 +1,54 @@
-export type RetrievalMode = 'internal_only' | 'web_only' | 'hybrid' | 'model_knowledge' | 'clarification_required';
+export type RetrievalMode = 'internal_only' | 'web_only' | 'hybrid' | 'model_knowledge' | 'clarification_required' | 'study_exam';
+
+export type StudyDifficulty = 'adaptive' | 'easy' | 'medium' | 'hard';
+export type StudyExamStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface StudyExamSubjectOption {
+  id: string;
+  label: string;
+}
+
+export interface StudyExamTopicOption {
+  id: string;
+  label: string;
+  subject_id: string;
+}
+
+export interface StudyExamConfig {
+  grade: number;
+  requested_subject_id?: string | null;
+  suggested_subject_id?: string | null;
+  suggested_topic_id?: string | null;
+  suggestion_reason?: string | null;
+  subjects: StudyExamSubjectOption[];
+  topics: StudyExamTopicOption[];
+  difficulties: StudyDifficulty[];
+  question_counts: number[];
+}
+
+export interface StudyExamRequest {
+  id: string;
+  status: StudyExamStatus;
+  exam_id?: string | null;
+  question_count: number;
+  selected_count: number;
+  shortfall_count: number;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudyExamCreatePayload {
+  subject_id: string;
+  subject_label?: string | null;
+  topic_id?: string | null;
+  topic_label?: string | null;
+  difficulty: StudyDifficulty;
+  question_count: number;
+  conversation_id?: string | null;
+  message_id?: string | null;
+  client_request_id: string;
+}
 
 export type EvidenceStatus = 'well_supported' | 'partially_supported' | 'insufficient_evidence' | 'conflicting_sources' | 'unverified';
 
@@ -55,6 +105,9 @@ export interface AdvancedChatResponse {
   message_id: string;
   model_name: string | null;
   follow_up_suggestions: string[] | null;
+  message_kind?: 'answer' | 'study_exam_config';
+  study_exam_config?: StudyExamConfig | null;
+  study_exam_request?: StudyExamRequest | null;
 }
 
 export interface ConversationResponse {
@@ -86,6 +139,9 @@ export interface MessageResponse {
   web_citations?: WebCitation[] | null;
   status: 'pending' | 'completed' | 'failed';
   error_message?: string | null;
+  message_kind?: 'answer' | 'study_exam_config';
+  study_exam_config?: StudyExamConfig | null;
+  study_exam_request?: StudyExamRequest | null;
   created_at: string;
 }
 
@@ -119,5 +175,8 @@ export interface LocalChatMessage {
   error_message?: string | null;
   created_at: string;
   feedback?: FeedbackData | null;
+  conversation_id?: string | null;
+  message_kind?: 'answer' | 'study_exam_config';
+  study_exam_config?: StudyExamConfig | null;
+  study_exam_request?: StudyExamRequest | null;
 }
-

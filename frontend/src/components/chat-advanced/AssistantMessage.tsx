@@ -9,6 +9,7 @@ import {
 } from '../../constants/advancedChat';
 import { renderAnswerWithCitations, formatConfidence } from '../../utils/chatCitations';
 import { AnswerFeedbackControls } from './feedback/AnswerFeedbackControls';
+import { StudyExamCard } from './StudyExamCard';
 
 interface AssistantMessageProps {
   message: LocalChatMessage;
@@ -146,6 +147,15 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
           </div>
         )}
       </div>
+
+      {message.message_kind === 'study_exam_config' && message.study_exam_config && (
+        <StudyExamCard
+          config={message.study_exam_config}
+          conversationId={message.conversation_id}
+          messageId={message.message_id}
+          initialRequest={message.study_exam_request}
+        />
+      )}
 
       <div style={styles.footerRow}>
         <div style={styles.footerMeta}>

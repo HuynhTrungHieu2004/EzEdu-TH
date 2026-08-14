@@ -142,6 +142,7 @@ const AdvancedChatPage = () => {
         const mapped: LocalChatMessage[] = res.messages.map((m) => ({
           local_id: m.id,
           message_id: m.id,
+          conversation_id: m.conversation_id,
           role: m.role,
           content: m.content,
           status: m.status,
@@ -150,6 +151,9 @@ const AdvancedChatPage = () => {
           confidence: m.confidence ?? undefined,
           internal_citations: m.internal_citations ?? undefined,
           web_citations: m.web_citations ?? undefined,
+          message_kind: m.message_kind,
+          study_exam_config: m.study_exam_config,
+          study_exam_request: m.study_exam_request,
           created_at: m.created_at,
         }));
         setMessages(mapped);
@@ -264,6 +268,7 @@ const AdvancedChatPage = () => {
       const mapped: LocalChatMessage[] = res.messages.map((m) => ({
         local_id: m.id,
         message_id: m.id,
+        conversation_id: m.conversation_id,
         role: m.role,
         content: m.content,
         status: m.status,
@@ -272,6 +277,9 @@ const AdvancedChatPage = () => {
         confidence: m.confidence ?? undefined,
         internal_citations: m.internal_citations ?? undefined,
         web_citations: m.web_citations ?? undefined,
+        message_kind: m.message_kind,
+        study_exam_config: m.study_exam_config,
+        study_exam_request: m.study_exam_request,
         created_at: m.created_at,
       }));
       setMessages((prev) => {
@@ -390,6 +398,7 @@ const AdvancedChatPage = () => {
             return {
               ...msg,
               message_id: response.message_id,
+              conversation_id: response.conversation_id,
               content: response.answer,
               short_answer: response.short_answer,
               explanation: response.explanation,
@@ -403,6 +412,9 @@ const AdvancedChatPage = () => {
               external_search_status: response.external_search_status,
               follow_up_suggestions: response.follow_up_suggestions || undefined,
               model_name: response.model_name,
+              message_kind: response.message_kind,
+              study_exam_config: response.study_exam_config,
+              study_exam_request: response.study_exam_request,
               status: 'completed' as const,
             };
           }
@@ -499,6 +511,7 @@ const AdvancedChatPage = () => {
             return {
               ...msg,
               message_id: response.message_id,
+              conversation_id: response.conversation_id,
               content: response.answer,
               short_answer: response.short_answer,
               explanation: response.explanation,
@@ -512,6 +525,9 @@ const AdvancedChatPage = () => {
               external_search_status: response.external_search_status,
               follow_up_suggestions: response.follow_up_suggestions || undefined,
               model_name: response.model_name,
+              message_kind: response.message_kind,
+              study_exam_config: response.study_exam_config,
+              study_exam_request: response.study_exam_request,
               status: 'completed' as const,
             };
           }

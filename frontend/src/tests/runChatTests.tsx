@@ -11,6 +11,7 @@ import {
   splitPreferenceInput,
 } from '../utils/personalizationUi';
 import type { RecommendationFeedbackPayload } from '../api/personalizationApi';
+import { STUDY_DIFFICULTIES, STUDY_QUESTION_COUNTS } from '../utils/studyExam';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -312,6 +313,15 @@ function runTests() {
   };
   assert(feedbackPayload.feedback_type === 'too_hard', 'Recommendation feedback payload typed');
   console.log("✅ 10. Test personalization empty/error/feedback helpers: OK");
+
+  // 11. Study-exam configuration contracts
+  assert(
+    JSON.stringify(STUDY_QUESTION_COUNTS) === JSON.stringify([5, 10, 15, 20]),
+    'Study exam question-count options stay within the approved product contract'
+  );
+  assert(STUDY_DIFFICULTIES[0].value === 'adaptive', 'Adaptive difficulty is recommended first');
+  assert(STUDY_DIFFICULTIES.length === 4, 'Exactly four study difficulty choices');
+  console.log("✅ 11. Test study-exam option contracts: OK");
 
   console.log("=== TẤT CẢ UNIT TESTS ĐỀU ĐẠT CHUẨN ===");
 }

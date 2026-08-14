@@ -14,6 +14,7 @@ export const RETRIEVAL_MODE_LABELS: Record<RetrievalMode, string> = {
   hybrid: 'Kết hợp học liệu & Internet',
   model_knowledge: 'Kiến thức nền tảng',
   clarification_required: 'Cần thêm thông tin',
+  study_exam: 'Tạo đề ôn tập',
 };
 
 export const EVIDENCE_STATUS_LABELS: Record<EvidenceStatus, string> = {

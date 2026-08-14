@@ -4,7 +4,9 @@ import type {
   AdvancedChatResponse,
   ConversationListResponse,
   ConversationMessagesListResponse,
-  ConversationResponse
+  ConversationResponse,
+  StudyExamCreatePayload,
+  StudyExamRequest,
 } from '../types/chat';
 
 export interface SourceChunk {
@@ -41,6 +43,16 @@ export const chatApi = {
     const response = await client.post<AdvancedChatResponse>('/chat/ask-advanced', payload, {
       signal,
     });
+    return response.data;
+  },
+
+  createStudyExamRequest: async (payload: StudyExamCreatePayload): Promise<StudyExamRequest> => {
+    const response = await client.post<StudyExamRequest>('/study-exams/requests', payload);
+    return response.data;
+  },
+
+  getStudyExamRequest: async (requestId: string): Promise<StudyExamRequest> => {
+    const response = await client.get<StudyExamRequest>(`/study-exams/requests/${requestId}`);
     return response.data;
   },
 
@@ -90,4 +102,3 @@ export const chatApi = {
     return response.data;
   },
 };
-
