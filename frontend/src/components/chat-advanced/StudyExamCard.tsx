@@ -4,7 +4,7 @@ import { gsap } from 'gsap';
 import { AlertCircle, BookOpen, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../../api/chatApi';
-import { useMotion } from '../../motion';
+import { MOTION_DURATION, MOTION_EASE, MOTION_STAGGER, useMotion } from '../../motion';
 import type {
   StudyDifficulty,
   StudyExamConfig,
@@ -89,7 +89,7 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
     timeline.fromTo(
       root,
       { autoAlpha: 0, y: 14 },
-      { autoAlpha: 1, y: 0, duration: 0.42, ease: 'power3.out', clearProps: 'transform,opacity,visibility' },
+      { autoAlpha: 1, y: 0, duration: MOTION_DURATION.slow, ease: MOTION_EASE.emphasized, clearProps: 'transform,opacity,visibility' },
     );
     if (items.length > 0) {
       timeline.fromTo(
@@ -98,9 +98,9 @@ export const StudyExamCard: React.FC<StudyExamCardProps> = ({
         {
           autoAlpha: 1,
           y: 0,
-          duration: 0.34,
-          stagger: 0.06,
-          ease: 'power2.out',
+          duration: MOTION_DURATION.base,
+          stagger: MOTION_STAGGER,
+          ease: MOTION_EASE.standard,
           clearProps: 'transform,opacity,visibility',
         },
         '-=0.18',

@@ -1,3 +1,4 @@
+export { MOTION_DURATION, MOTION_EASE, MOTION_STAGGER } from './timing';
 export { MotionProvider } from './MotionProvider';
 export { useMotion } from './useMotion';
 export { PageEntrance } from './PageEntrance';

@@ -3,6 +3,7 @@ import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMotion } from './useMotion';
+import { MOTION_DURATION, MOTION_EASE, MOTION_STAGGER } from './timing';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -22,7 +23,7 @@ export interface ScrollRevealProps {
  * scope của khối, nên rời trang là `useGSAP` tự revert cả tween lẫn trigger.
  * Ở chế độ giảm chuyển động không tạo trigger nào: nội dung hiện sẵn.
  */
-export function ScrollReveal({ children, className, selector, stagger = 0.08 }: ScrollRevealProps) {
+export function ScrollReveal({ children, className, selector, stagger = MOTION_STAGGER }: ScrollRevealProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const { reducedMotion } = useMotion();
 
@@ -46,9 +47,9 @@ export function ScrollReveal({ children, className, selector, stagger = 0.08 }: 
       {
         autoAlpha: 1,
         y: 0,
-        duration: 0.62,
+        duration: MOTION_DURATION.slow,
         stagger,
-        ease: 'power3.out',
+        ease: MOTION_EASE.emphasized,
         clearProps: 'transform,opacity,visibility',
         scrollTrigger: {
           trigger: root,

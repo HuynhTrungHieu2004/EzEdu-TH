@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useMotion } from './useMotion';
+import { MOTION_DURATION, MOTION_EASE } from './timing';
 
 export interface PageEntranceProps {
   children: ReactNode;
@@ -28,8 +29,8 @@ export function PageEntrance({ children, routeKey, className }: PageEntranceProp
       {
         autoAlpha: 1,
         y: 0,
-        duration: 0.58,
-        ease: 'power3.out',
+        duration: MOTION_DURATION.slow,
+        ease: MOTION_EASE.emphasized,
         clearProps: 'transform,opacity,visibility',
       },
     );

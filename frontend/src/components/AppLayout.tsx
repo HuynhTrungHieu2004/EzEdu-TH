@@ -15,7 +15,7 @@ import { questionApi } from '../api/questionApi';
 import { useAuth } from '../hooks/useAuth';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
-import { PageEntrance, useMotion } from '../motion';
+import { MOTION_DURATION, MOTION_EASE, PageEntrance, useMotion } from '../motion';
 import { buildNavigation, type NavGroup, type NavItem } from './navigation';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { usePathnameNavigationEpoch } from './PathnameNavigationEpochContext';
@@ -177,8 +177,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {
         autoAlpha: 1,
         scaleY: 1,
-        duration: 0.28,
-        ease: 'power2.out',
+        duration: MOTION_DURATION.base,
+        ease: MOTION_EASE.standard,
         clearProps: 'transform,transformOrigin,opacity,visibility',
       },
     );

@@ -24,7 +24,7 @@ import {
   Textarea,
   TimerRing,
 } from '../../components/ui';
-import { AnimatedCounter, Confetti, StaggerGroup, useMotion } from '../../motion';
+import { AnimatedCounter, Confetti, MOTION_DURATION, MOTION_EASE, StaggerGroup, useMotion } from '../../motion';
 import '../question-set.css';
 import '../exam-attempt.css';
 
@@ -214,8 +214,8 @@ export default function ExamAttemptPage() {
       {
         autoAlpha: 1,
         x: 0,
-        duration: 0.32,
-        ease: 'power2.out',
+        duration: MOTION_DURATION.base,
+        ease: MOTION_EASE.standard,
         clearProps: 'transform,opacity,visibility',
       },
     );

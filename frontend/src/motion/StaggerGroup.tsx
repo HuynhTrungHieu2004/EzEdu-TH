@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from 'react';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useMotion } from './useMotion';
+import { MOTION_DURATION, MOTION_EASE, MOTION_STAGGER } from './timing';
 
 export interface StaggerGroupProps {
   children: ReactNode;
@@ -34,9 +35,9 @@ export function StaggerGroup({
       {
         autoAlpha: 1,
         y: 0,
-        duration: 0.58,
-        stagger: 0.07,
-        ease: 'power3.out',
+        duration: MOTION_DURATION.slow,
+        stagger: MOTION_STAGGER,
+        ease: MOTION_EASE.emphasized,
         clearProps: 'transform,opacity,visibility',
       },
     );

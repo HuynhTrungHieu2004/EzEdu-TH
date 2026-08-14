@@ -2,6 +2,7 @@ import { useRef, type ComponentPropsWithoutRef, type PointerEvent } from 'react'
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useMotion } from './useMotion';
+import { MOTION_DURATION, MOTION_EASE } from './timing';
 
 export interface MotionCardProps extends ComponentPropsWithoutRef<'div'> {
   tilt?: number;
@@ -32,9 +33,9 @@ export function MotionCard({
 
     if (!interactive) return;
 
-    rotationX.current = gsap.quickTo(card, 'rotationX', { duration: 0.24, ease: 'power3.out' });
-    rotationY.current = gsap.quickTo(card, 'rotationY', { duration: 0.24, ease: 'power3.out' });
-    translateY.current = gsap.quickTo(card, 'y', { duration: 0.24, ease: 'power3.out' });
+    rotationX.current = gsap.quickTo(card, 'rotationX', { duration: MOTION_DURATION.base, ease: MOTION_EASE.emphasized });
+    rotationY.current = gsap.quickTo(card, 'rotationY', { duration: MOTION_DURATION.base, ease: MOTION_EASE.emphasized });
+    translateY.current = gsap.quickTo(card, 'y', { duration: MOTION_DURATION.base, ease: MOTION_EASE.emphasized });
 
     return () => {
       rotationX.current = noop;
