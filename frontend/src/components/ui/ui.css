@@ -1566,7 +1566,9 @@
 }
 
 .ez-datatable th {
-  color: var(--ez-text-muted);
+  /* Chữ mờ trên nền muted chỉ đạt 4.34:1 — tiêu đề cột dùng bậc secondary để
+     đủ AA (áp dụng cho mọi bảng: admin, học liệu, ngân hàng câu hỏi). */
+  color: var(--ez-text-secondary);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-bold);
   text-transform: uppercase;
@@ -1710,6 +1712,14 @@
     grid-template-columns: 1fr;
     padding: var(--ez-space-3);
   }
+}
+
+/* Số kết quả đang hiện sau khi lọc — dùng chung cho mọi trang danh sách */
+.ez-filter-summary {
+  margin: var(--ez-space-4) 0 var(--ez-space-3);
+  color: var(--ez-text-muted);
+  font-size: var(--ez-text-body-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ───────────────────────────────────────────────────────────────────────
