@@ -14,9 +14,10 @@
  * KHÔNG bao gồm sidebar.
  * Sidebar chỉ xuất hiện trong AppLayout (authenticated area).
  */
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './PublicLayout.css';
 import { ArrowLeft } from 'lucide-react';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ interface PublicLayoutProps {
 
 export default function PublicLayout({ children }: PublicLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <div className="pub-layout">
@@ -67,7 +69,10 @@ export default function PublicLayout({ children }: PublicLayoutProps) {
         <div className="pub-blob pub-blob-2" aria-hidden="true" />
         <div className="pub-blob pub-blob-3" aria-hidden="true" />
 
-        <div className="pub-card-wrap">{children}</div>
+        <div className="pub-card-wrap">
+          {/* Lỗi render của trang công khai giữ lại header/footer thay vì trắng trang */}
+          <RouteErrorBoundary resetKey={location.pathname}>{children}</RouteErrorBoundary>
+        </div>
       </main>
 
       {/* ── Footer tối giản ─────────────────────────────────────────── */}

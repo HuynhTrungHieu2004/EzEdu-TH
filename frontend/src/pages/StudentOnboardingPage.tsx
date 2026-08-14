@@ -8,6 +8,7 @@ import {
   type StudentOnboardingOptions,
   type StudentOnboardingPayload,
 } from '../api/personalizationApi';
+import { Alert, Button } from '../components/ui';
 
 const emptyDraft: StudentOnboardingPayload = {
   grade_level: 12,
@@ -169,7 +170,11 @@ export default function StudentOnboardingPage() {
           </p>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <Alert tone="error" style={{ marginBottom: 'var(--ez-space-4)' }}>
+            {error}
+          </Alert>
+        )}
 
         <fieldset className="student-onboarding-section">
           <legend>Lớp hiện tại</legend>
@@ -254,22 +259,23 @@ export default function StudentOnboardingPage() {
         </fieldset>
 
         <div className="student-onboarding-actions">
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Đang lưu hồ sơ...' : 'Lưu và bắt đầu học'}
-          </button>
+          <Button type="submit" size="lg" loading={saving}>
+            Lưu và bắt đầu học
+          </Button>
           {/*
             Đường thoát cho người dùng mới. Trước đây trang này khoá cứng mọi
             route khác, nên học sinh chưa muốn khai thông tin thì không vào được
             đâu cả. Xem docs/ui-redesign/01-audit-report.md §6.2 (lỗi H3).
           */}
-          <button
+          <Button
             type="button"
-            className="btn-secondary"
+            variant="outline"
+            size="lg"
             disabled={saving}
             onClick={() => navigate('/dashboard', { replace: true })}
           >
             Để sau
-          </button>
+          </Button>
         </div>
       </form>
     </main>
