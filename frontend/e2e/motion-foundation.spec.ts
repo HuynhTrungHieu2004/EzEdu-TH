@@ -4,6 +4,8 @@ import { TEACHER_USER, captureBrowserErrors, stubApi } from './helpers';
 declare global {
   interface Window {
     __previousPageEntrance?: HTMLElement;
+    __activeIndicatorStyleHistory?: string[];
+    __activeIndicatorStyleObserver?: MutationObserver;
   }
 }
 
@@ -64,28 +66,55 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
   await page.goto('/dashboard');
 
   const sidebar = page.locator('.ez-sidebar-nav');
-  await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
-  await expect(page).toHaveURL(/\/documents$/);
+  await sidebar.evaluate((element) => {
+    const history: string[] = [];
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (
+          mutation.type === 'attributes'
+          && mutation.target instanceof HTMLElement
+          && mutation.target.matches('[data-active-indicator]')
+        ) {
+          history.push(mutation.target.getAttribute('style') ?? '');
+        }
+      }
+    });
 
-  const indicator = sidebar
-    .getByRole('link', { name: 'Học liệu', exact: true })
-    .locator('[data-active-indicator]');
+    observer.observe(element, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+    window.__activeIndicatorStyleHistory = history;
+    window.__activeIndicatorStyleObserver = observer;
+  });
 
-  await expect.poll(
-    () => indicator.evaluate((element) => element.style.transform),
-    { timeout: 180 },
-  ).not.toBe('');
+  try {
+    await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
+    await expect(page).toHaveURL(/\/documents$/);
 
-  await expect.poll(
-    () => indicator.evaluate((element) => ({
-      transform: element.style.transform,
-      opacity: element.style.opacity,
-      visibility: element.style.visibility,
-    })),
-    { timeout: 1_000 },
-  ).toEqual({ transform: '', opacity: '', visibility: '' });
+    const indicator = sidebar
+      .getByRole('link', { name: 'Học liệu', exact: true })
+      .locator('[data-active-indicator]');
 
-  expect(browserErrors).toEqual([]);
+    await expect.poll(
+      () => page.evaluate(() => window.__activeIndicatorStyleHistory ?? []),
+      { timeout: 1_000 },
+    ).toEqual(expect.arrayContaining([expect.stringContaining('transform')]));
+
+    await expect.poll(
+      () => indicator.evaluate((element) => ({
+        transform: element.style.transform,
+        opacity: element.style.opacity,
+        visibility: element.style.visibility,
+      })),
+      { timeout: 1_000 },
+    ).toEqual({ transform: '', opacity: '', visibility: '' });
+
+    expect(browserErrors).toEqual([]);
+  } finally {
+    await page.evaluate(() => window.__activeIndicatorStyleObserver?.disconnect());
+  }
 });
 
 test('reduced mode không để transform trên route content', async ({ browser }) => {
