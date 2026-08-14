@@ -30,6 +30,7 @@ import { hasPermission } from '../utils/adminPermissions';
 import { useAuth } from '../hooks/useAuth';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
+import { PageEntrance } from '../motion';
 import {
   Badge,
   Button,
@@ -399,7 +400,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         <main id="main" className="ez-main" tabIndex={-1}>
-          {children}
+          <PageEntrance routeKey={location.pathname}>
+            {children}
+          </PageEntrance>
         </main>
 
         {tabItems.length > 0 ? (

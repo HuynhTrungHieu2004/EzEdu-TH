@@ -20,3 +20,26 @@ test.describe('motion preference', () => {
     await context.close();
   });
 });
+
+test('route content công bố motion contract và cleanup khi điều hướng', async ({ page }) => {
+  const unmountWarnings: string[] = [];
+  page.on('console', (message) => {
+    if (
+      (message.type() === 'warning' || message.type() === 'error')
+      && /unmount|unmounted component/i.test(message.text())
+    ) {
+      unmountWarnings.push(message.text());
+    }
+  });
+
+  await stubApi(page, TEACHER_USER);
+  await page.goto('/dashboard');
+  await expect(page.locator('[data-page-entrance]')).toBeVisible();
+  await page.goto('/documents');
+  await expect(page.locator('[data-page-entrance]')).toHaveCount(1);
+  const orphaned = await page.locator('[data-page-entrance]').evaluateAll((nodes) =>
+    nodes.filter((node) => !document.documentElement.contains(node)).length,
+  );
+  expect(orphaned).toBe(0);
+  expect(unmountWarnings).toEqual([]);
+});
