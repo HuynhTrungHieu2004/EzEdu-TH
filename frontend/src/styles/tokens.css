@@ -402,10 +402,10 @@
 
   /* Accent — gold */
   --ez-accent:        var(--ez-gold-500);
-  --ez-accent-hover:  var(--ez-coral-600);
-  --ez-accent-subtle: var(--ez-coral-50);
-  --ez-accent-border: var(--ez-coral-200);
-  --ez-accent-text:   var(--ez-coral-700);
+  --ez-accent-hover:  var(--ez-gold-500);
+  --ez-accent-subtle: rgba(229, 184, 91, 0.18);
+  --ez-accent-border: rgba(229, 184, 91, 0.42);
+  --ez-accent-text:   var(--ez-ink-900);
 
   /* Success / Warning / Error / Info */
   --ez-success:        var(--ez-green-600);
@@ -448,21 +448,21 @@
    Kích hoạt bằng [data-theme="dark"] trên <html> (giữ đúng cơ chế đã có).
    ═══════════════════════════════════════════════════════════════════════ */
 [data-theme='dark'] {
-  --ez-bg:            var(--ez-neutral-950);
-  --ez-bg-subtle:     var(--ez-neutral-900);
-  --ez-bg-inverse:    var(--ez-neutral-50);
+  --ez-bg:            var(--ez-ink-950);
+  --ez-bg-subtle:     var(--ez-ink-900);
+  --ez-bg-inverse:    var(--ez-paper-50);
 
-  --ez-surface:         #1a1e2e;
-  --ez-surface-subtle:  #1f2436;
-  --ez-surface-muted:   #262c40;
-  --ez-surface-hover:   #262c40;
-  --ez-surface-active:  #2f3648;
-  --ez-surface-inverse: var(--ez-neutral-50);
+  --ez-surface:         var(--ez-ink-900);
+  --ez-surface-subtle:  var(--ez-ink-800);
+  --ez-surface-muted:   #214e5d;
+  --ez-surface-hover:   #214e5d;
+  --ez-surface-active:  #2b5d6d;
+  --ez-surface-inverse: var(--ez-paper-50);
 
-  --ez-text:           #eaecf4;
-  --ez-text-secondary: #b0b6c8;
-  --ez-text-muted:     #8b92a8;
-  --ez-text-inverse:   var(--ez-neutral-900);
+  --ez-text:           var(--ez-paper-50);
+  --ez-text-secondary: #c4d6d5;
+  --ez-text-muted:     var(--ez-nav-text-muted);
+  --ez-text-inverse:   var(--ez-ink-950);
   /* Ở chế độ tối, các màu thương hiệu được nâng sáng lên để nổi trên nền tối.
      Hệ quả: chữ TRẮNG trên nút primary không đủ mức AA 4.5:1 cho chữ thường.
      Vì vậy nhãn trên nền thương hiệu dùng màu gần đen:
@@ -470,21 +470,20 @@
        trên secondary (#7bacf9) → 8.03:1
        trên error (#f2726f)     → 6.57:1
      Đây cũng là quy ước quen thuộc của giao diện tối: nền nhấn sáng, nhãn tối. */
-  --ez-text-on-brand:  var(--ez-neutral-950);
-  --ez-text-link:      var(--ez-forest-300);
+  --ez-text-on-brand:  var(--ez-paper-50);
+  --ez-text-link:      var(--ez-mineral-100);
 
-  --ez-border:        #313850;
-  --ez-border-subtle: #262c40;
-  --ez-border-strong: #414a66;
-  --ez-border-focus:  var(--ez-forest-300);
+  --ez-border:        #2b5662;
+  --ez-border-subtle: #214e5d;
+  --ez-border-strong: #417180;
+  --ez-border-focus:  var(--ez-mineral-600);
 
-  /* Trên nền tối cần bậc màu sáng hơn để giữ tương phản */
-  --ez-primary:         var(--ez-forest-300);
-  --ez-primary-hover:   var(--ez-forest-200);
-  --ez-primary-active:  var(--ez-forest-100);
-  --ez-primary-subtle:  rgba(125, 168, 147, 0.14);
-  --ez-primary-border:  rgba(125, 168, 147, 0.34);
-  --ez-primary-text:    var(--ez-forest-100);
+  --ez-primary:         var(--ez-mineral-600);
+  --ez-primary-hover:   var(--ez-mineral-700);
+  --ez-primary-active:  var(--ez-mineral-700);
+  --ez-primary-subtle:  rgba(23, 125, 115, 0.22);
+  --ez-primary-border:  rgba(23, 125, 115, 0.48);
+  --ez-primary-text:    var(--ez-mineral-100);
 
   --ez-secondary:        var(--ez-sky-300);
   --ez-secondary-hover:  var(--ez-sky-200);
@@ -493,11 +492,11 @@
   --ez-secondary-border: rgba(123, 172, 249, 0.32);
   --ez-secondary-text:   var(--ez-sky-200);
 
-  --ez-accent:        var(--ez-coral-300);
-  --ez-accent-hover:  var(--ez-coral-200);
-  --ez-accent-subtle: rgba(236, 123, 118, 0.14);
-  --ez-accent-border: rgba(236, 123, 118, 0.32);
-  --ez-accent-text:   var(--ez-coral-200);
+  --ez-accent:        var(--ez-gold-500);
+  --ez-accent-hover:  var(--ez-gold-500);
+  --ez-accent-subtle: rgba(229, 184, 91, 0.18);
+  --ez-accent-border: rgba(229, 184, 91, 0.42);
+  --ez-accent-text:   var(--ez-gold-500);
 
   --ez-success:        #4ec98a;
   --ez-success-subtle: rgba(78, 201, 138, 0.14);

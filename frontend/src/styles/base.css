@@ -263,6 +263,10 @@ th {
   }
 }
 
+html[data-motion='reduced'] {
+  scroll-behavior: auto !important;
+}
+
 html[data-motion='reduced'] *,
 html[data-motion='reduced'] *::before,
 html[data-motion='reduced'] *::after {
