@@ -19,6 +19,13 @@ export const TEACHER_USER = {
   role: 'lecturer',
 };
 
+export const STUDENT_USER = {
+  ...ADMIN_USER,
+  email: 'student.e2e@example.test',
+  full_name: 'Học sinh E2E',
+  role: 'student',
+};
+
 type AuthFixtureUser = Omit<typeof ADMIN_USER, 'role'> & {
   role: string;
   student_profile_completed?: boolean;

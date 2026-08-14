@@ -1,5 +1,33 @@
 import { expect, test } from '@playwright/test';
-import { TEACHER_USER, stubApi } from './helpers';
+import { ADMIN_USER, STUDENT_USER, TEACHER_USER, stubApi } from './helpers';
+
+test('student shell chỉ hiện hành trình học sinh', async ({ page }) => {
+  await stubApi(page, STUDENT_USER);
+  await page.goto('/dashboard');
+
+  const navigation = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  await expect(navigation.getByText('Tổng quan')).toBeVisible();
+  await expect(navigation.getByText('Ngân hàng câu hỏi')).toHaveCount(0);
+});
+
+test('teacher shell hiện nhóm nghiệp vụ giáo viên', async ({ page }) => {
+  await stubApi(page, TEACHER_USER);
+  await page.goto('/dashboard');
+
+  const navigation = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  await expect(navigation.getByRole('link', { name: 'Học liệu', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Ma trận đề', exact: true })).toBeVisible();
+});
+
+test('admin navigation có nhóm thu gọn với aria-expanded', async ({ page }) => {
+  await stubApi(page, ADMIN_USER);
+  await page.goto('/admin/dashboard');
+
+  const trigger = page.getByRole('button', { name: 'Nội dung' });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+});
 
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {
   await stubApi(page, TEACHER_USER);

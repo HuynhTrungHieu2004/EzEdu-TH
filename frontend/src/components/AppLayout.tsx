@@ -2,35 +2,19 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart3,
-  Bell,
-  ClipboardList,
-  Database,
   Ellipsis,
-  FileQuestion,
-  Globe,
-  LayoutDashboard,
-  Library,
   LogOut,
-  MessageSquare,
   Monitor,
   Moon,
-  ScrollText,
-  Settings,
-  ShieldCheck,
-  Sparkles,
   Sun,
-  Target,
-  TrendingUp,
   UserCog,
-  Users,
 } from 'lucide-react';
 import { questionApi } from '../api/questionApi';
-import { hasPermission } from '../utils/adminPermissions';
 import { useAuth } from '../hooks/useAuth';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
 import { PageEntrance } from '../motion';
+import { buildNavigation, type NavItem } from './navigation';
 import {
   Badge,
   Button,
@@ -45,19 +29,6 @@ import './app-layout.css';
 
 interface AppLayoutProps {
   children: ReactNode;
-}
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: ReactNode;
-  /** Số hiển thị ở cuối mục, kèm nhãn đọc được cho trình đọc màn hình. */
-  badge?: { value: number; label: string };
-}
-
-interface NavGroup {
-  label?: string;
-  items: NavItem[];
 }
 
 const ICON = 18;
@@ -99,6 +70,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { preference, setPreference } = useTheme();
   const [pendingExams, setPendingExams] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
 
   const permissions = user?.permissions_override ?? [];
   const pendingBadgeCount = area === 'student' ? pendingExams : 0;
@@ -125,125 +97,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   }
 
-  /**
-   * Nhóm mục điều hướng theo khu vực.
-   *
-   * Điểm khác biệt quan trọng so với bản trước: mỗi khu vực chỉ nhận đúng nhóm
-   * của mình. Trước đây `isLecturerRole` bao gồm cả `admin` và `super_admin`,
-   * nên tài khoản quản trị thấy thêm 5 mục của giáo viên — những mục gọi API
-   * theo quyền sở hữu nên gần như luôn rỗng với admin.
-   * Xem docs/ui-redesign/01-audit-report.md §6.2 (lỗi H2).
-   */
-  function buildGroups(): NavGroup[] {
-    if (area === 'student') {
-      const items: NavItem[] = [
-        { to: '/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
-        { to: '/tools', label: 'Công cụ AI', icon: <Sparkles size={ICON} /> },
-        {
-          to: '/published-questions',
-          label: 'Bài luyện tập',
-          icon: <ClipboardList size={ICON} />,
-          badge:
-            pendingBadgeCount > 0
-              ? { value: pendingBadgeCount, label: `${pendingBadgeCount} bài luyện tập chưa làm` }
-              : undefined,
-        },
-        { to: '/chat-advanced', label: 'Hỏi đáp AI', icon: <MessageSquare size={ICON} /> },
-        { to: '/learning-history', label: 'Tiến độ', icon: <TrendingUp size={ICON} /> },
-      ];
-      // Chỉ hiện khi flag bật — tránh dẫn người dùng tới trang chắc chắn 403.
-      if (isEnabled('enable_personalization')) {
-        items.push({ to: '/personalization', label: 'Lộ trình học', icon: <Target size={ICON} /> });
-      }
-      return [{ items }];
-    }
-
-    if (area === 'teacher') {
-      return [
-        {
-          items: [
-            { to: '/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
-            { to: '/tools', label: 'Công cụ AI', icon: <Sparkles size={ICON} /> },
-            { to: '/documents', label: 'Học liệu', icon: <Library size={ICON} /> },
-            { to: '/teacher/content-history', label: 'Lịch sử', icon: <ClipboardList size={ICON} /> },
-            { to: '/question-history', label: 'Đề & câu hỏi', icon: <FileQuestion size={ICON} /> },
-            { to: '/question-bank', label: 'Ngân hàng câu hỏi', icon: <Database size={ICON} /> },
-            { to: '/exam-blueprints', label: 'Ma trận đề', icon: <ClipboardList size={ICON} /> },
-            { to: '/chat-advanced', label: 'Hỏi đáp AI', icon: <MessageSquare size={ICON} /> },
-            { to: '/classes', label: 'Lớp học', icon: <Users size={ICON} /> },
-          ],
-        },
-      ];
-    }
-
-    if (area === 'admin') {
-      const groups: NavGroup[] = [];
-      const overview: NavItem[] = [];
-      if (
-        hasPermission(role, 'analytics.view', permissions) ||
-        hasPermission(role, 'system_health.view', permissions)
-      ) {
-        overview.push({
-          to: '/admin/dashboard',
-          label: 'Tổng quan',
-          icon: <LayoutDashboard size={ICON} />,
-        });
-      }
-      if (hasPermission(role, 'users.view', permissions)) {
-        overview.push({ to: '/admin/users', label: 'Người dùng', icon: <Users size={ICON} /> });
-      }
-      if (overview.length > 0) groups.push({ items: overview });
-
-      const content: NavItem[] = [];
-      if (hasPermission(role, 'documents.view', permissions)) {
-        content.push({ to: '/admin/documents', label: 'Học liệu', icon: <Library size={ICON} /> });
-      }
-      if (hasPermission(role, 'questions.view', permissions)) {
-        content.push({ to: '/admin/questions', label: 'Câu hỏi', icon: <FileQuestion size={ICON} /> });
-        content.push({ to: '/admin/exams', label: 'Đề thi', icon: <ClipboardList size={ICON} /> });
-      }
-      if (content.length > 0) groups.push({ label: 'Nội dung', items: content });
-
-      const platform: NavItem[] = [];
-      if (hasPermission(role, 'ai_usage.view', permissions)) {
-        platform.push({ to: '/admin/ai', label: 'AI', icon: <Sparkles size={ICON} /> });
-      }
-      if (hasPermission(role, 'website_content.view', permissions)) {
-        platform.push({ to: '/admin/website-content', label: 'Website', icon: <Globe size={ICON} /> });
-      }
-      if (platform.length > 0) groups.push({ label: 'Nền tảng', items: platform });
-
-      const system: NavItem[] = [];
-      if (hasPermission(role, 'system_settings.view', permissions)) {
-        system.push({ to: '/admin/settings', label: 'Cấu hình', icon: <Settings size={ICON} /> });
-        system.push({ to: '/admin/feature-flags', label: 'Feature flags', icon: <ShieldCheck size={ICON} /> });
-      }
-      if (hasPermission(role, 'notifications.manage', permissions)) {
-        system.push({ to: '/admin/notifications', label: 'Thông báo', icon: <Bell size={ICON} /> });
-      }
-      if (system.length > 0) groups.push({ label: 'Hệ thống', items: system });
-
-      const logs: NavItem[] = [];
-      if (hasPermission(role, 'reports.export', permissions)) {
-        logs.push({ to: '/admin/reports', label: 'Báo cáo', icon: <BarChart3 size={ICON} /> });
-      }
-      if (hasPermission(role, 'activity_logs.view', permissions)) {
-        logs.push({ to: '/admin/activity-logs', label: 'Nhật ký hoạt động', icon: <ScrollText size={ICON} /> });
-      }
-      if (hasPermission(role, 'admin_audit_logs.view', permissions)) {
-        logs.push({ to: '/admin/audit-logs', label: 'Nhật ký quản trị', icon: <ScrollText size={ICON} /> });
-      }
-      if (logs.length > 0) groups.push({ label: 'Báo cáo & log', items: logs });
-
-      return groups;
-    }
-
-    return [];
-  }
-
-  const groups = buildGroups();
+  const groups = area
+    ? buildNavigation({
+      area,
+      role,
+      permissions,
+      isFeatureEnabled: isEnabled,
+      badges: pendingBadgeCount > 0
+        ? { pendingExams: { value: pendingBadgeCount, label: `${pendingBadgeCount} bài luyện tập chưa làm` } }
+        : {},
+    })
+    : [];
   const allItems = groups.flatMap((g) => g.items);
   const activeItem = allItems.find((item) => isActive(item.to));
+  const activeGroupId = groups.find((group) => group.items.some((item) => isActive(item.to)))?.id;
 
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
@@ -349,12 +216,38 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Skeleton height="2.5rem" />
             </div>
           ) : (
-            groups.map((group, index) => (
-              <div key={group.label ?? `group-${index}`} className="ez-nav-group">
-                {group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
-                {group.items.map((item) => renderNavLink(item))}
-              </div>
-            ))
+            groups.map((group) => {
+              const isOpen = !group.collapsible
+                || group.id === activeGroupId
+                || !collapsedGroupIds.has(group.id);
+              const panelId = `nav-group-${group.id}`;
+
+              return (
+                <div key={group.id} className="ez-nav-group">
+                  {group.collapsible ? (
+                    <button
+                      type="button"
+                      className="ez-nav-group-label"
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                      onClick={() => {
+                        setCollapsedGroupIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(group.id)) next.delete(group.id);
+                          else next.add(group.id);
+                          return next;
+                        });
+                      }}
+                    >
+                      {group.label}
+                    </button>
+                  ) : group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
+                  <div id={panelId} hidden={!isOpen}>
+                    {group.items.map((item) => renderNavLink(item))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </nav>
 
