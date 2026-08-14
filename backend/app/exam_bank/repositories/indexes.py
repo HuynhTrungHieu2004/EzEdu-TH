@@ -16,6 +16,7 @@ from app.exam_bank.constants.collections import (
     EXAM_ATTEMPTS,
     EXAM_BLUEPRINTS,
     QUESTIONS,
+    STUDY_EXAM_REQUESTS,
 )
 
 logger = logging.getLogger("app.exam_bank.repositories.indexes")
@@ -55,6 +56,17 @@ EXAM_BANK_INDEXES: tuple = (
         unique=True,
     ),
     IndexSpec(EXAM_ATTEMPTS, [("status", ASCENDING), ("due_at", ASCENDING)], "attempt_status_due_at"),
+    IndexSpec(
+        STUDY_EXAM_REQUESTS,
+        [("student_id", ASCENDING), ("client_request_id", ASCENDING)],
+        "study_request_student_client",
+        unique=True,
+    ),
+    IndexSpec(
+        STUDY_EXAM_REQUESTS,
+        [("student_id", ASCENDING), ("status", ASCENDING), ("created_at", DESCENDING)],
+        "study_request_student_status_created",
+    ),
 )
 
 

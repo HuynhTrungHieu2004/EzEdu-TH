@@ -5,7 +5,7 @@ riêng: /taxonomy, /questions, /exam-blueprints, /exams).
 
 from fastapi import APIRouter
 
-from app.exam_bank.api import attempts, blueprints, exams, questions, taxonomy
+from app.exam_bank.api import attempts, blueprints, exams, questions, study_exams, taxonomy
 
 router = APIRouter(tags=["Exam Bank"])
 router.include_router(taxonomy.router)
@@ -13,3 +13,4 @@ router.include_router(questions.router)
 router.include_router(blueprints.router)
 router.include_router(exams.router)
 router.include_router(attempts.router)
+router.include_router(study_exams.router)

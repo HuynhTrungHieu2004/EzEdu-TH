@@ -30,6 +30,10 @@ from app.personalization.services.knowledge_extraction_job import (
     assign_personalization_clusters_job,
     extract_document_knowledge_job,
 )
+from app.exam_bank.services.study_exam_service import (
+    STUDY_EXAM_JOB_TYPE,
+    generate_study_exam_job,
+)
 
 logger = logging.getLogger("app.worker")
 
@@ -42,6 +46,7 @@ HANDLERS: Dict[str, Callable[[dict], Awaitable[object]]] = {
     INGEST_JOB_TYPE: lambda payload: ingest_curriculum_source_job(get_database(), payload),
     KNOWLEDGE_EXTRACTION_JOB_TYPE: extract_document_knowledge_job,
     CLUSTER_ASSIGNMENT_JOB_TYPE: assign_personalization_clusters_job,
+    STUDY_EXAM_JOB_TYPE: lambda payload: generate_study_exam_job(get_database(), payload),
 }
 
 POLL_INTERVAL_SECONDS = 3.0
