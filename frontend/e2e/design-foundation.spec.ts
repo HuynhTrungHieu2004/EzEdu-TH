@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { ADMIN_USER, STUDENT_USER, TEACHER_USER, stubApi } from './helpers';
 
@@ -63,8 +64,8 @@ for (const { user, path, label } of [
 
     const tabbar = page.locator('.ez-tabbar');
     const moreButton = tabbar.getByRole('button', { name: /Thêm/ });
-    await expect(moreButton).toHaveAttribute('aria-current', 'page');
-    await expect(moreButton).toContainText(`Đang xem ${label}`);
+    expect(await moreButton.getAttribute('aria-current')).toBeNull();
+    await expect(moreButton.locator('.ez-sr-only')).toHaveText(`Đang xem ${label}`);
     await expect(moreButton.locator('[data-active-indicator]')).toBeVisible();
 
     await moreButton.click();
@@ -72,6 +73,13 @@ for (const { user, path, label } of [
     const activeOverflowLink = drawer.getByRole('link', { name: label, exact: true });
     await expect(activeOverflowLink).toHaveAttribute('aria-current', 'page');
     await expect(activeOverflowLink.locator('[data-active-indicator]')).toBeVisible();
+
+    const axeResults = await new AxeBuilder({ page })
+      .include('.ez-tabbar')
+      .include('.ez-more-drawer')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeResults.violations).toEqual([]);
   });
 }
 

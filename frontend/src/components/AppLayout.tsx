@@ -366,7 +366,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 className={overflowActive ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
                 onClick={() => setMoreOpen(true)}
                 aria-expanded={moreOpen}
-                aria-current={overflowActive ? 'page' : undefined}
               >
                 {overflowActive ? (
                   <span
