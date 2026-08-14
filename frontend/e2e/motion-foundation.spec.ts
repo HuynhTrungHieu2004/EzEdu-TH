@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { TEACHER_USER, stubApi } from './helpers';
+import { TEACHER_USER, captureBrowserErrors, stubApi } from './helpers';
 
 declare global {
   interface Window {
@@ -28,15 +28,7 @@ test.describe('motion preference', () => {
 });
 
 test('route content cleanup animation khi điều hướng SPA', async ({ page }) => {
-  const unmountWarnings: string[] = [];
-  page.on('console', (message) => {
-    if (
-      (message.type() === 'warning' || message.type() === 'error')
-      && /unmount|unmounted component/i.test(message.text())
-    ) {
-      unmountWarnings.push(message.text());
-    }
-  });
+  const browserErrors = captureBrowserErrors(page);
 
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
@@ -62,7 +54,77 @@ test('route content cleanup animation khi điều hướng SPA', async ({ page }
   });
 
   expect(cleanup).toEqual({ detached: true, animationStylesRemoved: true });
-  expect(unmountWarnings).toEqual([]);
+  expect(browserErrors).toEqual([]);
+});
+
+test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigation', async ({ page }) => {
+  const browserErrors = captureBrowserErrors(page);
+  await stubApi(page, TEACHER_USER);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/dashboard');
+
+  const sidebar = page.locator('.ez-sidebar-nav');
+  await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
+  await expect(page).toHaveURL(/\/documents$/);
+
+  const indicator = sidebar
+    .getByRole('link', { name: 'Học liệu', exact: true })
+    .locator('[data-active-indicator]');
+
+  await expect.poll(
+    () => indicator.evaluate((element) => element.style.transform),
+    { timeout: 180 },
+  ).not.toBe('');
+
+  await expect.poll(
+    () => indicator.evaluate((element) => ({
+      transform: element.style.transform,
+      opacity: element.style.opacity,
+      visibility: element.style.visibility,
+    })),
+    { timeout: 1_000 },
+  ).toEqual({ transform: '', opacity: '', visibility: '' });
+
+  expect(browserErrors).toEqual([]);
+});
+
+test('reduced mode không để transform trên route content', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  await stubApi(page, TEACHER_USER);
+  await page.goto('/dashboard');
+
+  const transform = await page
+    .locator('[data-page-entrance]')
+    .evaluate((element) => getComputedStyle(element).transform);
+  expect(transform).toBe('none');
+  await context.close();
+});
+
+test('reduced mode cập nhật active navigation indicator tức thì', async ({ browser }) => {
+  const context = await browser.newContext({
+    reducedMotion: 'reduce',
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  await stubApi(page, TEACHER_USER);
+  await page.goto('/dashboard');
+
+  const sidebar = page.locator('.ez-sidebar-nav');
+  await sidebar.getByRole('link', { name: 'Học liệu', exact: true }).click();
+  await expect(page).toHaveURL(/\/documents$/);
+
+  const inlineAnimation = await sidebar
+    .getByRole('link', { name: 'Học liệu', exact: true })
+    .locator('[data-active-indicator]')
+    .evaluate((element) => ({
+      transform: element.style.transform,
+      opacity: element.style.opacity,
+      visibility: element.style.visibility,
+    }));
+
+  expect(inlineAnimation).toEqual({ transform: '', opacity: '', visibility: '' });
+  await context.close();
 });
 
 test('AnimatedCounter hoàn tất decimal theo formatter', async ({ browser }) => {

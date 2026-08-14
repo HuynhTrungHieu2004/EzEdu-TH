@@ -197,6 +197,7 @@
   height: 24px;
   border-radius: 0 2px 2px 0;
   background-color: var(--ez-accent);
+  will-change: transform, opacity;
 }
 
 .ez-nav-item-active:hover {

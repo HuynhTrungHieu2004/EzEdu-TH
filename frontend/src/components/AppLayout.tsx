@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Ellipsis,
@@ -13,7 +15,7 @@ import { questionApi } from '../api/questionApi';
 import { useAuth } from '../hooks/useAuth';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
-import { PageEntrance } from '../motion';
+import { PageEntrance, useMotion } from '../motion';
 import { buildNavigation, type NavGroup, type NavItem } from './navigation';
 import { usePathnameNavigationEpoch } from './PathnameNavigationEpochContext';
 import {
@@ -96,7 +98,9 @@ function initialsOf(name: string): string {
 export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = useRef<HTMLElement>(null);
   const { status, user, role, area, logout } = useAuth();
+  const { reducedMotion } = useMotion();
   const { isEnabled } = useFeatureFlags();
   const { preference, setPreference } = useTheme();
   const pathnameNavigationEpoch = usePathnameNavigationEpoch();
@@ -156,6 +160,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const overflowActive = Boolean(overflowActiveItem);
 
   const displayName = user?.full_name || 'Người dùng';
+
+  useGSAP(() => {
+    const activeIndicator = sidebarRef.current?.querySelector<HTMLElement>('[data-active-indicator]');
+    if (!activeIndicator) return;
+
+    if (reducedMotion) {
+      gsap.set(activeIndicator, { clearProps: 'transform,transformOrigin,opacity,visibility' });
+      return;
+    }
+
+    gsap.fromTo(
+      activeIndicator,
+      { autoAlpha: 0, scaleY: 0.35, transformOrigin: 'left center' },
+      {
+        autoAlpha: 1,
+        scaleY: 1,
+        duration: 0.28,
+        ease: 'power2.out',
+        clearProps: 'transform,transformOrigin,opacity,visibility',
+      },
+    );
+  }, {
+    scope: sidebarRef,
+    dependencies: [location.pathname, reducedMotion],
+    revertOnUpdate: true,
+  });
 
   const userMenu = (
     <>
@@ -236,7 +266,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         Bỏ qua tới nội dung chính
       </a>
 
-      <aside className="ez-sidebar">
+      <aside ref={sidebarRef} className="ez-sidebar">
         <Link to={area === 'admin' ? '/admin/dashboard' : '/dashboard'} className="ez-brand">
           <span className="ez-brand-mark" aria-hidden="true" translate="no">
             Ez
