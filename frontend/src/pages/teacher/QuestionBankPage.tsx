@@ -16,6 +16,8 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorState,
+  FilterBar,
+  FormField,
   PageHeader,
   Select,
   SkeletonText,
@@ -166,11 +168,11 @@ export default function QuestionBankPage() {
         </Alert>
       )}
 
-      <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
-        <CardBody>
-          <div className="qs-audience-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--ez-space-3)' }}>
-            <Select
-              aria-label="Lọc theo trạng thái"
+      {/* Cùng một thanh lọc như các trang danh sách khác thay vì grid inline riêng */}
+      <div style={{ marginBottom: 'var(--ez-space-6)' }}>
+        <FilterBar columns={3}>
+        <FormField label="Trạng thái">
+          <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as QuestionBankStatus | '')}
               options={[
@@ -181,9 +183,10 @@ export default function QuestionBankPage() {
                 { value: 'published', label: 'Đã xuất bản' },
                 { value: 'archived', label: 'Đã lưu trữ' },
               ]}
-            />
-            <Select
-              aria-label="Lọc theo mức Bloom"
+          />
+        </FormField>
+        <FormField label="Mức Bloom">
+          <Select
               value={bloomFilter}
               onChange={(e) => setBloomFilter(e.target.value)}
               options={[
@@ -193,9 +196,10 @@ export default function QuestionBankPage() {
                 { value: 'apply', label: 'Vận dụng' },
                 { value: 'analyze', label: 'Vận dụng cao' },
               ]}
-            />
-            <Select
-              aria-label="Lọc theo độ khó"
+          />
+        </FormField>
+        <FormField label="Độ khó">
+          <Select
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
               options={[
@@ -204,10 +208,10 @@ export default function QuestionBankPage() {
                 { value: 'medium', label: 'Trung bình' },
                 { value: 'hard', label: 'Khó' },
               ]}
-            />
-          </div>
-        </CardBody>
-      </Card>
+          />
+        </FormField>
+        </FilterBar>
+      </div>
 
       {selectedIds.size > 0 && (
         <Card variant="muted" style={{ marginBottom: 'var(--ez-space-4)' }}>
