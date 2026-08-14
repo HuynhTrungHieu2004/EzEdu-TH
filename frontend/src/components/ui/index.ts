@@ -44,6 +44,8 @@ export type { ToolCardProps } from './ToolCard';
 export { SearchCommand } from './SearchCommand';
 export type { SearchCommandProps } from './SearchCommand';
 export { ProgressBar, ProgressSteps } from './Progress';
+export { TimerRing } from './TimerRing';
+export type { TimerRingProps } from './TimerRing';
 export type { ProgressStep } from './Progress';
 
 /* Lớp nổi */

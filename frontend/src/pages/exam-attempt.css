@@ -1,0 +1,169 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   LÀM BÀI VÀ KẾT QUẢ
+   Một câu mỗi lần, dải chọn câu, vòng đếm ngược, thanh hành động dưới cùng.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Vòng đếm ngược ─────────────────────────────────────────────────── */
+.ez-timer-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.ez-timer-ring-track {
+  stroke: var(--ez-border);
+}
+
+.ez-timer-ring-value {
+  stroke: var(--ez-primary);
+  transition: stroke-dashoffset var(--ez-motion-fast) linear, stroke var(--ez-motion-base) var(--ez-ease-standard);
+}
+
+.ez-timer-ring-danger .ez-timer-ring-value {
+  stroke: var(--ez-error);
+}
+
+.ez-timer-ring-text {
+  position: absolute;
+  font-size: var(--ez-text-h5);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ez-text);
+}
+
+.ez-timer-ring-danger .ez-timer-ring-text {
+  color: var(--ez-error);
+}
+
+/* ── Dải chọn câu ───────────────────────────────────────────────────── */
+.ez-question-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-2);
+  margin-bottom: var(--ez-space-5);
+}
+
+.ez-question-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ez-touch-min);
+  min-height: var(--ez-touch-min);
+  padding: 0 var(--ez-space-2);
+  border: 1px solid var(--ez-border);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface);
+  color: var(--ez-text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: var(--ez-transition-colors);
+}
+
+.ez-question-chip:hover {
+  border-color: var(--ez-primary);
+  color: var(--ez-primary-text);
+}
+
+/* Đã trả lời phân biệt bằng nền + viền, không chỉ bằng màu chữ */
+.ez-question-chip[data-answered='true'] {
+  border-color: var(--ez-primary);
+  background-color: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
+}
+
+/* Đặt sau và cùng độ ưu tiên với rule [data-answered]: câu đang mở phải thắng,
+   kể cả khi câu đó đã được trả lời. */
+.ez-question-chip.ez-question-chip-current,
+.ez-question-chip.ez-question-chip-current:hover {
+  border-color: var(--ez-nav-bg);
+  background-color: var(--ez-nav-bg);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 0 var(--ez-accent);
+}
+
+/* ── Thanh hành động dưới cùng ──────────────────────────────────────── */
+.ez-exam-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--ez-z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+  margin-top: var(--ez-space-6);
+  padding: var(--ez-space-4) 0;
+  background-color: var(--ez-bg);
+  border-top: 1px solid var(--ez-border);
+}
+
+.ez-exam-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-3);
+}
+
+.ez-exam-footer-actions > :last-child {
+  margin-left: auto;
+}
+
+@media (max-width: 639px) {
+  .ez-exam-footer-actions > :last-child {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+}
+
+/* ── Khối kết quả ───────────────────────────────────────────────────── */
+.ez-result-summary {
+  position: relative;
+  overflow: hidden;
+}
+
+.ez-result-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ez-space-5);
+}
+
+.ez-result-score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-1);
+}
+
+.ez-result-score-value {
+  font-size: var(--ez-text-h2);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ez-text);
+}
+
+.ez-result-score-meta,
+.ez-result-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ez-space-3);
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+}
+
+/* ── Confetti ───────────────────────────────────────────────────────── */
+.ez-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ez-confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  visibility: hidden;
+}
