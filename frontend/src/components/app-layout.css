@@ -388,6 +388,21 @@
   background-color: var(--ez-error);
 }
 
+.ez-more-drawer .ez-nav-item {
+  color: var(--ez-text-secondary);
+}
+
+.ez-more-drawer .ez-nav-item:hover {
+  background-color: var(--ez-surface-hover);
+  color: var(--ez-text);
+}
+
+.ez-more-drawer .ez-nav-item-active,
+.ez-more-drawer .ez-nav-item-active:hover {
+  background-color: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
+}
+
 /* ───────────────────────────────────────────────────────────────────────
    Nội dung chính co lại trên màn hình nhỏ
    ─────────────────────────────────────────────────────────────────────── */
@@ -408,21 +423,6 @@
     width: var(--ez-touch-min);
     min-width: var(--ez-touch-min);
     min-height: var(--ez-touch-min);
-  }
-
-  .ez-more-drawer .ez-nav-item {
-    color: var(--ez-text-secondary);
-  }
-
-  .ez-more-drawer .ez-nav-item:hover {
-    background-color: var(--ez-surface-hover);
-    color: var(--ez-text);
-  }
-
-  .ez-more-drawer .ez-nav-item-active,
-  .ez-more-drawer .ez-nav-item-active:hover {
-    background-color: var(--ez-primary-subtle);
-    color: var(--ez-primary-text);
   }
 }
 

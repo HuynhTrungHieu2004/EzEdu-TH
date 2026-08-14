@@ -83,6 +83,29 @@ for (const { user, path, label } of [
   });
 }
 
+test('More drawer giữ tương phản khi viewport đổi sang desktop', async ({ page }) => {
+  await stubApi(page, TEACHER_USER);
+  await page.setViewportSize({ width: 1023, height: 768 });
+  await page.goto('/question-history');
+
+  await page.locator('.ez-tabbar').getByRole('button', { name: /Thêm/ }).click();
+  const drawer = page.getByRole('dialog', { name: 'Thêm' });
+  await expect(drawer).toBeVisible();
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'Đề & câu hỏi', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  const axeResults = await new AxeBuilder({ page })
+    .include('.ez-more-drawer')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(axeResults.violations).toEqual([]);
+});
+
 test('admin navigation toggles every group and reopens the active group after routing', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
   await page.setViewportSize({ width: 1440, height: 900 });
