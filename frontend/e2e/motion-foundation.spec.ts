@@ -1,5 +1,12 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { TEACHER_USER, captureBrowserErrors, stubApi } from './helpers';
+import {
+  ADMIN_USER,
+  TEACHER_USER,
+  captureBrowserErrors,
+  expectNoPageOverflow,
+  stubApi,
+} from './helpers';
 
 declare global {
   interface Window {
@@ -172,4 +179,64 @@ test('AnimatedCounter render decimal cuối ngay trong reduced mode', async ({ b
 
   await expect(page.locator('[data-animated-counter]')).toHaveText('12.5');
   await context.close();
+});
+
+test('reduced motion giữ AppShell đại diện không tràn và axe sạch', async ({ browser }) => {
+  const scenarios = [
+    {
+      name: 'admin desktop sidebar',
+      user: ADMIN_USER,
+      path: '/admin/users',
+      viewport: { width: 1440, height: 900 },
+      shell: '.ez-sidebar',
+    },
+    {
+      name: 'teacher mobile tabbar',
+      user: TEACHER_USER,
+      path: '/question-history',
+      viewport: { width: 390, height: 844 },
+      shell: '.ez-tabbar',
+      historyFixture: true,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const context = await browser.newContext({
+      reducedMotion: 'reduce',
+      viewport: scenario.viewport,
+    });
+    const page = await context.newPage();
+    const browserErrors = captureBrowserErrors(page);
+
+    try {
+      await stubApi(page, scenario.user);
+      if (scenario.historyFixture) {
+        await page.route('**/api/v1/questions/my-history**', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ items: [], next_cursor: null, has_more: false }),
+          });
+        });
+      }
+      await page.goto(scenario.path);
+      await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+      await expect(page.locator(scenario.shell)).toBeVisible();
+      await expect(page.locator('[data-page-entrance]')).toBeVisible();
+      await expect.poll(() => page.locator('[data-page-entrance]').evaluate((element) => ({
+        opacity: element.style.opacity,
+        transform: element.style.transform,
+        visibility: element.style.visibility,
+      }))).toEqual({ opacity: '', transform: '', visibility: '' });
+
+      await expectNoPageOverflow(page);
+      const axeResults = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      expect(axeResults.violations, scenario.name).toEqual([]);
+      expect(browserErrors, scenario.name).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  }
 });
