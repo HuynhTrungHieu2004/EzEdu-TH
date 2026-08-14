@@ -94,21 +94,80 @@ test('trang công khai không có vi phạm axe A/AA sau khi di trú', async ({ 
   }
 });
 
-test('onboarding học sinh có đường thoát "Để sau"', async ({ page }) => {
+async function stubOnboarding(page: import('@playwright/test').Page) {
   await stubApi(page, { ...STUDENT_USER, student_profile_completed: false });
-  await page.route('**/api/v1/personalization/onboarding-options', async (route) => {
+  await page.route('**/api/v1/personalization/me/onboarding/options', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         grades: [10, 11, 12],
-        subjects: [{ id: 'math', label: 'Toán' }, { id: 'physics', label: 'Vật lý' }],
-        goals: [],
+        subjects: [{ id: 'toan', label: 'Toán' }, { id: 'vat_li', label: 'Vật lí' }],
+        exam_combinations: [
+          { code: 'A00', label: 'A00 (Toán, Vật lí, Hóa học)', subjects: ['Toán', 'Vật lí', 'Hóa học'], group: 'A' },
+          { code: 'D01', label: 'D01 (Toán, Ngữ văn, Tiếng Anh)', subjects: ['Toán', 'Ngữ văn', 'Tiếng Anh'], group: 'D' },
+        ],
       }),
     });
   });
+  await page.route('**/api/v1/personalization/me/onboarding', async (route) => {
+    if (route.request().method() === 'PUT') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user_id: STUDENT_USER.id, grade_level: 11, strong_subjects: [], weak_subjects: [], target_exam_combinations: ['A00'], onboarding_completed: true }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+  });
+}
+
+test('onboarding đi từng bước, quay lại được và giữ đường thoát "Để sau"', async ({ page }) => {
+  await stubOnboarding(page);
   await page.goto('/student-onboarding');
 
+  // Bước 1: lớp
+  await expect(page.getByRole('group', { name: 'Bạn đang học lớp mấy?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Quay lại' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Để sau' })).toBeEnabled();
-  await expect(page.getByRole('button', { name: 'Lưu và bắt đầu học' })).toBeEnabled();
+  await page.getByRole('radio', { name: 'Lớp 11' }).check();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+
+  // Bước 2 -> 3
+  await expect(page.getByRole('group', { name: 'Môn nào bạn đang tự tin?' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Toán' }).check();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+
+  // Điểm mạnh đã chọn không xuất hiện trong danh sách điểm yếu
+  await expect(page.getByRole('group', { name: 'Môn nào bạn muốn cải thiện?' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Toán' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Vật lí' })).toBeVisible();
+
+  // Quay lại giữ nguyên lựa chọn của bước trước
+  await page.getByRole('button', { name: 'Quay lại' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Toán' })).toBeChecked();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+
+  // Bước cuối bắt buộc chọn tổ hợp
+  await expect(page.getByRole('group', { name: 'Khối hoặc tổ hợp môn muốn ôn' })).toBeVisible();
+  await page.getByRole('button', { name: 'Lưu và bắt đầu học' }).click();
+  await expect(page.getByText('Hãy chọn ít nhất một khối hoặc tổ hợp môn muốn ôn.')).toBeVisible();
+
+  await page.getByRole('checkbox', { name: /A00/ }).check();
+  await page.getByRole('button', { name: 'Lưu và bắt đầu học' }).click();
+  await expect(page).toHaveURL(/\/published-questions$/);
+});
+
+test('onboarding giữ nháp khi tải lại trang', async ({ page }) => {
+  await stubOnboarding(page);
+  await page.goto('/student-onboarding');
+
+  await page.getByRole('radio', { name: 'Lớp 10' }).check();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.getByRole('checkbox', { name: 'Vật lí' }).check();
+
+  await page.reload();
+
+  // Về lại bước 1 nhưng dữ liệu đã chọn còn nguyên
+  await expect(page.getByRole('radio', { name: 'Lớp 10' })).toBeChecked();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Vật lí' })).toBeChecked();
 });
