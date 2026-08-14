@@ -17,6 +17,7 @@ import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
 import { PageEntrance, useMotion } from '../motion';
 import { buildNavigation, type NavGroup, type NavItem } from './navigation';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { usePathnameNavigationEpoch } from './PathnameNavigationEpochContext';
 import {
   Badge,
@@ -355,7 +356,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         <main id="main" className="ez-main" tabIndex={-1}>
           <PageEntrance key={location.pathname} routeKey={location.pathname}>
-            {children}
+            {/* Lỗi render của một trang không được làm trắng cả khung ứng dụng */}
+            <RouteErrorBoundary resetKey={location.pathname}>
+              {children}
+            </RouteErrorBoundary>
           </PageEntrance>
         </main>
 
