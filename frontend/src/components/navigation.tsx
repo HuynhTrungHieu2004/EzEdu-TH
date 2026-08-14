@@ -100,7 +100,9 @@ export function buildNavigation({
   if (hasPermission(role, 'users.view', permissions)) {
     overview.push({ to: '/admin/users', label: 'Người dùng', icon: <Users size={ICON} /> });
   }
-  if (overview.length > 0) groups.push({ id: 'admin-overview', items: overview });
+  if (overview.length > 0) {
+    groups.push({ id: 'admin-overview', label: 'Tổng quan', collapsible: true, items: overview });
+  }
 
   const content: NavItem[] = [];
   if (hasPermission(role, 'documents.view', permissions)) {

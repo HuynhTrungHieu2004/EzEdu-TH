@@ -19,14 +19,36 @@ test('teacher shell hiện nhóm nghiệp vụ giáo viên', async ({ page }) =>
   await expect(navigation.getByRole('link', { name: 'Ma trận đề', exact: true })).toBeVisible();
 });
 
-test('admin navigation có nhóm thu gọn với aria-expanded', async ({ page }) => {
+test('admin navigation toggles every group and reopens the active group after routing', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
   await page.goto('/admin/dashboard');
 
-  const trigger = page.getByRole('button', { name: 'Nội dung' });
-  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await trigger.click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  const overviewTrigger = page.getByRole('button', { name: 'Tổng quan' });
+  const contentTrigger = page.getByRole('button', { name: 'Nội dung' });
+  const overviewPanel = page.locator('#nav-group-admin-overview');
+  const contentPanel = page.locator('#nav-group-admin-content');
+
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
+  await overviewTrigger.click();
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(overviewPanel).toBeHidden();
+  await overviewTrigger.click();
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
+
+  await contentTrigger.click();
+  await expect(contentTrigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(contentPanel).toBeHidden();
+
+  await page.evaluate(() => {
+    window.history.pushState({ key: 'admin-documents-e2e' }, '', '/admin/documents');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  await expect(contentTrigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(contentPanel).toBeVisible();
+  await contentTrigger.click();
+  await expect(contentTrigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(contentPanel).toBeHidden();
 });
 
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {

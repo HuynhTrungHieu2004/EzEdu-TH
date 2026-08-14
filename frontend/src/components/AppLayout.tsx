@@ -14,7 +14,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
 import { PageEntrance } from '../motion';
-import { buildNavigation, type NavItem } from './navigation';
+import { buildNavigation, type NavGroup, type NavItem } from './navigation';
 import {
   Badge,
   Button,
@@ -31,7 +31,36 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
+interface SidebarNavigationGroupProps {
+  group: NavGroup;
+  renderNavLink: (item: NavItem) => ReactNode;
+}
+
 const ICON = 18;
+
+function SidebarNavigationGroup({ group, renderNavLink }: SidebarNavigationGroupProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  const panelId = `nav-group-${group.id}`;
+
+  return (
+    <div className="ez-nav-group">
+      {group.collapsible ? (
+        <button
+          type="button"
+          className="ez-nav-group-label"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          {group.label ?? group.id}
+        </button>
+      ) : group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
+      <div id={panelId} hidden={!isOpen}>
+        {group.items.map((item) => renderNavLink(item))}
+      </div>
+    </div>
+  );
+}
 
 function roleLabel(role: string | undefined): string {
   switch (role) {
@@ -70,7 +99,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { preference, setPreference } = useTheme();
   const [pendingExams, setPendingExams] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
 
   const permissions = user?.permissions_override ?? [];
   const pendingBadgeCount = area === 'student' ? pendingExams : 0;
@@ -110,7 +138,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     : [];
   const allItems = groups.flatMap((g) => g.items);
   const activeItem = allItems.find((item) => isActive(item.to));
-  const activeGroupId = groups.find((group) => group.items.some((item) => isActive(item.to)))?.id;
 
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
@@ -216,38 +243,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Skeleton height="2.5rem" />
             </div>
           ) : (
-            groups.map((group) => {
-              const isOpen = !group.collapsible
-                || group.id === activeGroupId
-                || !collapsedGroupIds.has(group.id);
-              const panelId = `nav-group-${group.id}`;
-
-              return (
-                <div key={group.id} className="ez-nav-group">
-                  {group.collapsible ? (
-                    <button
-                      type="button"
-                      className="ez-nav-group-label"
-                      aria-expanded={isOpen}
-                      aria-controls={panelId}
-                      onClick={() => {
-                        setCollapsedGroupIds((current) => {
-                          const next = new Set(current);
-                          if (next.has(group.id)) next.delete(group.id);
-                          else next.add(group.id);
-                          return next;
-                        });
-                      }}
-                    >
-                      {group.label}
-                    </button>
-                  ) : group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
-                  <div id={panelId} hidden={!isOpen}>
-                    {group.items.map((item) => renderNavLink(item))}
-                  </div>
-                </div>
-              );
-            })
+            groups.map((group) => (
+              <SidebarNavigationGroup
+                key={`${location.key}-${group.id}`}
+                group={group}
+                renderNavLink={renderNavLink}
+              />
+            ))
           )}
         </nav>
 
