@@ -82,6 +82,11 @@ test('panel bên của chat theo bề ngang: ba cột desktop, drawer trên mobi
   await expect(asides.first()).toBeHidden();
   await expect(asides.last()).toBeHidden();
 
+  // Khối chọn phạm vi cũng vào drawer để hội thoại lên ngay đầu màn hình
+  const scopeTrigger = page.getByRole('button', { name: 'Phạm vi kiến thức' });
+  await expect(scopeTrigger).toBeVisible();
+  await expect(page.locator('.ez-chat-scope')).toBeHidden();
+
   const citationTrigger = page.getByRole('button', { name: 'Nguồn trích dẫn' });
   await expect(citationTrigger).toBeVisible();
   await citationTrigger.click();

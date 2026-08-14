@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, BookOpen, MessagesSquare } from 'lucide-react';
+import { AlertTriangle, BookOpen, MessagesSquare, SlidersHorizontal } from 'lucide-react';
 
 import { chatApi } from '../api/chatApi';
 import { documentApi } from '../api/documentApi';
@@ -45,6 +45,7 @@ const AdvancedChatPage = () => {
   // Chỉ dùng dưới 1024px: hai panel bên hiển thị dạng drawer
   const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
   const [citationDrawerOpen, setCitationDrawerOpen] = useState(false);
+  const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
 
   // Status indicators
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -711,6 +712,31 @@ const AdvancedChatPage = () => {
     />
   );
 
+  const scopeControls = (
+    <>
+      <KnowledgeScopeSelector
+        scope={scope}
+        useWebSearch={useWebSearch}
+        onScopeChange={(newScope) => {
+          setScope(newScope);
+          setSelectedDocumentIds([]);
+        }}
+        onWebSearchToggle={setUseWebSearch}
+        disabled={isBusy}
+      />
+
+      <DocumentSelector
+        documents={documents}
+        selectedIds={selectedDocumentIds}
+        scope={scope}
+        loading={loadingDocs}
+        error={docsError}
+        onChange={setSelectedDocumentIds}
+        disabled={isBusy}
+      />
+    </>
+  );
+
   const citationList = (
     <CitationPanel
       internalCitations={activeInternalCitations}
@@ -728,8 +754,16 @@ const AdvancedChatPage = () => {
 
         {/* Center Panel: Main query stream and settings */}
         <div style={styles.chatArea}>
-          {/* Dưới 1024px hai panel bên nằm trong drawer, mở từ thanh này */}
+          {/* Dưới 1024px các panel phụ nằm trong drawer, mở từ thanh này */}
           <div className="ez-chat-mobile-bar">
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={<SlidersHorizontal size={16} aria-hidden="true" />}
+              onClick={() => setScopeDrawerOpen(true)}
+            >
+              Phạm vi kiến thức
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -748,26 +782,8 @@ const AdvancedChatPage = () => {
             </Button>
           </div>
 
-          <KnowledgeScopeSelector
-            scope={scope}
-            useWebSearch={useWebSearch}
-            onScopeChange={(newScope) => {
-              setScope(newScope);
-              setSelectedDocumentIds([]);
-            }}
-            onWebSearchToggle={setUseWebSearch}
-            disabled={isBusy}
-          />
-
-          <DocumentSelector
-            documents={documents}
-            selectedIds={selectedDocumentIds}
-            scope={scope}
-            loading={loadingDocs}
-            error={docsError}
-            onChange={setSelectedDocumentIds}
-            disabled={isBusy}
-          />
+          {/* Ẩn dưới 1024px: hai khối này chiếm gần 280px trước khi tới hội thoại */}
+          <div className="ez-chat-scope">{scopeControls}</div>
 
           {errorMessage && (
             <div style={styles.errorAlert} role="alert">
@@ -828,6 +844,16 @@ const AdvancedChatPage = () => {
         className="ez-chat-drawer-panel"
       >
         {conversationList}
+      </Drawer>
+
+      <Drawer
+        open={scopeDrawerOpen}
+        onClose={() => setScopeDrawerOpen(false)}
+        side="bottom"
+        title="Phạm vi kiến thức"
+        className="ez-chat-drawer-panel"
+      >
+        {scopeControls}
       </Drawer>
 
       <Drawer

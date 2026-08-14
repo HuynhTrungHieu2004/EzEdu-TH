@@ -39,3 +39,11 @@
 .ez-chat-drawer-panel [data-citation-header] {
   display: none;
 }
+
+/* Khối chọn phạm vi kiến thức chiếm gần 280px chiều cao — dưới 1024px đưa vào
+   drawer để hội thoại lên ngay đầu màn hình. */
+@media (max-width: 1023px) {
+  .ez-chat-scope {
+    display: none;
+  }
+}
