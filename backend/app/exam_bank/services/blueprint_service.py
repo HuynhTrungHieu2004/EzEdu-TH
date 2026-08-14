@@ -139,6 +139,7 @@ async def fetch_candidate_questions(
         candidates.append(
             {
                 "id": str(doc["_id"]),
+                "content": doc.get("content", ""),
                 "topic_id": doc.get("topic_id"),
                 "bloom_level": doc["bloom_level"],
                 "difficulty": doc["difficulty"],

@@ -6,6 +6,7 @@ from mongomock_motor import AsyncMongoMockClient
 from app.core.concurrency import VersionConflict
 from app.exam_bank.schemas.question import QuestionBankCreate, QuestionBankReviewRequest, QuestionBankUpdate
 from app.exam_bank.services import question_bank_service
+from app.exam_bank.services.blueprint_service import fetch_candidate_questions
 
 
 def _create_payload(**overrides):
@@ -164,6 +165,27 @@ class QuestionBankServiceTests(unittest.IsolatedAsyncioTestCase):
             self.db, [other_q.id], target_status="archived", actor_id=self.owner_id, is_admin=False
         )
         self.assertEqual(changed, 0)
+
+    async def test_blueprint_candidates_include_content_for_kmeans(self):
+        created = await question_bank_service.create_question(
+            self.db, _create_payload(), owner_id=self.owner_id
+        )
+        await self.db["questions"].update_one(
+            {"_id": __import__("bson").ObjectId(created.id)},
+            {"$set": {"status": "approved"}},
+        )
+        blueprint = {
+            "subject_id": "math",
+            "grade": 10,
+            "curriculum_version": "2018",
+            "constraints": {},
+        }
+
+        candidates = await fetch_candidate_questions(
+            self.db, blueprint, exclude_recently_used_days=None
+        )
+
+        self.assertEqual(candidates[0]["content"], "1 + 1 = ?")
 
 
 if __name__ == "__main__":
