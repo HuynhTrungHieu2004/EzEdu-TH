@@ -260,10 +260,13 @@ test('dark theme keeps the academic teal and gold semantic palette', async ({ pa
   expect(colors.accent).toBe('rgb(229, 184, 91)');
 });
 
+// `/documents` đã bỏ wrapper legacy `.page` khi di trú sang DataTable dùng chung,
+// nên bài này chuyển sang một route còn dùng `.page` (`.page` legacy vẫn khai báo
+// `animation: fadeSlideUp`, đúng thứ cần kiểm ở chế độ giảm chuyển động).
 test('reduced motion disables legacy page entrance on authenticated content', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await stubApi(page, TEACHER_USER);
-  await page.goto('/documents');
+  await page.goto('/teacher/content-history');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
 
   const motion = await page.locator('[data-page-entrance] .page').evaluate((element) => {
