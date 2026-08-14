@@ -1,13 +1,31 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
+import { Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from '../components/ui';
+import { Alert, Button, Card, CardBody, FormField, Input, Select } from '../components/ui';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { GoogleRoleDialog } from '../components/GoogleRoleDialog';
 import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
+import './auth.css';
+
+const BRAND_POINTS = [
+  'Giáo viên: tải học liệu, sinh câu hỏi, dựng ma trận đề',
+  'Học sinh: ôn tập theo chủ đề và xem tiến độ từng tuần',
+  'Mỗi câu trả lời của AI đều kèm nguồn trích dẫn',
+];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+type FieldErrors = {
+  fullName?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+};
 
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -17,6 +35,7 @@ const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const navigate = useNavigate();
   const { refresh } = useAuth();
@@ -29,29 +48,28 @@ const RegisterPage = () => {
     }
   }, [navigate]);
 
+  /** Mỗi lỗi hiện cạnh đúng trường gây ra nó, không gộp vào một dòng trên đầu. */
+  function validate(): boolean {
+    const next: FieldErrors = {};
+    if (!fullName.trim()) next.fullName = 'Nhập họ và tên.';
+    if (!email.trim()) next.email = 'Nhập email.';
+    else if (!EMAIL_PATTERN.test(email.trim())) next.email = 'Email chưa đúng định dạng.';
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      next.password = `Mật khẩu phải chứa ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`;
+    }
+    if (confirmPassword !== password) next.confirmPassword = 'Mật khẩu xác nhận không khớp.';
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (password.length < 6) {
-      setError('Mật khẩu phải chứa ít nhất 6 ký tự.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.');
-      return;
-    }
+    if (!validate()) return;
 
     setLoading(true);
-
     try {
-      await authApi.register({
-        email,
-        full_name: fullName,
-        password,
-        role,
-      });
+      await authApi.register({ email, full_name: fullName, password, role });
       if (role === 'student') {
         const data = await authApi.login({ email, password });
         localStorage.setItem('access_token', data.access_token);
@@ -68,115 +86,127 @@ const RegisterPage = () => {
       });
     } catch (err: unknown) {
       const detail = getApiErrorDetail(err);
-      setError(
-        detail ?? 'Đăng ký không thành công. Email có thể đã tồn tại hoặc không hợp lệ.'
-      );
+      setError(detail ?? 'Đăng ký không thành công. Email có thể đã tồn tại hoặc không hợp lệ.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-header">
-          <div className="auth-mark" translate="no">Ez</div>
-          <h1 className="auth-title">Đăng ký EzEdu AI</h1>
-          <p className="auth-subtitle">Biến học liệu thành đề thi dễ dàng</p>
-        </div>
+    <div className="ez-auth">
+      <aside className="ez-auth-brand" aria-hidden="true">
+        <h2 className="ez-auth-brand-title">Tạo tài khoản EzEdu AI</h2>
+        <p className="ez-auth-brand-sub">
+          Một tài khoản dùng chung cho việc dạy và việc học, phân quyền theo vai trò bạn chọn.
+        </p>
+        <ul className="ez-auth-points">
+          {BRAND_POINTS.map((point) => (
+            <li key={point} className="ez-auth-point">
+              <span className="ez-auth-point-mark">
+                <Check size={15} />
+              </span>
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      </aside>
 
-        {error && <div className="alert alert-error">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="form-stack">
-          <div className="form-group">
-            <label htmlFor="register-full-name" className="form-label">Họ và tên</label>
-            <input
-              id="register-full-name"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nguyễn Văn A"
-              required
-              disabled={loading}
-              className="form-input"
-            />
+      <Card>
+        <CardBody>
+          <div className="ez-auth-form-head">
+            <h1 className="ez-auth-title">Đăng ký</h1>
+            <p className="ez-auth-subtitle">Chỉ mất một phút để bắt đầu.</p>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="register-email" className="form-label">Email</label>
-            <input
-              id="register-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              required
-              disabled={loading}
-              className="form-input"
-            />
+          {error && <Alert tone="error" style={{ marginBottom: 'var(--ez-space-4)' }}>{error}</Alert>}
+
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="ez-auth-fields">
+              <FormField label="Họ và tên" error={fieldErrors.fullName}>
+                <Input
+                  autoComplete="name"
+                  value={fullName}
+                  placeholder="Nguyễn Văn A"
+                  disabled={loading}
+                  invalid={Boolean(fieldErrors.fullName)}
+                  onChange={(event) => setFullName(event.target.value)}
+                />
+              </FormField>
+
+              <FormField label="Email" error={fieldErrors.email}>
+                <Input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  placeholder="name@example.com"
+                  disabled={loading}
+                  invalid={Boolean(fieldErrors.email)}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </FormField>
+
+              <FormField label="Bạn là">
+                <Select
+                  value={role}
+                  disabled={loading}
+                  options={[
+                    { value: 'student', label: 'Học sinh' },
+                    { value: 'lecturer', label: 'Giảng viên' },
+                  ]}
+                  onChange={(event) => setRole(event.target.value as 'student' | 'lecturer')}
+                />
+              </FormField>
+
+              <FormField
+                label="Mật khẩu"
+                hint={`Tối thiểu ${MIN_PASSWORD_LENGTH} ký tự`}
+                error={fieldErrors.password}
+              >
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  invalid={Boolean(fieldErrors.password)}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </FormField>
+
+              <FormField label="Xác nhận mật khẩu" error={fieldErrors.confirmPassword}>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  invalid={Boolean(fieldErrors.confirmPassword)}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </FormField>
+
+              <Button type="submit" size="lg" block loading={loading}>
+                Đăng ký tài khoản
+              </Button>
+            </div>
+          </form>
+
+          <div className="ez-auth-divider">hoặc</div>
+
+          <div className="ez-auth-alt">
+            <GoogleSignInButton onCredential={google.onCredential} disabled={google.dangXuLy} />
+            {google.error && <Alert tone="error">{google.error}</Alert>}
           </div>
+          {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
 
-          <div className="form-group">
-            <label htmlFor="register-role" className="form-label">Bạn là</label>
-            <select
-              id="register-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as 'student' | 'lecturer')}
-              disabled={loading}
-              className="form-select"
-            >
-              <option value="student">Học sinh</option>
-              <option value="lecturer">Giảng viên</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="register-password" className="form-label">Mật khẩu (tối thiểu 6 ký tự)</label>
-            <input
-              id="register-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="register-confirm-password" className="form-label">Xác nhận mật khẩu</label>
-            <input
-              id="register-confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={loading}
-              className="form-input"
-            />
-          </div>
-
-          <Button type="submit" size="hero" block disabled={loading}>
-            {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
-          </Button>
-        </form>
-
-        <div style={{ display: 'grid', gap: 12, justifyItems: 'center', marginTop: 16 }}>
-          <span className="text-muted">hoặc</span>
-          <GoogleSignInButton onCredential={google.onCredential} disabled={google.dangXuLy} />
-          {google.error && <p className="text-danger">{google.error}</p>}
-        </div>
-        {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
-
-        <div className="auth-footer">
-          Đã có tài khoản?{' '}
-          <button type="button" onClick={() => navigate('/login')} className="text-link">
-            Đăng nhập
-          </button>
-        </div>
-      </div>
+          <p className="ez-auth-footer">
+            Đã có tài khoản?{' '}
+            <Button variant="link" onClick={() => navigate('/login')}>
+              Đăng nhập
+            </Button>
+          </p>
+        </CardBody>
+      </Card>
     </div>
   );
 };

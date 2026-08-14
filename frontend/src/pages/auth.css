@@ -1,0 +1,138 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   ĐĂNG NHẬP / ĐĂNG KÝ
+   Bố cục hai vùng theo spec §6.2: vùng thương hiệu (navy) và vùng form.
+   Dưới 900px chỉ còn vùng form — vùng thương hiệu là trang trí, không chứa
+   thông tin nào mà form không nói.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ez-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ez-space-6);
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+  padding: var(--ez-space-6) 0;
+}
+
+@media (min-width: 900px) {
+  .ez-auth {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: stretch;
+    gap: var(--ez-space-8);
+  }
+}
+
+/* ── Vùng thương hiệu ───────────────────────────────────────────────── */
+.ez-auth-brand {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--ez-space-5);
+  padding: var(--ez-space-8);
+  border-radius: var(--ez-radius-xl);
+  background: var(--ez-gradient-hero);
+  color: var(--ez-text-on-brand);
+}
+
+@media (min-width: 900px) {
+  .ez-auth-brand {
+    display: flex;
+  }
+}
+
+.ez-auth-brand-title {
+  margin: 0;
+  font-family: var(--ez-font-heading);
+  font-size: var(--ez-text-h2);
+  line-height: var(--ez-leading-heading);
+  color: var(--ez-text-on-brand);
+}
+
+.ez-auth-brand-sub {
+  margin: 0;
+  color: rgb(255 255 255 / 88%);
+  line-height: var(--ez-leading-body);
+}
+
+.ez-auth-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ez-auth-point {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ez-space-3);
+  color: rgb(255 255 255 / 92%);
+}
+
+.ez-auth-point-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--ez-radius-full, 999px);
+  background-color: var(--ez-accent);
+  color: var(--ez-ink-900);
+}
+
+/* ── Vùng form ──────────────────────────────────────────────────────── */
+.ez-auth-form-head {
+  margin-bottom: var(--ez-space-5);
+}
+
+.ez-auth-title {
+  margin: 0 0 var(--ez-space-2);
+  font-family: var(--ez-font-heading);
+  font-size: var(--ez-text-h3);
+  line-height: var(--ez-leading-heading);
+  color: var(--ez-text);
+}
+
+.ez-auth-subtitle {
+  margin: 0;
+  color: var(--ez-text-secondary);
+}
+
+.ez-auth-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-4);
+}
+
+.ez-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-3);
+  margin: var(--ez-space-5) 0;
+  color: var(--ez-text-muted);
+  font-size: var(--ez-text-body-sm);
+}
+
+.ez-auth-divider::before,
+.ez-auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--ez-border);
+}
+
+.ez-auth-alt {
+  display: grid;
+  gap: var(--ez-space-3);
+  justify-items: center;
+}
+
+.ez-auth-footer {
+  margin-top: var(--ez-space-5);
+  text-align: center;
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+}
