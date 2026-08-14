@@ -265,17 +265,18 @@
    5b. GRADIENT — dùng cho hero/CTA nổi bật, tinh thần MagicSchool
    ─────────────────────────────────────────────────────────────────────── */
 :root {
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-coral-400) 0%, var(--ez-forest-500) 55%, var(--ez-forest-700) 100%);
-  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-forest-600) 0%, var(--ez-forest-700) 100%);
-  /* Nền nhấn của khung sau đăng nhập — navy mực chuyển sang teal khoáng.
-     `--ez-gradient-hero`/`--ez-gradient-cta` còn phục vụ trang công khai chưa
-     di trú, nên khung app dùng token riêng thay vì sửa hai token đó. */
+  /* Trang công khai dùng chung hướng "Học thuật hiện đại" với khung sau đăng
+     nhập: navy mực nền, teal khoáng nhấn. Trước đây hai token này còn neo vào
+     thang forest của hệ cũ nên landing/login nhìn lệch hẳn với app. */
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-950) 0%, var(--ez-ink-800) 55%, var(--ez-mineral-700) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-ink-900) 0%, var(--ez-mineral-700) 100%);
+  /* Nền nhấn của khung sau đăng nhập */
   --ez-gradient-shell: linear-gradient(120deg, var(--ez-ink-900) 0%, var(--ez-ink-800) 58%, var(--ez-mineral-700) 100%);
 }
 
 [data-theme='dark'] {
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-coral-400) 0%, var(--ez-forest-400) 55%, var(--ez-forest-800) 100%);
-  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-forest-400) 0%, var(--ez-forest-600) 100%);
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-950) 0%, var(--ez-ink-900) 55%, var(--ez-mineral-700) 100%);
+  --ez-gradient-cta:  linear-gradient(120deg, var(--ez-ink-950) 0%, var(--ez-mineral-700) 100%);
   --ez-gradient-shell: linear-gradient(120deg, var(--ez-ink-950) 0%, var(--ez-ink-900) 58%, var(--ez-mineral-700) 100%);
 }
 

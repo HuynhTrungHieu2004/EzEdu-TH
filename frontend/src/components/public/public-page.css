@@ -40,8 +40,10 @@
 .ezp-section-alt { background-color: var(--ez-surface); }
 
 /* Section nền tối — chỉ dùng cho CTA cuối trang, tạo điểm kết rõ ràng */
+/* Khối tối dùng navy mực của hệ học thuật, không dùng neutral tím của hệ cũ */
 .ezp-section-dark {
-  background-color: var(--ez-neutral-900);
+  background-color: var(--ez-nav-bg);
+  background-image: var(--ez-gradient-cta);
   color: var(--ez-neutral-50);
 }
 
@@ -90,7 +92,7 @@
 
 .ezp-section-dark .ezp-title { color: var(--ez-neutral-0); }
 .ezp-section-dark .ezp-lede { color: var(--ez-neutral-300); }
-.ezp-section-dark .ezp-eyebrow { color: var(--ez-coral-300); }
+.ezp-section-dark .ezp-eyebrow { color: var(--ez-accent); }
 
 /* ───────────────────────────────────────────────────────────────────────
    HEADER
@@ -99,12 +101,10 @@
   position: sticky;
   top: 0;
   z-index: var(--ez-z-sticky);
-  background-color: color-mix(in srgb, var(--ez-surface) 92%, transparent);
+  /* Nền đục hẳn: ở mức 92% chữ của section bên dưới hằn qua thanh header khi
+     cuộn, đọc rất khó. */
+  background-color: var(--ez-surface);
   border-bottom: 1px solid var(--ez-border-subtle);
-}
-
-@supports not (background-color: color-mix(in srgb, red 50%, transparent)) {
-  .ezp-header { background-color: var(--ez-surface); }
 }
 
 .ezp-header-inner {
