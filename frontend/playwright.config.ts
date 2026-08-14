@@ -27,6 +27,12 @@ export default defineConfig({
     env: {
       ...process.env,
       VITE_API_BASE_URL: baseURL,
+      // Google Identity Services từ chối origin 127.0.0.1:4173 và log lỗi ra
+      // console, làm mọi bài kiểm "không lỗi trình duyệt" fail trên máy có
+      // client ID thật trong .env. Bộ kiểm thử không dùng đăng nhập Google:
+      // chạy với client ID rỗng để nút hiện đúng trạng thái "chưa cấu hình"
+      // và console sạch. Ai cần thử luồng Google thì chạy dev server thường.
+      VITE_GOOGLE_CLIENT_ID: '',
     },
   },
   projects: [
