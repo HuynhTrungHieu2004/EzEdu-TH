@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { ADMIN_USER, TEACHER_USER, stubApi } from './helpers';
 
 const ROUTES = [
@@ -12,6 +13,16 @@ const ROUTES = [
   '/maintenance',
   '/duong-dan-khong-ton-tai',
 ];
+
+async function expectSettledPageEntrance(page: Page) {
+  const entrance = page.locator('[data-page-entrance]');
+  await expect(entrance).toBeVisible();
+  await expect.poll(() => entrance.evaluate((element) => ({
+    opacity: element.style.opacity,
+    transform: element.style.transform,
+    visibility: element.style.visibility,
+  }))).toEqual({ opacity: '', transform: '', visibility: '' });
+}
 
 for (const path of ROUTES) {
   test(`${path} không có vi phạm axe mức A/AA`, async ({ page }) => {
@@ -64,6 +75,7 @@ test('Admin layout và unavailable state không có vi phạm axe mức A/AA', a
   await stubApi(page, ADMIN_USER);
   await page.goto('/admin/users');
   await expect(page.locator('#main')).not.toBeEmpty();
+  await expectSettledPageEntrance(page);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
@@ -74,6 +86,7 @@ test('Teacher ExamGrading invalid state không có vi phạm axe mức A/AA', as
   await stubApi(page, TEACHER_USER);
   await page.goto('/exams/not-an-object-id/grading');
   await expect(page.getByText('Không tìm thấy đề thi')).toBeVisible();
+  await expectSettledPageEntrance(page);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();

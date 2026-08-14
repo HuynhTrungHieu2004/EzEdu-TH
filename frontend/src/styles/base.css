@@ -265,12 +265,41 @@ th {
 
 html[data-motion='reduced'] {
   scroll-behavior: auto !important;
+  /* Các component mới dùng duration semantic, vì vậy zero hoá token sẽ làm
+     trạng thái xuất hiện tức thì mà không cần từng component tự đoán mode. */
+  --ez-duration-fast: 0ms;
+  --ez-duration-base: 0ms;
+  --ez-duration-slow: 0ms;
+  --ez-motion-fast: 0ms;
+  --ez-motion-base: 0ms;
+  --ez-motion-slow: 0ms;
 }
 
 html[data-motion='reduced'] *,
 html[data-motion='reduced'] *::before,
 html[data-motion='reduced'] *::after {
   scroll-behavior: auto !important;
+  /* Transition chỉ làm mượt thay đổi trạng thái; bỏ duration không làm mất
+     trạng thái cuối, đồng thời phủ được các consumer legacy chưa dùng token. */
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Chỉ tắt animation trang trí/entrance đã biết. Không dùng blanket
+   `animation: none` để spinner, progress indeterminate và skeleton shimmer
+   vẫn truyền đạt đúng trạng thái đang xử lý/đang tải. */
+html[data-motion='reduced'] :where(
+  .page,
+  .sidebar-brand-icon,
+  .ez-toast,
+  .ez-overlay,
+  .ez-dialog,
+  .ez-drawer,
+  .ez-dropdown-menu,
+  .ez-tooltip,
+  .ez-chalk-underline path
+) {
+  animation: none !important;
 }
 
 /* ───────────────────────────────────────────────────────────────────────

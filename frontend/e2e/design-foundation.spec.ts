@@ -260,22 +260,24 @@ test('dark theme keeps the academic teal and gold semantic palette', async ({ pa
   expect(colors.accent).toBe('rgb(229, 184, 91)');
 });
 
-test('reduced motion preserves animations while disabling root smooth scrolling', async ({ page }) => {
+test('reduced motion disables legacy page entrance on authenticated content', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await stubApi(page, TEACHER_USER);
-  await page.goto('/dashboard');
-  const motion = await page.evaluate(() => {
-    document.documentElement.dataset.motion = 'reduced';
-    const probe = document.createElement('div');
-    probe.style.animation = 'spin 750ms linear infinite';
-    document.body.append(probe);
-    const result = {
+  await page.goto('/documents');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+
+  const motion = await page.locator('[data-page-entrance] .page').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
       rootScrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
-      animationDuration: getComputedStyle(probe).animationDuration,
+      animationName: style.animationName,
+      animationDuration: style.animationDuration,
+      transitionDuration: style.transitionDuration,
     };
-    probe.remove();
-    return result;
   });
 
   expect(motion.rootScrollBehavior).toBe('auto');
-  expect(motion.animationDuration).toBe('0.75s');
+  expect(motion.animationName).toBe('none');
+  expect(motion.animationDuration).toBe('0s');
+  expect(motion.transitionDuration).toBe('0s');
 });

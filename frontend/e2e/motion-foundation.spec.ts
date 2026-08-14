@@ -11,7 +11,8 @@ import {
 declare global {
   interface Window {
     __previousPageEntrance?: HTMLElement;
-    __activeIndicatorStyleHistory?: string[];
+    __pageEntranceWasActivelyStyled?: boolean;
+    __activeIndicatorStyleHistory?: Array<{ href: string | null; style: string }>;
     __activeIndicatorStyleObserver?: MutationObserver;
   }
 }
@@ -38,31 +39,68 @@ test.describe('motion preference', () => {
 
 test('route content cleanup animation khi điều hướng SPA', async ({ page }) => {
   const browserErrors = captureBrowserErrors(page);
-
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
-  const entrance = page.locator('[data-page-entrance]');
-  await expect(entrance).toBeVisible();
-  await entrance.evaluate((node) => {
-    window.__previousPageEntrance = node as HTMLElement;
+  const dashboardEntrance = page.locator('[data-page-entrance]');
+  await expect(dashboardEntrance).toBeVisible();
+  await expect.poll(() => dashboardEntrance.evaluate((element) => ({
+    transform: element.style.transform,
+    opacity: element.style.opacity,
+    visibility: element.style.visibility,
+  }))).toEqual({ transform: '', opacity: '', visibility: '' });
+
+  await page.evaluate(() => {
+    const settledDashboardEntrance = document.querySelector('[data-page-entrance]');
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (
+          mutation.type !== 'attributes'
+          || !(mutation.target instanceof HTMLElement)
+          || !mutation.target.matches('[data-page-entrance]')
+          || mutation.target === settledDashboardEntrance
+          || !document.documentElement.contains(mutation.target)
+        ) continue;
+
+        const style = mutation.target.getAttribute('style') ?? '';
+        if (!style.includes('transform') && !style.includes('opacity')) continue;
+        const questionHistoryLink = document.querySelector<HTMLAnchorElement>(
+          '.ez-sidebar a[href="/question-history"]',
+        );
+        if (!questionHistoryLink) continue;
+
+        window.__previousPageEntrance = mutation.target;
+        window.__pageEntranceWasActivelyStyled = true;
+        observer.disconnect();
+        questionHistoryLink.click();
+        break;
+      }
+    });
+    observer.observe(document.documentElement, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
   });
 
   await page.getByRole('link', { name: 'Học liệu', exact: true }).click();
-  await expect(page).toHaveURL(/\/documents$/);
+  await expect(page).toHaveURL(/\/question-history$/);
   await expect(page.locator('[data-page-entrance]')).toHaveCount(1);
 
-  const cleanup = await page.evaluate(() => {
+  await expect.poll(() => page.evaluate(() => {
     const previous = window.__previousPageEntrance;
     return {
+      wasActivelyStyled: window.__pageEntranceWasActivelyStyled === true,
       detached: Boolean(previous && !document.documentElement.contains(previous)),
       animationStylesRemoved: Boolean(previous)
         && previous.style.opacity === ''
         && previous.style.transform === ''
         && previous.style.visibility === '',
     };
+  })).toEqual({
+    wasActivelyStyled: true,
+    detached: true,
+    animationStylesRemoved: true,
   });
-
-  expect(cleanup).toEqual({ detached: true, animationStylesRemoved: true });
   expect(browserErrors).toEqual([]);
 });
 
@@ -73,8 +111,17 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
   await page.goto('/dashboard');
 
   const sidebar = page.locator('.ez-sidebar-nav');
+  const initialIndicator = sidebar
+    .getByRole('link', { name: 'Tổng quan', exact: true })
+    .locator('[data-active-indicator]');
+  await expect.poll(() => initialIndicator.evaluate((element) => ({
+    transform: element.style.transform,
+    opacity: element.style.opacity,
+    visibility: element.style.visibility,
+  }))).toEqual({ transform: '', opacity: '', visibility: '' });
+
   await sidebar.evaluate((element) => {
-    const history: string[] = [];
+    const history: Array<{ href: string | null; style: string }> = [];
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (
@@ -82,7 +129,10 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
           && mutation.target instanceof HTMLElement
           && mutation.target.matches('[data-active-indicator]')
         ) {
-          history.push(mutation.target.getAttribute('style') ?? '');
+          history.push({
+            href: mutation.target.closest('a')?.getAttribute('href') ?? null,
+            style: mutation.target.getAttribute('style') ?? '',
+          });
         }
       }
     });
@@ -107,7 +157,9 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
     await expect.poll(
       () => page.evaluate(() => window.__activeIndicatorStyleHistory ?? []),
       { timeout: 1_000 },
-    ).toEqual(expect.arrayContaining([expect.stringContaining('transform')]));
+    ).toEqual(expect.arrayContaining([
+      expect.objectContaining({ href: '/documents', style: expect.stringContaining('transform') }),
+    ]));
 
     await expect.poll(
       () => indicator.evaluate((element) => ({
@@ -160,6 +212,70 @@ test('reduced mode cập nhật active navigation indicator tức thì', async (
     }));
 
   expect(inlineAnimation).toEqual({ transform: '', opacity: '', visibility: '' });
+  await context.close();
+});
+
+test('reduced mode opens More drawer and account dropdown without decorative motion', async ({ browser }) => {
+  const context = await browser.newContext({
+    reducedMotion: 'reduce',
+    viewport: { width: 390, height: 844 },
+  });
+  const page = await context.newPage();
+  const browserErrors = captureBrowserErrors(page);
+  await stubApi(page, TEACHER_USER);
+  await page.route('**/api/v1/questions/my-history**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], next_cursor: null, has_more: false }),
+    });
+  });
+  await page.goto('/question-history');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+
+  await page.locator('.ez-tabbar').getByRole('button', { name: /Thêm/ }).click();
+  const drawer = page.getByRole('dialog', { name: 'Thêm' });
+  await expect(drawer).toBeVisible();
+  const drawerMotion = await drawer.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const overlayStyle = getComputedStyle(document.querySelector('.ez-overlay') as Element);
+    return {
+      animationName: style.animationName,
+      animationDuration: style.animationDuration,
+      transform: style.transform,
+      overlayAnimationName: overlayStyle.animationName,
+    };
+  });
+  expect(drawerMotion).toEqual({
+    animationName: 'none',
+    animationDuration: '0s',
+    transform: 'none',
+    overlayAnimationName: 'none',
+  });
+  await expectNoPageOverflow(page);
+  expect((await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze()).violations).toEqual([]);
+
+  await drawer.getByRole('button', { name: 'Đóng' }).click();
+  await expect(drawer).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mở menu tài khoản' }).click();
+  const accountMenu = page.getByRole('menu', { name: 'Tài khoản và cài đặt' });
+  await expect(accountMenu).toBeVisible();
+  const dropdownMotion = await accountMenu.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      animationName: style.animationName,
+      animationDuration: style.animationDuration,
+      transitionDuration: style.transitionDuration,
+    };
+  });
+  expect(dropdownMotion).toEqual({
+    animationName: 'none',
+    animationDuration: '0s',
+    transitionDuration: '0s',
+  });
+  expect(browserErrors).toEqual([]);
   await context.close();
 });
 
