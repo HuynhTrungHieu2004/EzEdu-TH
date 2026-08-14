@@ -49,6 +49,46 @@ test('reduced motion: landing hiện sẵn nội dung, không đợi cuộn', as
   await context.close();
 });
 
+test('dây chuyền dữ liệu ghim theo cuộn trên desktop', async ({ page }) => {
+  await stubApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+
+  const pipeline = page.locator('[data-pipeline]');
+  await pipeline.scrollIntoViewIfNeeded();
+  await expect(pipeline.locator('.ezp-pipeline-stage')).toHaveCount(6);
+  await expect(page.getByRole('heading', { name: 'Học liệu của bạn đi qua sáu công đoạn' })).toBeVisible();
+
+  // ScrollTrigger ghim khối lại -> chèn pin-spacer vào DOM
+  await expect.poll(async () => page.locator('.pin-spacer').count()).toBeGreaterThan(0);
+
+  // Cuộn tiếp thì công đoạn sau sáng dần theo tiến độ
+  await page.mouse.wheel(0, 900);
+  await expect
+    .poll(async () => page.locator('.ezp-pipeline-stage[data-active="true"]').count())
+    .toBeGreaterThan(1);
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('reduced motion: dây chuyền dữ liệu không ghim và hiện đủ nội dung', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await stubApi(page);
+  await page.goto('/');
+
+  const pipeline = page.locator('[data-pipeline]');
+  await pipeline.scrollIntoViewIfNeeded();
+  await expect(pipeline.locator('.ezp-pipeline-stage')).toHaveCount(6);
+  expect(await page.locator('.pin-spacer').count()).toBe(0);
+  await expect(pipeline.getByText('CP-SAT')).toBeVisible();
+
+  await context.close();
+});
+
 test('đăng nhập báo lỗi cạnh từng trường, không gộp một dòng', async ({ page }) => {
   await stubApi(page);
   await page.goto('/login');

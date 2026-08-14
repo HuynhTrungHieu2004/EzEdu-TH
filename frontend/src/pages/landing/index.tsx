@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
+import { DataPipeline } from '../../components/public/DataPipeline';
 import PublicHeader from '../../components/public/PublicHeader';
 import PublicFooter from '../../components/public/PublicFooter';
 import {
@@ -103,6 +104,8 @@ export default function LandingPage() {
           {uploadEnabled && <ScrollReveal><PrimaryTool /></ScrollReveal>}
           <ScrollReveal><QuickExamples /></ScrollReveal>
           <ScrollReveal selector=".ezp-step"><HowItWorks /></ScrollReveal>
+          {/* Ghim theo cuộn: tự quản ScrollTrigger nên không bọc ScrollReveal */}
+          <DataPipeline />
           <ScrollReveal selector=".ezp-card"><WhyEzEdu /></ScrollReveal>
           <ScrollReveal><FeaturesByRole /></ScrollReveal>
           <ScrollReveal selector=".ezp-card"><TeacherToolsShowcase /></ScrollReveal>
