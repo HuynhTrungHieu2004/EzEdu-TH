@@ -54,3 +54,57 @@ Kết quả: exit 0. Vite build hoàn thành; chỉ có cảnh báo kích thư�
 ## Commit
 
 Các thay đổi Task 4 được commit cùng message `feat: add reusable motion primitives`.
+
+## Fix round 1/5 — counter precision and SPA cleanup
+
+### Changes
+
+- `AnimatedCounter` vẫn làm tròn các frame trung gian, nhưng reduced mode và `onComplete` nay dùng `formatter(value)` với input chính xác. Giá trị `12.5` với formatter một chữ số thập phân kết thúc là `12.5`.
+- `AppLayout` key `PageEntrance` theo pathname. Một click router thực sự sẽ unmount entrance cũ, để GSAP context revert toàn bộ visual styles do animation sở hữu trước khi node detached.
+- Thay test `page.goto()`/`evaluateAll()` tautological bằng SPA click qua `Link` “Học liệu”. Test giữ reference node cũ, xác nhận nó detached, và xác nhận `opacity`, `transform`, `visibility` inline đã được revert/clear.
+- Thêm harness hẹp tại `frontend/e2e/fixtures/motion-harness.html` và `.tsx`. Harness chỉ được Vite phục vụ cho Playwright, mount `AnimatedCounter` thật trong `MotionProvider`, và không được import bởi production app/bundle. Nó cho coverage component thật của decimal formatter ở full và reduced mode mà không thêm test-only route hoặc product UI ẩn.
+
+### Red evidence
+
+Sau khi thay tests/harness nhưng trước khi sửa production code, đã chạy:
+
+```bash
+cd frontend && npx playwright test e2e/motion-foundation.spec.ts --project=desktop-1440
+```
+
+Kết quả: exit 1; 2 passed, 3 failed.
+
+- SPA cleanup nhận `{ detached: false, animationStylesRemoved: false }`.
+- Full-mode decimal counter nhận `13.0`, expected `12.5`.
+- Reduced-mode decimal counter nhận `13.0`, expected `12.5`.
+
+### Final verification
+
+```bash
+cd frontend && npx playwright test e2e/motion-foundation.spec.ts --project=desktop-1440
+```
+
+Kết quả: exit 0, 5/5 passed.
+
+```bash
+cd frontend && npm run lint -- src/motion e2e/motion-foundation.spec.ts e2e/fixtures/motion-harness.tsx
+```
+
+Kết quả: exit 0, không lint error.
+
+```bash
+cd frontend && npm run build
+```
+
+Kết quả: exit 0. Vite vẫn chỉ báo warning bundle chính 614.35 kB minified, ngoài phạm vi fix này.
+
+### Fix self-review
+
+- Final value không đi qua `Math.round`; chỉ intermediate frame đi qua rounding như brief yêu cầu.
+- Navigation assertion dùng client-side Link (không document reload), retain reference DOM của entrance cũ, và chứng minh node detached + inline visual styles đã được cleanup.
+- Không thêm hidden production route/component; fixture nằm hoàn toàn trong e2e test tree.
+- Không thay CSS/token/navigation ngoài `PageEntrance` key cần thiết cho lifecycle contract.
+
+### Commit
+
+Fix được commit với message `fix: correct motion counter completion and cleanup tests`.

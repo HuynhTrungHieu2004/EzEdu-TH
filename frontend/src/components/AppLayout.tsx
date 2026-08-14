@@ -400,7 +400,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         <main id="main" className="ez-main" tabIndex={-1}>
-          <PageEntrance routeKey={location.pathname}>
+          <PageEntrance key={location.pathname} routeKey={location.pathname}>
             {children}
           </PageEntrance>
         </main>

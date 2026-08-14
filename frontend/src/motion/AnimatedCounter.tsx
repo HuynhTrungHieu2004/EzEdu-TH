@@ -23,23 +23,26 @@ export function AnimatedCounter({
     const target = targetRef.current;
     if (!target) return;
 
-    const render = (current: number) => {
+    const renderIntermediate = (current: number) => {
       target.textContent = formatter(Math.round(current));
+    };
+    const renderFinal = () => {
+      target.textContent = formatter(value);
     };
 
     if (reducedMotion) {
-      render(value);
+      renderFinal();
       return;
     }
 
     const counter = { current: 0 };
-    render(counter.current);
+    renderIntermediate(counter.current);
     gsap.to(counter, {
       current: value,
       duration,
       ease: 'power3.out',
-      onUpdate: () => render(counter.current),
-      onComplete: () => render(value),
+      onUpdate: () => renderIntermediate(counter.current),
+      onComplete: renderFinal,
     });
   }, { scope: targetRef, dependencies: [value, duration, formatter, reducedMotion], revertOnUpdate: true });
 
