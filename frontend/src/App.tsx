@@ -24,7 +24,6 @@ import AppLayout from './components/AppLayout';
 import PublicLayout from './components/PublicLayout';
 import RoleRoute from './components/RoleRoute';
 import AdminRoute from './components/AdminRoute';
-import { PathnameNavigationEpochProvider } from './components/PathnameNavigationEpoch';
 import { AuthProvider } from './contexts/AuthContext';
 import { SkeletonText, ToastProvider } from './components/ui';
 
@@ -84,7 +83,6 @@ const STUDENT_AND_TEACHER = ['student', 'lecturer', 'user'];
 function App() {
   return (
     <BrowserRouter>
-      <PathnameNavigationEpochProvider>
       <AuthProvider>
       <ToastProvider>
       <Suspense fallback={<RouteFallback />}>
@@ -286,7 +284,6 @@ function App() {
       </Suspense>
       </ToastProvider>
       </AuthProvider>
-      </PathnameNavigationEpochProvider>
     </BrowserRouter>
   );
 }

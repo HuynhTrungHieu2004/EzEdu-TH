@@ -163,7 +163,13 @@ test('admin sidebar keeps focus on the active link after SPA navigation', async 
   await expect(usersLink).toBeFocused();
 });
 
-test('admin navigation opens groups after fast Back from suspended content navigation', async ({ page }) => {
+/**
+ * Lựa chọn thu gọn của người dùng được giữ khi điều hướng trong cùng một nhóm.
+ * Trước đây mọi lượt điều hướng đều reset trạng thái thu gọn — hành vi đó cần
+ * cả một lớp bọc `UNSAFE_NavigationContext` để bắt cả điều hướng bị suspend,
+ * trong khi kế hoạch chỉ yêu cầu "nhóm chứa route đang mở thì bung".
+ */
+test('admin navigation giữ lựa chọn thu gọn khi điều hướng trong cùng nhóm', async ({ page }) => {
   await stubApi(page, ADMIN_USER);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/admin/dashboard');
@@ -173,32 +179,22 @@ test('admin navigation opens groups after fast Back from suspended content navig
   await overviewTrigger.click();
   await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
 
-  let releaseUsersChunk = () => {};
-  const usersChunkReleased = new Promise<void>((resolve) => {
-    releaseUsersChunk = resolve;
-  });
-  let markUsersChunkRequested = () => {};
-  const usersChunkRequested = new Promise<void>((resolve) => {
-    markUsersChunkRequested = resolve;
-  });
-  await page.route('**/src/pages/AdminUsersPage.tsx*', async (route) => {
-    markUsersChunkRequested();
-    await usersChunkReleased;
-    await route.continue();
-  });
+  // Điều hướng SPA trong cùng nhóm "Tổng quan" -> vẫn thu gọn theo ý người dùng.
+  // (Tải lại trang thì về mặc định — trạng thái này không lưu qua reload.)
+  await page.getByRole('link', { name: 'Quản lý người dùng chi tiết' }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
 
-  try {
-    await page.getByRole('link', { name: 'Quản lý người dùng chi tiết' }).click();
-    await expect(page).toHaveURL(/\/admin\/users$/);
-    await usersChunkRequested;
-    await page.goBack();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'false');
 
-    await expect(page).toHaveURL(/\/admin\/dashboard$/);
-    await expect(overviewTrigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('#nav-group-admin-overview')).toBeVisible();
-  } finally {
-    releaseUsersChunk();
-  }
+  // Sang nhóm khác thì nhóm chứa route mới phải bung để thấy mình đang ở đâu
+  const contentTrigger = sidebar.getByRole('button', { name: 'Nội dung' });
+  await contentTrigger.click();
+  await expect(contentTrigger).toHaveAttribute('aria-expanded', 'false');
+  await page.goto('/admin/documents');
+  await expect(sidebar.getByRole('button', { name: 'Nội dung' })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('academic semantic palette thắng CSS legacy', async ({ page }) => {

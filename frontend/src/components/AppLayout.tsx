@@ -18,7 +18,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { MOTION_DURATION, MOTION_EASE, PageEntrance, useMotion } from '../motion';
 import { buildNavigation, type NavGroup, type NavItem } from './navigation';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
-import { usePathnameNavigationEpoch } from './PathnameNavigationEpochContext';
 import {
   Badge,
   Button,
@@ -104,13 +103,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { reducedMotion } = useMotion();
   const { isEnabled } = useFeatureFlags();
   const { preference, setPreference } = useTheme();
-  const pathnameNavigationEpoch = usePathnameNavigationEpoch();
   const [pendingExams, setPendingExams] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [collapsedNavigation, setCollapsedNavigation] = useState(() => ({
-    pathnameNavigationEpoch,
-    groupIds: new Set<string>(),
-  }));
+  /**
+   * Nhóm nào người dùng tự thu gọn. Lựa chọn đó được giữ khi điều hướng — chỉ
+   * nhóm chứa route vừa mở mới bung lại, vì đóng nhóm đang xem thì không thấy
+   * mình đang ở đâu.
+   */
+  const [collapsedNavigation, setCollapsedNavigation] = useState<{
+    activeGroupId: string | null;
+    groupIds: Set<string>;
+  }>({ activeGroupId: null, groupIds: new Set<string>() });
 
   const permissions = user?.permissions_override ?? [];
   const pendingBadgeCount = area === 'student' ? pendingExams : 0;
@@ -150,9 +153,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     : [];
   const allItems = groups.flatMap((g) => g.items);
   const activeItem = allItems.find((item) => isActive(item.to));
-  const collapsedGroupIds = collapsedNavigation.pathnameNavigationEpoch === pathnameNavigationEpoch
-    ? collapsedNavigation.groupIds
-    : new Set<string>();
+  const activeGroupId = groups.find((group) => group.items.some((item) => isActive(item.to)))?.id ?? null;
+  // Nhóm chứa route đang mở luôn bung, kể cả khi người dùng từng thu gọn nó.
+  const collapsedGroupIds = activeGroupId && collapsedNavigation.groupIds.has(activeGroupId)
+    && collapsedNavigation.activeGroupId !== activeGroupId
+    ? new Set([...collapsedNavigation.groupIds].filter((id) => id !== activeGroupId))
+    : collapsedNavigation.groupIds;
 
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
@@ -293,16 +299,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 group={group}
                 isOpen={!group.collapsible || !collapsedGroupIds.has(group.id)}
                 onToggle={() => {
-                  setCollapsedNavigation((current) => {
-                    const groupIds = current.pathnameNavigationEpoch === pathnameNavigationEpoch
-                      ? new Set(current.groupIds)
-                      : new Set<string>();
+                  setCollapsedNavigation(() => {
+                    const groupIds = new Set(collapsedGroupIds);
                     if (groupIds.has(group.id)) groupIds.delete(group.id);
                     else groupIds.add(group.id);
-                    return {
-                      pathnameNavigationEpoch,
-                      groupIds,
-                    };
+                    return { activeGroupId, groupIds };
                   });
                 }}
                 renderNavLink={renderNavLink}
