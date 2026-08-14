@@ -36,11 +36,20 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'desktop-1440', use: { viewport: { width: 1440, height: 900 } } },
-    { name: 'laptop-1280', use: { viewport: { width: 1280, height: 800 } } },
-    { name: 'tablet-landscape-1024', use: { viewport: { width: 1024, height: 768 } } },
-    { name: 'tablet-portrait-768', use: { viewport: { width: 768, height: 1024 } } },
-    { name: 'mobile-390', use: { viewport: { width: 390, height: 844 } } },
-    { name: 'mobile-360', use: { viewport: { width: 360, height: 800 } } },
+    // Ma trận viewport bỏ qua bài đo hiệu năng — số đo sẽ nhiễu khi sáu project
+    // chạy song song, và nhịp khung hình không phụ thuộc bề rộng cửa sổ.
+    { name: 'desktop-1440', testIgnore: /motion-performance/, use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'laptop-1280', testIgnore: /motion-performance/, use: { viewport: { width: 1280, height: 800 } } },
+    { name: 'tablet-landscape-1024', testIgnore: /motion-performance/, use: { viewport: { width: 1024, height: 768 } } },
+    { name: 'tablet-portrait-768', testIgnore: /motion-performance/, use: { viewport: { width: 768, height: 1024 } } },
+    { name: 'mobile-390', testIgnore: /motion-performance/, use: { viewport: { width: 390, height: 844 } } },
+    { name: 'mobile-360', testIgnore: /motion-performance/, use: { viewport: { width: 360, height: 800 } } },
+    // Project riêng cho bài đo hiệu năng, chạy tuần tự một mình.
+    {
+      name: 'perf',
+      testMatch: /motion-performance/,
+      workers: 1,
+      use: { viewport: { width: 1440, height: 900 } },
+    },
   ],
 });
