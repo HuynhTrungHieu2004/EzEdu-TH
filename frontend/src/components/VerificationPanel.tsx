@@ -496,7 +496,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
           )}
 
           {issues.length > 0 && filteredIssues.length === 0 && (
-            <div style={{ ...styles.noIssues, backgroundColor: 'var(--code-bg)', color: 'var(--text)' }}>
+            <div style={{ ...styles.noIssues, backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' }}>
               Không có vấn đề nào khớp với bộ lọc hiện tại.
             </div>
           )}
@@ -524,9 +524,9 @@ const styles: Record<string, React.CSSProperties> = {
   wrapper: {
     padding: '24px',
     borderRadius: '16px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-bg)',
+    boxShadow: 'var(--ez-shadow-lg)',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
@@ -535,12 +535,12 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: {
     fontSize: '16px',
     fontWeight: '600',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     margin: 0,
   },
   subtitle: {
     fontSize: '13px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     margin: 0,
   },
   errorAlert: {
@@ -583,7 +583,7 @@ const styles: Record<string, React.CSSProperties> = {
   spinnerSmall: {
     width: '20px',
     height: '20px',
-    border: '3px solid var(--border)',
+    border: '3px solid var(--ez-border)',
     borderTop: '3px solid #f59e0b',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
@@ -592,14 +592,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressInfo: {
     fontSize: '13px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     marginTop: '4px',
   },
   progressTrack: {
     width: '100%',
     height: '6px',
     borderRadius: '3px',
-    backgroundColor: 'var(--border)',
+    backgroundColor: 'var(--ez-border)',
     overflow: 'hidden',
     marginTop: '8px',
   },
@@ -625,8 +625,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '16px',
     padding: '14px 18px',
     borderRadius: '12px',
-    backgroundColor: 'var(--code-bg)',
-    border: '1px solid var(--border)',
+    backgroundColor: 'var(--ez-surface-muted)',
+    border: '1px solid var(--ez-border)',
     flexWrap: 'wrap',
   },
   summaryLeft: {
@@ -637,7 +637,7 @@ const styles: Record<string, React.CSSProperties> = {
   summaryTitle: {
     fontSize: '14px',
     fontWeight: '700',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
   },
   typeBadges: {
     display: 'flex',
@@ -649,9 +649,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     fontSize: '11px',
     fontWeight: '600',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text)',
-    border: '1px solid var(--border)',
+    backgroundColor: 'var(--ez-bg)',
+    color: 'var(--ez-text-secondary)',
+    border: '1px solid var(--ez-border)',
   },
   summaryRight: {
     display: 'flex',
@@ -662,7 +662,7 @@ const styles: Record<string, React.CSSProperties> = {
   resolveProgress: {
     fontSize: '13px',
     fontWeight: '600',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
   },
   applyButton: {
     padding: '8px 16px',
@@ -678,9 +678,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 14px',
     fontSize: '12px',
     fontWeight: '500',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     backgroundColor: 'transparent',
-    border: '1px solid var(--border)',
+    border: '1px solid var(--ez-border)',
     borderRadius: '8px',
     cursor: 'pointer',
   },
@@ -704,16 +704,16 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     fontSize: '13px',
   },
   guidelinesBox: {
     padding: '12px 16px',
     borderRadius: '10px',
-    backgroundColor: 'var(--code-bg)',
-    border: '1px solid var(--border)',
+    backgroundColor: 'var(--ez-surface-muted)',
+    border: '1px solid var(--ez-border)',
     fontSize: '13px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     lineHeight: '1.5',
   },
   staleAlert: {
@@ -736,7 +736,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modelInfo: {
     fontSize: '12px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     marginTop: '2px',
     display: 'block',
   },
@@ -745,7 +745,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     fontSize: '12px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     marginTop: '6px',
     flexWrap: 'wrap',
   },
@@ -763,8 +763,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
     padding: '10px 16px',
     borderRadius: '10px',
-    backgroundColor: 'var(--code-bg)',
-    border: '1px solid var(--border)',
+    backgroundColor: 'var(--ez-surface-muted)',
+    border: '1px solid var(--ez-border)',
   },
   filterGroup: {
     display: 'flex',
@@ -774,15 +774,15 @@ const styles: Record<string, React.CSSProperties> = {
   filterLabel: {
     fontSize: '12px',
     fontWeight: '600',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
   },
   filterSelect: {
     padding: '6px 12px',
     fontSize: '12px',
     borderRadius: '6px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-bg)',
+    color: 'var(--ez-text-secondary)',
     outline: 'none',
   },
 };

@@ -143,7 +143,7 @@ function DonutChart({ value, total, color = 'var(--ez-primary)' }: { value: numb
   const pct = total > 0 ? value / total : 0;
   return (
     <svg role="img" aria-label={`${Math.round(pct * 100)}%`} viewBox="0 0 72 72" width="72" height="72">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-border)" strokeWidth="8" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--ez-border)" strokeWidth="8" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
         stroke={color} strokeWidth="8"

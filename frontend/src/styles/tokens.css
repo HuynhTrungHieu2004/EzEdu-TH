@@ -553,77 +553,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 :root,
 [data-theme='dark'] {
-  --app-bg:         var(--ez-bg);
-  --bg:             var(--ez-bg);
-  --ink:            var(--ez-text);
-  --text-h:         var(--ez-text);
-  --text:           var(--ez-text-secondary);
-  --muted:          var(--ez-text-muted);
-
-  --surface:        var(--ez-surface);
-  --surface-strong: var(--ez-surface);
-  --surface-muted:  var(--ez-surface-muted);
-  --card:           var(--ez-surface);
-  --code-bg:        var(--ez-surface-muted);
 
   /* Bỏ hiệu ứng kính: surface đục hoàn toàn, tránh cảm giác "template AI" */
-  --glass-bg:       var(--ez-surface);
-  --glass-border:   var(--ez-border);
-
-  --border:         var(--ez-border);
-  --border-strong:  var(--ez-border-strong);
-
-  --accent:         var(--ez-primary);
-  --accent-hover:   var(--ez-primary-hover);
-  --accent-bg:      var(--ez-primary-subtle);
-  --accent-border:  var(--ez-primary-border);
-  --accent-2:       var(--ez-secondary);
-  --accent-2-bg:    var(--ez-secondary-subtle);
-  --accent-3:       var(--ez-accent);
-  --accent-3-bg:    var(--ez-accent-subtle);
-  --accent-4:       var(--ez-accent);
-
-  --success:        var(--ez-success);
-  --success-bg:     var(--ez-success-subtle);
-  --warning:        var(--ez-warning);
-  --warning-bg:     var(--ez-warning-subtle);
-  --danger:         var(--ez-error);
-  --danger-bg:      var(--ez-error-subtle);
-
-  --shadow:         var(--ez-shadow-lg);
-  --shadow-soft:    var(--ez-shadow-md);
-  --shadow-card:    var(--ez-shadow-sm);
-  --shadow-glow:    var(--ez-shadow-md);
   --ring:           0 0 0 3px var(--ez-primary-subtle);
 
   /* Bảng màu cũ: trỏ về bậc indigo tương ứng để chữ/nền cũ không bị lệch */
-  --crystal-50:  var(--ez-indigo-50);
-  --crystal-100: var(--ez-indigo-100);
-  --crystal-200: var(--ez-indigo-200);
-  --crystal-300: var(--ez-indigo-300);
-  --crystal-400: var(--ez-indigo-400);
-  --crystal-500: var(--ez-indigo-500);
-  --crystal-600: var(--ez-indigo-600);
-  --crystal-700: var(--ez-indigo-700);
-
-  --ice-50:  var(--ez-blue-50);
-  --ice-100: var(--ez-blue-100);
-  --ice-200: var(--ez-blue-100);
-  --ice-400: var(--ez-blue-500);
-  --ice-500: var(--ez-blue-600);
-
-  --mint-50:  var(--ez-teal-50);
-  --mint-100: var(--ez-teal-100);
-  --mint-400: var(--ez-teal-400);
-  --mint-500: var(--ez-teal-500);
-
-  --rose-50:  var(--ez-red-50);
-  --rose-100: var(--ez-red-100);
-  --rose-200: var(--ez-red-100);
-  --rose-400: var(--ez-red-500);
-  --rose-500: var(--ez-red-600);
-
-  --amber-50:  var(--ez-amber-50);
-  --amber-400: var(--ez-amber-400);
-  --amber-500: var(--ez-amber-500);
 }

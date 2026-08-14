@@ -74,13 +74,13 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '12px',
     padding: '16px 20px',
-    backgroundColor: 'var(--surface)',
-    borderBottom: '1px solid var(--border)',
+    backgroundColor: 'var(--ez-surface)',
+    borderBottom: '1px solid var(--ez-border)',
   },
   label: {
     fontSize: '13px',
     fontWeight: '700',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
   },
   btnGrid: {
     display: 'flex',
@@ -90,19 +90,19 @@ const styles = {
   btn: {
     padding: '8px 14px',
     borderRadius: '8px',
-    border: '1px solid var(--border-strong)',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text)',
+    border: '1px solid var(--ez-border-strong)',
+    backgroundColor: 'var(--ez-bg)',
+    color: 'var(--ez-text-secondary)',
     fontSize: '13px',
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   btnActive: {
-    backgroundColor: 'var(--accent)',
+    backgroundColor: 'var(--ez-primary)',
     color: '#fff',
-    borderColor: 'var(--accent)',
-    boxShadow: 'var(--shadow-soft)',
+    borderColor: 'var(--ez-primary)',
+    boxShadow: 'var(--ez-shadow-md)',
   },
   toggleRow: {
     display: 'flex',
@@ -119,17 +119,17 @@ const styles = {
   checkbox: {
     width: '16px',
     height: '16px',
-    accentColor: 'var(--accent)',
+    accentColor: 'var(--ez-primary)',
     cursor: 'pointer',
   },
   toggleText: {
     fontSize: '13px',
     fontWeight: '600',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
   },
   helpText: {
     fontSize: '11px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     paddingLeft: '24px',
   },
 };

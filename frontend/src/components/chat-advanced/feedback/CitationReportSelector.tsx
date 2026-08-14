@@ -88,8 +88,8 @@ export const CitationReportSelector: React.FC<CitationReportSelectorProps> = ({
                 <span
                   style={{
                     ...styles.badge,
-                    backgroundColor: item.type === 'internal' ? 'var(--accent-bg)' : 'var(--accent-2-bg)',
-                    color: item.type === 'internal' ? 'var(--accent)' : 'var(--accent-2)',
+                    backgroundColor: item.type === 'internal' ? 'var(--ez-primary-subtle)' : 'var(--ez-secondary-subtle)',
+                    color: item.type === 'internal' ? 'var(--ez-primary)' : 'var(--ez-secondary)',
                   }}
                 >
                   {item.source_id}
@@ -116,7 +116,7 @@ const styles = {
   label: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
   },
   grid: {
     display: 'flex',
@@ -129,17 +129,17 @@ const styles = {
     gap: '10px',
     padding: '8px 12px',
     borderRadius: '8px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-surface)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     fontSize: '12px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     userSelect: 'none' as const,
   },
   checkboxLabelChecked: {
-    borderColor: 'var(--danger)',
-    backgroundColor: 'var(--danger-bg)',
+    borderColor: 'var(--ez-error)',
+    backgroundColor: 'var(--ez-error-subtle)',
   },
   checkboxLabelDisabled: {
     opacity: 0.5,

@@ -45,32 +45,32 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   const getRetrievalStyle = (mode?: string | null) => {
     switch (mode) {
       case 'internal_only':
-        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
+        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
       case 'web_only':
-        return { backgroundColor: 'var(--ice-50)', color: 'var(--ice-500)', border: '1px solid var(--ice-200)' };
+        return { backgroundColor: 'var(--ez-blue-50)', color: 'var(--ez-blue-600)', border: '1px solid var(--ez-blue-100)' };
       case 'hybrid':
-        return { backgroundColor: 'var(--crystal-100)', color: 'var(--crystal-600)', border: '1px solid var(--crystal-200)' };
+        return { backgroundColor: 'var(--ez-indigo-100)', color: 'var(--ez-indigo-600)', border: '1px solid var(--ez-indigo-200)' };
       case 'model_knowledge':
-        return { backgroundColor: 'var(--amber-50)', color: 'var(--amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
+        return { backgroundColor: 'var(--ez-amber-50)', color: 'var(--ez-amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
       case 'clarification_required':
-        return { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+        return { backgroundColor: 'var(--ez-error-subtle)', color: 'var(--ez-error)', border: '1px solid rgba(239, 68, 68, 0.2)' };
       default:
-        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
+        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
     }
   };
 
   const getEvidenceStyle = (status?: string | null) => {
     switch (status) {
       case 'well_supported':
-        return { backgroundColor: 'var(--mint-50)', color: 'var(--mint-500)', border: '1px solid rgba(16, 185, 129, 0.2)' };
+        return { backgroundColor: 'var(--ez-teal-50)', color: 'var(--ez-teal-500)', border: '1px solid rgba(16, 185, 129, 0.2)' };
       case 'partially_supported':
-        return { backgroundColor: 'var(--amber-50)', color: 'var(--amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
+        return { backgroundColor: 'var(--ez-amber-50)', color: 'var(--ez-amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
       case 'insufficient_evidence':
       case 'conflicting_sources':
       case 'unverified':
-        return { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+        return { backgroundColor: 'var(--ez-error-subtle)', color: 'var(--ez-error)', border: '1px solid rgba(239, 68, 68, 0.2)' };
       default:
-        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
+        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
     }
   };
 
@@ -208,10 +208,10 @@ const styles = {
     width: '100%',
     padding: '18px 20px',
     borderRadius: '16px 16px 16px 4px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--surface-strong)',
-    color: 'var(--text-h)',
-    boxShadow: 'var(--shadow-soft)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-surface)',
+    color: 'var(--ez-text)',
+    boxShadow: 'var(--ez-shadow-md)',
   },
   badgeHeader: {
     display: 'flex',
@@ -231,11 +231,11 @@ const styles = {
   searchBadge: {
     fontSize: '11px',
     fontWeight: '600',
-    backgroundColor: 'var(--surface-muted)',
-    color: 'var(--text)',
+    backgroundColor: 'var(--ez-surface-muted)',
+    color: 'var(--ez-text-secondary)',
     padding: '4px 10px',
     borderRadius: '6px',
-    border: '1px solid var(--border)',
+    border: '1px solid var(--ez-border)',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '5px',
@@ -248,15 +248,15 @@ const styles = {
     padding: '10px 12px',
     borderRadius: '8px',
     color: 'var(--warning-text)',
-    backgroundColor: 'var(--warning-bg)',
-    border: '1px solid var(--border-strong)',
+    backgroundColor: 'var(--ez-warning-subtle)',
+    border: '1px solid var(--ez-border-strong)',
     marginBottom: '12px',
     lineHeight: 1.5,
   },
   tabs: {
     display: 'flex',
     gap: '4px',
-    borderBottom: '1px solid var(--border)',
+    borderBottom: '1px solid var(--ez-border)',
     marginBottom: '14px',
   },
   tabBtn: {
@@ -265,29 +265,29 @@ const styles = {
     fontWeight: '600',
     border: 'none',
     backgroundColor: 'transparent',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     cursor: 'pointer',
     borderBottom: '2px solid transparent',
     transition: 'all 0.2s',
   },
   tabBtnActive: {
-    color: 'var(--accent)',
-    borderBottom: '2px solid var(--accent)',
+    color: 'var(--ez-primary)',
+    borderBottom: '2px solid var(--ez-primary)',
   },
   contentText: {
     fontSize: '14px',
     lineHeight: 1.65,
   },
   shortAnswerBlock: {
-    backgroundColor: 'var(--surface-muted)',
+    backgroundColor: 'var(--ez-surface-muted)',
     padding: '12px',
     borderRadius: '8px',
-    borderLeft: '4px solid var(--accent)',
+    borderLeft: '4px solid var(--ez-primary)',
   },
   footerRow: {
     marginTop: '16px',
     paddingTop: '12px',
-    borderTop: '1px dashed var(--border)',
+    borderTop: '1px dashed var(--ez-border)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -301,7 +301,7 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     fontSize: '11px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     flex: 1,
   },
   feedbackContainer: {
@@ -319,12 +319,12 @@ const styles = {
   suggestionsContainer: {
     marginTop: '16px',
     paddingTop: '14px',
-    borderTop: '1px dashed var(--border)',
+    borderTop: '1px dashed var(--ez-border)',
   },
   suggestionsTitle: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     marginBottom: '8px',
     display: 'flex',
     alignItems: 'center',
@@ -338,9 +338,9 @@ const styles = {
   suggestionChip: {
     padding: '6px 12px',
     borderRadius: '20px',
-    border: '1px solid var(--border-strong)',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--accent)',
+    border: '1px solid var(--ez-border-strong)',
+    backgroundColor: 'var(--ez-bg)',
+    color: 'var(--ez-primary)',
     fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',

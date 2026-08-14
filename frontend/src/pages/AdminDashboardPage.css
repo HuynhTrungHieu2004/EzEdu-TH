@@ -13,13 +13,13 @@
 .admin-header h1 {
   font-size: 1.8rem;
   font-weight: 800;
-  color: var(--ink);
+  color: var(--ez-text);
   margin: 0 0 0.25rem;
 }
 
 .admin-subtitle {
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   margin: 0;
 }
 
@@ -49,7 +49,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.74rem;
   font-weight: 700;
 }
@@ -59,10 +59,10 @@
 .admin-filter-grid select,
 .admin-role-select {
   min-height: 2.35rem;
-  border: 1.5px solid var(--border-strong);
+  border: 1.5px solid var(--ez-border-strong);
   border-radius: var(--ez-radius-md);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--ez-surface);
+  color: var(--ez-text-secondary);
   padding: 0.4rem 0.65rem;
   font: inherit;
   outline: none;
@@ -72,16 +72,16 @@
 .admin-filter-grid input:focus-visible,
 .admin-filter-grid select:focus-visible,
 .admin-role-select:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  border-color: var(--ez-primary);
+  box-shadow: 0 0 0 3px var(--ez-primary-subtle);
 }
 
 .preset-btn {
   padding: 0.4rem 1rem;
   border-radius: var(--ez-radius-full);
-  border: 1.5px solid var(--border-strong);
-  background: var(--glass-bg);
-  color: var(--text);
+  border: 1.5px solid var(--ez-border-strong);
+  background: var(--ez-surface);
+  color: var(--ez-text-secondary);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -90,14 +90,14 @@
 }
 
 .preset-btn:hover {
-  background: var(--accent-bg);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--ez-primary-subtle);
+  border-color: var(--ez-primary-border);
+  color: var(--ez-primary);
 }
 
 .preset-btn--active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--ez-primary);
+  border-color: var(--ez-primary);
   color: var(--ez-text-on-brand);
 }
 
@@ -108,14 +108,14 @@
   margin-bottom: 1.5rem;
   overflow-x: auto;
   padding-bottom: 2px;
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid var(--ez-border);
 }
 
 .admin-tab {
   padding: 0.55rem 1.1rem;
   border: none;
   background: transparent;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -125,24 +125,24 @@
 }
 
 .admin-tab:hover {
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: var(--ez-primary-subtle);
+  color: var(--ez-primary);
 }
 
 .admin-tab--active {
-  color: var(--accent);
-  background: var(--accent-bg);
-  border-bottom: 2.5px solid var(--accent);
+  color: var(--ez-primary);
+  background: var(--ez-primary-subtle);
+  border-bottom: 2.5px solid var(--ez-primary);
 }
 
 /* ── Panel ──────────────────────────────────────────────────── */
 .admin-panel {
-  background: var(--surface);
+  background: var(--ez-surface);
   backdrop-filter: blur(12px);
-  border: 1.5px solid var(--glass-border);
+  border: 1.5px solid var(--ez-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--ez-shadow-sm);
   margin-bottom: 1.25rem;
 }
 
@@ -157,7 +157,7 @@
 .panel-title {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--ez-text);
   margin: 0;
 }
 
@@ -168,7 +168,7 @@
 }
 
 .panel-loading {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.875rem;
   text-align: center;
   padding: 2rem 0;
@@ -178,7 +178,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: var(--danger);
+  color: var(--ez-error);
   font-size: 0.875rem;
   padding: 1rem 0;
 }
@@ -186,9 +186,9 @@
 .btn-retry {
   padding: 0.3rem 0.8rem;
   border-radius: var(--ez-radius-md);
-  border: 1.5px solid var(--danger);
-  background: var(--danger-bg);
-  color: var(--danger);
+  border: 1.5px solid var(--ez-error);
+  background: var(--ez-error-subtle);
+  color: var(--ez-error);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -196,7 +196,7 @@
 }
 
 .btn-retry:hover {
-  background: var(--danger);
+  background: var(--ez-error);
   color: var(--ez-text-on-brand);
 }
 
@@ -215,17 +215,17 @@
   min-height: 2.35rem;
   padding: 0.42rem 1rem;
   border-radius: var(--ez-radius-full);
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
+  border: 1.5px solid var(--ez-border-strong);
+  background: var(--ez-surface);
+  color: var(--ez-text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
   transition: border-color 0.18s, color 0.18s;
 }
 
 .admin-quick-link:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--ez-primary);
+  color: var(--ez-primary);
   text-decoration: none;
 }
 
@@ -233,9 +233,9 @@
   min-height: 2.35rem;
   padding: 0.42rem 0.9rem;
   border-radius: var(--ez-radius-full);
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
+  border: 1.5px solid var(--ez-border-strong);
+  background: var(--ez-surface);
+  color: var(--ez-text-secondary);
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
@@ -244,8 +244,8 @@
 }
 
 .admin-action-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--ez-primary);
+  color: var(--ez-primary);
   transform: translateY(-1px);
 }
 
@@ -255,8 +255,8 @@
 }
 
 .admin-action-btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--ez-primary);
+  border-color: var(--ez-primary);
   color: var(--ez-text-on-brand);
 }
 
@@ -265,13 +265,13 @@
 }
 
 .admin-action-btn--danger {
-  border-color: var(--danger);
-  color: var(--danger);
+  border-color: var(--ez-error);
+  color: var(--ez-error);
 }
 
 .admin-action-btn--success {
-  border-color: var(--success);
-  color: var(--success);
+  border-color: var(--ez-success);
+  color: var(--ez-success);
 }
 
 .admin-filter-grid {
@@ -284,14 +284,14 @@
 
 .admin-inline-notice {
   margin: 0 0 0.8rem;
-  color: var(--accent);
+  color: var(--ez-primary);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .admin-table-note {
   margin: 0.25rem 0 0.75rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.78rem;
 }
 
@@ -326,7 +326,7 @@
 .admin-cell-sub {
   display: block;
   margin-top: 0.16rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
@@ -337,9 +337,9 @@
   min-height: 1.65rem;
   padding: 0.18rem 0.62rem;
   border-radius: var(--ez-radius-full);
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  color: var(--text);
+  border: 1px solid var(--ez-border);
+  background: var(--ez-surface-muted);
+  color: var(--ez-text-secondary);
   font-size: 0.74rem;
   font-weight: 800;
   white-space: nowrap;
@@ -347,23 +347,23 @@
 
 .admin-status-badge--active,
 .admin-status-badge--info {
-  border-color: var(--success);
-  background: var(--success-bg);
-  color: var(--success);
+  border-color: var(--ez-success);
+  background: var(--ez-success-subtle);
+  color: var(--ez-success);
 }
 
 .admin-status-badge--locked,
 .admin-status-badge--warning {
-  border-color: var(--warning);
-  background: var(--warning-bg);
-  color: var(--warning);
+  border-color: var(--ez-warning);
+  background: var(--ez-warning-subtle);
+  color: var(--ez-warning);
 }
 
 .admin-status-badge--critical,
 .admin-status-badge--error {
-  border-color: var(--danger);
-  background: var(--danger-bg);
-  color: var(--danger);
+  border-color: var(--ez-error);
+  background: var(--ez-error-subtle);
+  color: var(--ez-error);
 }
 
 .admin-role-select {
@@ -377,9 +377,9 @@
 
 .admin-log-item {
   padding: 0.95rem 1rem;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--ez-border);
   border-radius: var(--radius);
-  background: var(--surface-muted);
+  background: var(--ez-surface-muted);
 }
 
 .admin-log-item > div {
@@ -390,18 +390,18 @@
 }
 
 .admin-log-item strong {
-  color: var(--ink);
+  color: var(--ez-text);
   font-size: 0.9rem;
 }
 
 .admin-log-item p {
   margin: 0.55rem 0 0.3rem;
-  color: var(--text);
+  color: var(--ez-text-secondary);
   font-size: 0.86rem;
 }
 
 .admin-log-item small {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.74rem;
   overflow-wrap: anywhere;
 }
@@ -419,8 +419,8 @@
 }
 
 .stat-card {
-  background: var(--surface-muted);
-  border: 1.5px solid var(--border);
+  background: var(--ez-surface-muted);
+  border: 1.5px solid var(--ez-border);
   border-radius: var(--radius);
   padding: 1rem 1.1rem;
   display: flex;
@@ -430,12 +430,12 @@
 }
 
 .stat-card:hover {
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--ez-shadow-md);
 }
 
 .stat-label {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -444,13 +444,13 @@
 .stat-value {
   font-size: 1.45rem;
   font-weight: 800;
-  color: var(--ink);
+  color: var(--ez-text);
   line-height: 1.2;
 }
 
 .stat-sub {
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   margin-top: 0.1rem;
 }
 
@@ -468,13 +468,13 @@
   gap: 0.85rem;
   padding: 1rem;
   border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  background: var(--surface-muted);
+  border: 1.5px solid var(--ez-border);
+  background: var(--ez-surface-muted);
 }
 
 .backend-health-summary time {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.78rem;
   white-space: nowrap;
 }
@@ -483,58 +483,58 @@
   width: 0.85rem;
   height: 0.85rem;
   border-radius: var(--ez-radius-full);
-  background: var(--muted);
+  background: var(--ez-text-muted);
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--ez-text-muted) 12%, transparent);
   flex-shrink: 0;
 }
 
 .backend-health-summary--healthy {
-  border-color: var(--success);
-  background: var(--success-bg);
+  border-color: var(--ez-success);
+  background: var(--ez-success-subtle);
 }
 
 .backend-health-summary--healthy .backend-health-dot {
-  background: var(--success);
-  box-shadow: 0 0 0 5px var(--success-bg);
+  background: var(--ez-success);
+  box-shadow: 0 0 0 5px var(--ez-success-subtle);
 }
 
 .backend-health-summary--degraded {
-  border-color: var(--warning);
-  background: var(--warning-bg);
+  border-color: var(--ez-warning);
+  background: var(--ez-warning-subtle);
 }
 
 .backend-health-summary--degraded .backend-health-dot {
-  background: var(--warning);
-  box-shadow: 0 0 0 5px var(--warning-bg);
+  background: var(--ez-warning);
+  box-shadow: 0 0 0 5px var(--ez-warning-subtle);
 }
 
 .backend-health-summary--unavailable,
 .backend-health-summary--down {
-  border-color: var(--danger);
-  background: var(--danger-bg);
+  border-color: var(--ez-error);
+  background: var(--ez-error-subtle);
 }
 
 .backend-health-summary--unavailable .backend-health-dot,
 .backend-health-summary--down .backend-health-dot {
-  background: var(--danger);
-  box-shadow: 0 0 0 5px var(--danger-bg);
+  background: var(--ez-error);
+  box-shadow: 0 0 0 5px var(--ez-error-subtle);
 }
 
 .backend-health-summary--unknown {
-  border-color: var(--border);
-  background: var(--surface-muted);
+  border-color: var(--ez-border);
+  background: var(--ez-surface-muted);
 }
 
 .backend-health-state {
   margin: 0 0 0.2rem;
-  color: var(--ink);
+  color: var(--ez-text);
   font-weight: 800;
   font-size: 1rem;
 }
 
 .backend-health-meta {
   margin: 0;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.78rem;
   overflow-wrap: anywhere;
 }
@@ -551,12 +551,12 @@
   gap: 0.25rem;
   padding: 0.85rem 0.95rem;
   border-radius: var(--radius);
-  background: var(--surface-muted);
-  border: 1.5px solid var(--border);
+  background: var(--ez-surface-muted);
+  border: 1.5px solid var(--ez-border);
 }
 
 .backend-service span {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -564,33 +564,33 @@
 }
 
 .backend-service strong {
-  color: var(--ink);
+  color: var(--ez-text);
   font-size: 0.9rem;
 }
 
 .backend-service--healthy {
-  border-color: var(--success);
+  border-color: var(--ez-success);
 }
 
 .backend-service--degraded {
-  border-color: var(--warning);
+  border-color: var(--ez-warning);
 }
 
 .backend-service--unavailable {
-  border-color: var(--danger);
+  border-color: var(--ez-error);
 }
 
 .backend-service--down {
-  border-color: var(--danger);
+  border-color: var(--ez-error);
 }
 
 .backend-service--unknown {
-  border-color: var(--border);
+  border-color: var(--ez-border);
   opacity: 0.9;
 }
 
 .backend-service small {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.72rem;
 }
 
@@ -604,9 +604,9 @@
   gap: 0.6rem;
   align-items: flex-start;
   padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ez-border);
   border-radius: var(--radius);
-  background: var(--surface-muted);
+  background: var(--ez-surface-muted);
 }
 
 .health-alert strong {
@@ -616,13 +616,13 @@
 }
 
 .health-alert--warning {
-  border-color: var(--warning);
-  background: var(--warning-bg);
+  border-color: var(--ez-warning);
+  background: var(--ez-warning-subtle);
 }
 
 .health-alert--critical {
-  border-color: var(--danger);
-  background: var(--danger-bg);
+  border-color: var(--ez-error);
+  background: var(--ez-error-subtle);
 }
 
 .system-health-layout {
@@ -638,21 +638,21 @@
 
 .health-component {
   padding: 1rem;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--ez-border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--ez-surface);
 }
 
 .health-component--healthy {
-  border-color: var(--success);
+  border-color: var(--ez-success);
 }
 
 .health-component--degraded {
-  border-color: var(--warning);
+  border-color: var(--ez-warning);
 }
 
 .health-component--down {
-  border-color: var(--danger);
+  border-color: var(--ez-error);
 }
 
 .health-component div:first-child {
@@ -663,7 +663,7 @@
 }
 
 .health-component p {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   margin: 0.5rem 0;
 }
 
@@ -680,7 +680,7 @@
 }
 
 .health-detail-list dt {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.78rem;
 }
 
@@ -693,8 +693,8 @@
   margin: 0;
   padding: 0.5rem;
   border-radius: var(--ez-radius-sm);
-  background: var(--surface-muted, var(--surface));
-  border: 1px solid var(--border);
+  background: var(--ez-surface-muted);
+  border: 1px solid var(--ez-border);
   font-size: 0.78rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -714,21 +714,21 @@
   align-items: center;
   padding: 0.5rem 0.7rem;
   border-radius: var(--ez-radius-full);
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
+  border: 1px solid var(--ez-border);
+  background: var(--ez-surface-muted);
   font-size: 0.78rem;
 }
 
 .health-history-item--healthy {
-  border-color: var(--success);
+  border-color: var(--ez-success);
 }
 
 .health-history-item--degraded {
-  border-color: var(--warning);
+  border-color: var(--ez-warning);
 }
 
 .health-history-item--down {
-  border-color: var(--danger);
+  border-color: var(--ez-error);
 }
 
 .admin-error-modal-backdrop {
@@ -748,8 +748,8 @@
   overflow: auto;
   padding: 1.25rem;
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--ez-surface);
+  box-shadow: var(--ez-shadow-lg);
 }
 
 /* ── Charts ─────────────────────────────────────────────────── */
@@ -759,19 +759,19 @@
 
 .chart-section h4 {
   font-size: 0.85rem;
-  color: var(--text);
+  color: var(--ez-text-secondary);
   font-weight: 600;
   margin: 0 0 0.5rem;
 }
 
 .chart-caption {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   margin-top: 0.3rem;
 }
 
 .chart-empty {
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-size: 0.85rem;
   text-align: center;
   padding: 1rem 0;
@@ -786,7 +786,7 @@
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--text);
+  color: var(--ez-text-secondary);
 }
 
 .legend-list li {
@@ -800,12 +800,12 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ez-primary);
   flex-shrink: 0;
 }
 
 .legend-dot--red {
-  background: var(--danger);
+  background: var(--ez-error);
 }
 
 /* ── Two Column ─────────────────────────────────────────────── */
@@ -819,7 +819,7 @@
 .two-col h4 {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--ez-text-secondary);
   margin: 0 0 0.5rem;
 }
 
@@ -837,7 +837,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.82rem;
-  color: var(--text);
+  color: var(--ez-text-secondary);
   font-weight: 600;
 }
 
@@ -857,32 +857,32 @@
   border-radius: var(--ez-radius-full);
   font-size: 0.75rem;
   font-weight: 700;
-  background: var(--surface-muted);
-  border: 1.5px solid var(--border);
-  color: var(--text);
+  background: var(--ez-surface-muted);
+  border: 1.5px solid var(--ez-border);
+  color: var(--ez-text-secondary);
 }
 
 .eval-badge--live {
-  background: var(--success-bg);
-  border-color: var(--success);
-  color: var(--success);
+  background: var(--ez-success-subtle);
+  border-color: var(--ez-success);
+  color: var(--ez-success);
 }
 
 .eval-badge--mock {
-  background: var(--accent-2-bg);
-  border-color: var(--accent-2);
-  color: var(--accent-2);
+  background: var(--ez-secondary-subtle);
+  border-color: var(--ez-secondary);
+  color: var(--ez-secondary);
 }
 
 .eval-badge--stale {
-  background: var(--warning-bg);
-  border-color: var(--warning);
-  color: var(--warning);
+  background: var(--ez-warning-subtle);
+  border-color: var(--ez-warning);
+  color: var(--ez-warning);
 }
 
 .eval-note {
   font-size: 0.72rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   font-style: italic;
   margin-left: auto;
 }
@@ -894,7 +894,7 @@
 
 .accessible-table-toggle > summary {
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   cursor: pointer;
   user-select: none;
 }
@@ -908,7 +908,7 @@
 
 .accessible-table caption {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--ez-text-muted);
   text-align: left;
   margin-bottom: 0.4rem;
   caption-side: top;
@@ -918,14 +918,14 @@
 .accessible-table td {
   text-align: left;
   padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
+  border-bottom: 1px solid var(--ez-border);
+  color: var(--ez-text-secondary);
 }
 
 .accessible-table th {
   font-weight: 700;
-  color: var(--ink);
-  background: var(--surface-muted);
+  color: var(--ez-text);
+  background: var(--ez-surface-muted);
 }
 
 .accessible-table tr:last-child td {

@@ -471,7 +471,7 @@ const S: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '24px',
     fontWeight: 700,
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     margin: '0 0 6px 0',
     display: 'flex',
     alignItems: 'center',
@@ -511,7 +511,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
     border: '1px solid var(--ez-border)',
     backgroundColor: 'var(--ez-surface)',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     outline: 'none',
     transition: 'border-color 0.2s',
   },
@@ -521,7 +521,7 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
     border: '1px solid var(--ez-border)',
     backgroundColor: 'var(--ez-surface)',
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     outline: 'none',
     cursor: 'pointer',
     minWidth: '140px',
@@ -597,7 +597,7 @@ const S: Record<string, React.CSSProperties> = {
   emptyTitle: {
     fontSize: '18px',
     fontWeight: 600,
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     margin: '0 0 8px 0',
   },
   emptyText: {
@@ -658,7 +658,7 @@ const S: Record<string, React.CSSProperties> = {
   cardDocName: {
     fontSize: '15px',
     fontWeight: 600,
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     margin: 0,
     lineHeight: 1.4,
     overflow: 'hidden',
@@ -690,8 +690,8 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--ez-success-border)',
   },
   diffMedium: {
-    backgroundColor: 'var(--warning-bg)',
-    color: 'var(--warning)',
+    backgroundColor: 'var(--ez-warning-subtle)',
+    color: 'var(--ez-warning)',
     border: '1px solid var(--ez-warning-border)',
   },
   diffHard: {
@@ -767,7 +767,7 @@ const S: Record<string, React.CSSProperties> = {
   dialogTitle: {
     fontSize: '18px',
     fontWeight: 700,
-    color: 'var(--text-h)',
+    color: 'var(--ez-text)',
     margin: '0 0 12px 0',
     display: 'flex',
     alignItems: 'center',
