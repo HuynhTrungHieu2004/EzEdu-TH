@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, ExternalLink, Pencil } from 'lucide-react';
 import { teacherHistoryApi } from '../../api/teacherHistoryApi';
@@ -42,7 +42,7 @@ export default function ContentHistoryPage() {
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
     teacherHistoryApi
@@ -53,12 +53,12 @@ export default function ContentHistoryPage() {
       })
       .catch((err) => setError(getApiErrorDetail(err) ?? 'Không tải được lịch sử.'))
       .finally(() => setLoading(false));
-  };
+  }, [page, search, type]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 250);
     return () => window.clearTimeout(timer);
-  }, [type, search, page]);
+  }, [load]);
 
   const handleDelete = async () => {
     if (!pendingDelete) return;

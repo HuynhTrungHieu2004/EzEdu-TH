@@ -6,8 +6,33 @@ const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 /** Cache ở phạm vi module: mọi lời gọi loadGoogleScript() dùng chung một promise. */
 let scriptPromise: Promise<void> | null = null;
 
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+type GoogleIdentityServices = {
+  accounts?: {
+    id?: {
+      initialize: (configuration: {
+        client_id: string;
+        callback: (response: GoogleCredentialResponse) => void;
+      }) => void;
+      renderButton: (
+        parent: HTMLElement,
+        options: {
+          theme: 'outline';
+          size: 'large';
+          width: number;
+          text: 'continue_with';
+          locale: string;
+        },
+      ) => void;
+    };
+  };
+};
+
 function googleReady(): boolean {
-  return !!(window as unknown as { google?: any }).google?.accounts?.id;
+  return !!(window as unknown as { google?: GoogleIdentityServices }).google?.accounts?.id;
 }
 
 /**
@@ -74,20 +99,17 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   useEffect(() => {
-    if (!clientId) {
-      setError('Chưa cấu hình đăng nhập Google.');
-      return;
-    }
+    if (!clientId) return;
     let huy = false;
 
     loadGoogleScript()
       .then(() => {
         if (huy || !holder.current) return;
-        const google = (window as unknown as { google?: any }).google;
+        const google = (window as unknown as { google?: GoogleIdentityServices }).google;
         if (!google?.accounts?.id) return;
         google.accounts.id.initialize({
           client_id: clientId,
-          callback: (res: { credential?: string }) => {
+          callback: (res) => {
             if (res.credential) onCredential(res.credential);
           },
         });
@@ -106,7 +128,8 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
     };
   }, [clientId, onCredential]);
 
-  if (error) return <p className="text-muted">{error}</p>;
+  const message = clientId ? error : 'Chưa cấu hình đăng nhập Google.';
+  if (message) return <p className="text-muted">{message}</p>;
 
   // Nút thật do Google render là một iframe bên trong div này — HTML
   // `disabled` không áp dụng được cho nó. `pointer-events: none` chặn mọi

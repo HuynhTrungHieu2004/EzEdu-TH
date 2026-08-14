@@ -144,25 +144,28 @@ export default function DocumentDetailPage() {
   useEffect(() => {
     if (activeTab !== 'related' || !documentId) return;
     let cancelled = false;
-    setSimilarLoading(true);
-    setSimilarMessage(null);
-    documentApi
-      .getSimilar(documentId)
-      .then((data) => {
-        if (cancelled) return;
-        // Cosine âm hoặc bằng 0 nghĩa là hai học liệu không chung nội dung —
-        // liệt kê chúng dưới nhãn "liên quan" chỉ gây hiểu nhầm.
-        setSimilarDocs((data.similar_documents ?? []).filter((item) => item.similarity > 0));
-        setSimilarMessage(data.message ?? null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setSimilarDocs([]);
-        setSimilarMessage(getApiErrorDetail(err) ?? 'Không tải được danh sách học liệu liên quan.');
-      })
-      .finally(() => {
-        if (!cancelled) setSimilarLoading(false);
-      });
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setSimilarLoading(true);
+      setSimilarMessage(null);
+      documentApi
+        .getSimilar(documentId)
+        .then((data) => {
+          if (cancelled) return;
+          // Cosine âm hoặc bằng 0 nghĩa là hai học liệu không chung nội dung —
+          // liệt kê chúng dưới nhãn "liên quan" chỉ gây hiểu nhầm.
+          setSimilarDocs((data.similar_documents ?? []).filter((item) => item.similarity > 0));
+          setSimilarMessage(data.message ?? null);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setSimilarDocs([]);
+          setSimilarMessage(getApiErrorDetail(err) ?? 'Không tải được danh sách học liệu liên quan.');
+        })
+        .finally(() => {
+          if (!cancelled) setSimilarLoading(false);
+        });
+    });
     return () => {
       cancelled = true;
     };
