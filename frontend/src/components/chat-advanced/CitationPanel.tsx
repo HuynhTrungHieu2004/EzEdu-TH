@@ -21,7 +21,9 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
+      {/* data-citation-header: khi panel nằm trong drawer, tiêu đề của drawer đã
+          nói đúng nội dung này nên CSS ẩn dòng tiêu đề nội bộ đi. */}
+      <div style={styles.header} data-citation-header>
         <span style={styles.title}><Pin size={16} aria-hidden="true" /><span>Nguồn trích dẫn</span></span>
         {onClose && (
           <button type="button" onClick={onClose} style={styles.closeBtn}>

@@ -1,0 +1,41 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   HỎI ĐÁP AI — bố cục theo bề ngang
+   Từ 1024px: ba cột (danh sách hội thoại · hội thoại · nguồn trích dẫn).
+   Dưới mốc đó: một cột, hai panel bên chuyển vào drawer để không bị bóp lại
+   còn vài chục pixel như bản trước.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ez-chat-mobile-bar {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .ez-chat-aside {
+    display: none;
+  }
+
+  .ez-chat-mobile-bar {
+    display: flex;
+    gap: var(--ez-space-2);
+    padding: var(--ez-space-2) var(--ez-space-4);
+    border-bottom: 1px solid var(--ez-border);
+    background-color: var(--ez-surface);
+  }
+
+  .ez-chat-mobile-bar .ez-btn {
+    min-height: var(--ez-touch-min);
+  }
+}
+
+/* `ConversationSidebar` và `CitationPanel` khai báo width cố định bằng inline
+   style để dựng ba cột desktop. Trong drawer chúng phải trải hết bề ngang, mà
+   inline style chỉ bị thắng bởi !important. */
+.ez-chat-drawer-panel > * {
+  width: 100% !important;
+  max-height: 60vh;
+}
+
+/* Drawer đã có tiêu đề "Nguồn trích dẫn" nên bỏ tiêu đề nội bộ của panel */
+.ez-chat-drawer-panel [data-citation-header] {
+  display: none;
+}

@@ -152,6 +152,8 @@ const styles = {
     padding: '24px 20px',
     overflowY: 'auto' as const,
     flex: 1,
+    // Danh sách tin nhắn là vùng cuộn duy nhất của cột chat.
+    minHeight: 0,
     backgroundColor: 'var(--bg)',
   },
   empty: {

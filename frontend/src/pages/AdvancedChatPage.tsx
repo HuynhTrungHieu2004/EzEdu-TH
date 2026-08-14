@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, BookOpen, MessagesSquare } from 'lucide-react';
 
 import { chatApi } from '../api/chatApi';
 import { documentApi } from '../api/documentApi';
@@ -24,6 +24,8 @@ import { CitationPanel } from '../components/chat-advanced/CitationPanel';
 import { FeedbackDialog } from '../components/chat-advanced/feedback/FeedbackDialog';
 import { RenameConversationDialog } from '../components/chat-advanced/RenameConversationDialog';
 import { DeleteConversationDialog } from '../components/chat-advanced/DeleteConversationDialog';
+import { Button, Drawer } from '../components/ui';
+import './advanced-chat.css';
 
 const AdvancedChatPage = () => {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
@@ -40,6 +42,9 @@ const AdvancedChatPage = () => {
   // Interactive panels
   const [focusedCitationId, setFocusedCitationId] = useState<string | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
+  // Chỉ dùng dưới 1024px: hai panel bên hiển thị dạng drawer
+  const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
+  const [citationDrawerOpen, setCitationDrawerOpen] = useState(false);
 
   // Status indicators
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -562,7 +567,11 @@ const AdvancedChatPage = () => {
   const handleCitationClick = (sourceId: string, msgIndex: number) => {
     setActiveMessageIndex(msgIndex);
     setFocusedCitationId(sourceId);
-    
+    // Dưới 1024px panel nguồn nằm trong drawer nên phải mở ra mới thấy trích dẫn
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      setCitationDrawerOpen(true);
+    }
+
     // Smooth scroll down to citation card in side drawer
     setTimeout(() => {
       const element = document.getElementById(`cite-${sourceId}`);
@@ -676,30 +685,69 @@ const AdvancedChatPage = () => {
   const activeInternalCitations = activeMsg?.internal_citations || [];
   const activeWebCitations = activeMsg?.web_citations || [];
 
+  const conversationList = (
+    <ConversationSidebar
+      conversations={conversations}
+      currentConversationId={currentConversationId}
+      loading={loadingConversations}
+      error={convsError}
+      onSelect={(id) => {
+        setCurrentConversationId(id);
+        setConversationDrawerOpen(false);
+      }}
+      onNewChat={() => {
+        handleNewChat();
+        setConversationDrawerOpen(false);
+      }}
+      searchValue={searchValue}
+      onSearchChange={handleSearchChange}
+      onSearchClear={handleSearchClear}
+      onPin={handlePinConversation}
+      onRename={setRenameConv}
+      onDelete={setDeleteConvId}
+      hasMoreConversations={hasMoreConversations}
+      onLoadMoreConversations={handleLoadMoreConversations}
+      loadingMoreConversations={loadingMoreConversations}
+    />
+  );
+
+  const citationList = (
+    <CitationPanel
+      internalCitations={activeInternalCitations}
+      webCitations={activeWebCitations}
+      focusedCitationId={focusedCitationId}
+      onReportCitation={handleReportCitation}
+    />
+  );
+
   return (
-    <div className="page" style={styles.page}>
+    <div className="page ez-page-fill" style={styles.page}>
       <div style={styles.workspace}>
         {/* Left Side: History Thread List */}
-        <ConversationSidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          loading={loadingConversations}
-          error={convsError}
-          onSelect={setCurrentConversationId}
-          onNewChat={handleNewChat}
-          searchValue={searchValue}
-          onSearchChange={handleSearchChange}
-          onSearchClear={handleSearchClear}
-          onPin={handlePinConversation}
-          onRename={setRenameConv}
-          onDelete={setDeleteConvId}
-          hasMoreConversations={hasMoreConversations}
-          onLoadMoreConversations={handleLoadMoreConversations}
-          loadingMoreConversations={loadingMoreConversations}
-        />
+        <div className="ez-chat-aside">{conversationList}</div>
 
         {/* Center Panel: Main query stream and settings */}
         <div style={styles.chatArea}>
+          {/* Dưới 1024px hai panel bên nằm trong drawer, mở từ thanh này */}
+          <div className="ez-chat-mobile-bar">
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={<MessagesSquare size={16} aria-hidden="true" />}
+              onClick={() => setConversationDrawerOpen(true)}
+            >
+              Hội thoại
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              leadingIcon={<BookOpen size={16} aria-hidden="true" />}
+              onClick={() => setCitationDrawerOpen(true)}
+            >
+              Nguồn trích dẫn
+            </Button>
+          </div>
+
           <KnowledgeScopeSelector
             scope={scope}
             useWebSearch={useWebSearch}
@@ -768,14 +816,29 @@ const AdvancedChatPage = () => {
           <ChatComposer onSend={handleSendMessage} disabled={isBusy || loadingHistory} />
         </div>
 
-        {/* Right Side: Citations Details drawer */}
-        <CitationPanel
-          internalCitations={activeInternalCitations}
-          webCitations={activeWebCitations}
-          focusedCitationId={focusedCitationId}
-          onReportCitation={handleReportCitation}
-        />
+        {/* Right Side: Citations Details */}
+        <div className="ez-chat-aside">{citationList}</div>
       </div>
+
+      <Drawer
+        open={conversationDrawerOpen}
+        onClose={() => setConversationDrawerOpen(false)}
+        side="left"
+        title="Hội thoại"
+        className="ez-chat-drawer-panel"
+      >
+        {conversationList}
+      </Drawer>
+
+      <Drawer
+        open={citationDrawerOpen}
+        onClose={() => setCitationDrawerOpen(false)}
+        side="bottom"
+        title="Nguồn trích dẫn"
+        className="ez-chat-drawer-panel"
+      >
+        {citationList}
+      </Drawer>
 
       {activeFeedbackMessage && (
         <FeedbackDialog
@@ -809,23 +872,27 @@ const AdvancedChatPage = () => {
 
 const styles = {
   page: {
+    // Chiều cao do `.ez-page-fill` trong app-layout.css cấp (phần còn lại của
+    // shell). Đặt 100svh ở đây sẽ cộng thêm topbar/tab bar và đẩy ô nhập câu
+    // hỏi xuống dưới màn hình.
     padding: 0,
-    height: '100svh',
-    display: 'flex',
-    flexDirection: 'column' as const,
+    minHeight: 0,
   },
   workspace: {
     display: 'flex',
     flexDirection: 'row' as const,
     width: '100%',
-    height: '100%',
+    flex: 1,
+    // minHeight: 0 để khối hội thoại co lại được trong khung; thiếu nó thì
+    // min-content của cột chat đẩy cả trang cao hơn viewport.
+    minHeight: 0,
     overflow: 'hidden',
   },
   chatArea: {
     display: 'flex',
     flexDirection: 'column' as const,
     flex: 1,
-    height: '100%',
+    minHeight: 0,
     backgroundColor: 'var(--ez-surface)',
   },
   loadingHistory: {
