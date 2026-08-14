@@ -14,7 +14,7 @@ import {
 import { questionApi } from '../api/questionApi';
 import type { QuestionSetSummary, HistoryParams } from '../api/questionApi';
 import { getApiErrorDetail, isUnauthorizedError } from '../api/errors';
-import { Alert, ConfirmDialog, FormField, Input } from '../components/ui';
+import { Alert, Button, ConfirmDialog, FormField, Input } from '../components/ui';
 
 /* ─── Constants ─────────────────────────────────────────────────────────── */
 const PAGE_SIZE = 20;
@@ -250,9 +250,13 @@ const QuestionHistoryPage: React.FC = () => {
             Quản lý bộ câu hỏi AI đã soạn, duyệt nội dung và ban hành đề thi cho học sinh.
           </p>
         </div>
-        <button type="button" onClick={() => navigate('/generate')} className="btn-primary">
-          <Plus size={16} aria-hidden="true" /><span>Upload học liệu &amp; sinh đề AI</span>
-        </button>
+        <Button
+          type="button"
+          leadingIcon={<Plus size={16} aria-hidden="true" />}
+          onClick={() => navigate('/generate')}
+        >
+          Upload học liệu &amp; sinh đề AI
+        </Button>
       </header>
 
       {/* ── Filters ── */}
@@ -302,7 +306,7 @@ const QuestionHistoryPage: React.FC = () => {
       {loading ? (
         <div style={S.center}>
           <div style={S.spinner} />
-          <p style={{ marginTop: '16px', color: 'var(--text)' }}>Đang tải lịch sử…</p>
+          <p style={{ marginTop: '16px', color: 'var(--ez-text-secondary)' }}>Đang tải lịch sử…</p>
         </div>
       ) : error ? (
         <div style={S.center}>
@@ -475,7 +479,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   subtitle: {
     fontSize: '14px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     margin: 0,
   },
 
@@ -497,7 +501,7 @@ const S: Record<string, React.CSSProperties> = {
   searchIcon: {
     position: 'absolute',
     left: '14px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     pointerEvents: 'none',
   },
   searchInput: {
@@ -505,8 +509,8 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 14px 10px 38px',
     fontSize: '14px',
     borderRadius: '10px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-surface)',
     color: 'var(--text-h)',
     outline: 'none',
     transition: 'border-color 0.2s',
@@ -515,8 +519,8 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 14px',
     fontSize: '14px',
     borderRadius: '10px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-surface)',
     color: 'var(--text-h)',
     outline: 'none',
     cursor: 'pointer',
@@ -526,10 +530,10 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 16px',
     fontSize: '13px',
     fontWeight: 500,
-    border: '1px solid var(--border)',
+    border: '1px solid var(--ez-border)',
     borderRadius: '10px',
-    backgroundColor: 'var(--surface)',
-    color: 'var(--danger)',
+    backgroundColor: 'var(--ez-surface)',
+    color: 'var(--ez-error)',
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
@@ -547,16 +551,16 @@ const S: Record<string, React.CSSProperties> = {
   spinner: {
     width: '40px',
     height: '40px',
-    border: '4px solid var(--border)',
-    borderTop: '4px solid var(--accent)',
+    border: '4px solid var(--ez-border)',
+    borderTop: '4px solid var(--ez-primary)',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
   errorBox: {
     padding: '14px 20px',
-    backgroundColor: 'var(--danger-bg)',
+    backgroundColor: 'var(--ez-error-subtle)',
     border: '1px solid var(--ez-error-border)',
-    color: 'var(--danger)',
+    color: 'var(--ez-error)',
     borderRadius: '10px',
     fontSize: '14px',
     marginBottom: '16px',
@@ -567,9 +571,9 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 24px',
     fontSize: '14px',
     fontWeight: 600,
-    color: 'var(--accent)',
-    backgroundColor: 'var(--accent-bg)',
-    border: '1px solid var(--accent-border)',
+    color: 'var(--ez-primary)',
+    backgroundColor: 'var(--ez-primary-subtle)',
+    border: '1px solid var(--ez-primary-border)',
     borderRadius: '10px',
     cursor: 'pointer',
     display: 'inline-flex',
@@ -587,7 +591,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   emptyIcon: {
     display: 'flex',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     marginBottom: '16px',
   },
   emptyTitle: {
@@ -598,7 +602,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   emptyText: {
     fontSize: '14px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     margin: '0 0 20px 0',
     maxWidth: '400px',
   },
@@ -617,9 +621,9 @@ const S: Record<string, React.CSSProperties> = {
     gap: '12px',
     padding: '20px',
     borderRadius: '14px',
-    border: '1px solid var(--border)',
-    backgroundColor: 'var(--surface)',
-    boxShadow: 'var(--shadow-card)',
+    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--ez-surface)',
+    boxShadow: 'var(--ez-shadow-sm)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
     textAlign: 'left',
   },
@@ -630,7 +634,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   cardDate: {
     fontSize: '12px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
     fontWeight: 500,
   },
   deleteBtn: {
@@ -644,12 +648,12 @@ const S: Record<string, React.CSSProperties> = {
     transition: 'opacity 0.2s',
     display: 'inline-flex',
     alignItems: 'center',
-    color: 'var(--danger)',
+    color: 'var(--ez-error)',
   },
   docNameIcon: {
     verticalAlign: '-3px',
     marginRight: '6px',
-    color: 'var(--muted)',
+    color: 'var(--ez-text-muted)',
   },
   cardDocName: {
     fontSize: '15px',
@@ -671,18 +675,18 @@ const S: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     padding: '3px 10px',
     borderRadius: '16px',
-    backgroundColor: 'var(--accent-bg)',
-    color: 'var(--accent)',
-    border: '1px solid var(--accent-border)',
+    backgroundColor: 'var(--ez-primary-subtle)',
+    color: 'var(--ez-primary)',
+    border: '1px solid var(--ez-primary-border)',
   },
   typeBadge: {
-    backgroundColor: 'var(--accent-2-bg)',
-    color: 'var(--accent-2)',
+    backgroundColor: 'var(--ez-secondary-subtle)',
+    color: 'var(--ez-secondary)',
     border: '1px solid var(--ez-secondary-border)',
   },
   diffEasy: {
-    backgroundColor: 'var(--success-bg)',
-    color: 'var(--success)',
+    backgroundColor: 'var(--ez-success-subtle)',
+    color: 'var(--ez-success)',
     border: '1px solid var(--ez-success-border)',
   },
   diffMedium: {
@@ -691,8 +695,8 @@ const S: Record<string, React.CSSProperties> = {
     border: '1px solid var(--ez-warning-border)',
   },
   diffHard: {
-    backgroundColor: 'var(--danger-bg)',
-    color: 'var(--danger)',
+    backgroundColor: 'var(--ez-error-subtle)',
+    color: 'var(--ez-error)',
     border: '1px solid var(--ez-error-border)',
   },
   bloomBar: {
@@ -707,7 +711,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'var(--ez-text-on-brand)',
-    background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
+    background: 'linear-gradient(135deg, var(--ez-primary), var(--ez-primary-hover))',
     border: 'none',
     borderRadius: '10px',
     cursor: 'pointer',
@@ -729,9 +733,9 @@ const S: Record<string, React.CSSProperties> = {
     padding: '12px 36px',
     fontSize: '14px',
     fontWeight: 600,
-    color: 'var(--accent)',
-    backgroundColor: 'var(--accent-bg)',
-    border: '1px solid var(--accent-border)',
+    color: 'var(--ez-primary)',
+    backgroundColor: 'var(--ez-primary-subtle)',
+    border: '1px solid var(--ez-primary-border)',
     borderRadius: '12px',
     cursor: 'pointer',
     display: 'inline-flex',
@@ -747,7 +751,7 @@ const S: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'var(--overlay-bg)',
+    backgroundColor: 'var(--ez-overlay)',
     backdropFilter: 'blur(4px)',
   },
   dialog: {
@@ -756,8 +760,8 @@ const S: Record<string, React.CSSProperties> = {
     margin: '16px',
     padding: '28px',
     borderRadius: '16px',
-    backgroundColor: 'var(--modal-bg)',
-    boxShadow: 'var(--modal-shadow)',
+    backgroundColor: 'var(--ez-surface)',
+    boxShadow: 'var(--ez-shadow-xl)',
     textAlign: 'left',
   },
   dialogTitle: {
@@ -771,20 +775,20 @@ const S: Record<string, React.CSSProperties> = {
   },
   dialogBody: {
     fontSize: '14px',
-    color: 'var(--text)',
+    color: 'var(--ez-text-secondary)',
     margin: '0 0 8px 0',
     lineHeight: 1.5,
   },
   dialogNote: {
     fontSize: '13px',
-    color: 'var(--danger)',
+    color: 'var(--ez-error)',
     margin: '0 0 16px 0',
     fontStyle: 'italic',
   },
   dialogError: {
     fontSize: '13px',
-    color: 'var(--danger)',
-    backgroundColor: 'var(--danger-bg)',
+    color: 'var(--ez-error)',
+    backgroundColor: 'var(--ez-error-subtle)',
     padding: '8px 12px',
     borderRadius: '8px',
     marginBottom: '12px',
@@ -798,9 +802,9 @@ const S: Record<string, React.CSSProperties> = {
     padding: '10px 20px',
     fontSize: '14px',
     fontWeight: 500,
-    color: 'var(--text)',
-    backgroundColor: 'var(--surface)',
-    border: '1px solid var(--border)',
+    color: 'var(--ez-text-secondary)',
+    backgroundColor: 'var(--ez-surface)',
+    border: '1px solid var(--ez-border)',
     borderRadius: '10px',
     cursor: 'pointer',
   },
@@ -809,7 +813,7 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     color: 'var(--ez-text-on-brand)',
-    backgroundColor: 'var(--danger)',
+    backgroundColor: 'var(--ez-error)',
     border: 'none',
     borderRadius: '10px',
     cursor: 'pointer',

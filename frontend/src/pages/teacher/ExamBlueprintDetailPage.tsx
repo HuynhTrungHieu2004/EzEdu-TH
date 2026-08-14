@@ -286,7 +286,7 @@ export default function ExamBlueprintDetailPage() {
               </Button>
             </CardHeader>
             <CardBody>
-              <table className="data-table">
+              <table className="ez-datatable">
                 <thead>
                   <tr>
                     <th>Mã chủ đề</th>
@@ -370,7 +370,7 @@ export default function ExamBlueprintDetailPage() {
               </Button>
             </CardHeader>
             <CardBody>
-              <table className="data-table">
+              <table className="ez-datatable">
                 <thead>
                   <tr>
                     <th>Mức Bloom</th>
@@ -461,7 +461,7 @@ export default function ExamBlueprintDetailPage() {
               </Button>
             </CardHeader>
             <CardBody>
-              <table className="data-table">
+              <table className="ez-datatable">
                 <thead>
                   <tr>
                     <th>Độ khó</th>
@@ -557,7 +557,7 @@ export default function ExamBlueprintDetailPage() {
               </Button>
             </CardHeader>
             <CardBody>
-              <table className="data-table">
+              <table className="ez-datatable">
                 <thead>
                   <tr>
                     <th>Dạng câu hỏi</th>

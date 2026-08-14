@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   CHI TIẾT LỚP HỌC — nhóm năng lực và ô tìm học sinh
+   ═══════════════════════════════════════════════════════════════════════ */
+.ez-cls-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ez-space-3);
+  margin-bottom: var(--ez-space-4);
+}
+
+.ez-cls-search .ez-input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.ez-cls-group {
+  padding: var(--ez-space-4);
+  border: 1px solid var(--ez-border);
+  border-radius: var(--ez-radius-lg);
+  background-color: var(--ez-surface);
+}
+
+.ez-cls-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ez-space-3);
+  margin-bottom: var(--ez-space-2);
+}
+
+.ez-cls-group-weak {
+  margin: 0 0 var(--ez-space-3);
+  color: var(--ez-text-secondary);
+  font-size: var(--ez-text-body-sm);
+  line-height: var(--ez-leading-body);
+}
+
+.ez-cls-group-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ez-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ez-cls-group-members li {
+  display: flex;
+  align-items: center;
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-2) var(--ez-space-3);
+  border-radius: var(--ez-radius-md);
+  background-color: var(--ez-surface-muted);
+  font-size: var(--ez-text-body-sm);
+}
+
+.ez-cls-group-score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--ez-weight-semibold);
+  color: var(--ez-text);
+}
