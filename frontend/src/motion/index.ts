@@ -5,5 +5,7 @@ export { StaggerGroup } from './StaggerGroup';
 export { AnimatedCounter } from './AnimatedCounter';
 export { MotionCard } from './MotionCard';
 export { Confetti } from './Confetti';
+export { ScrollReveal } from './ScrollReveal';
+export type { ScrollRevealProps } from './ScrollReveal';
 export type { ConfettiProps } from './Confetti';
 export type { MotionMode, MotionContextValue } from './MotionProvider';
