@@ -33,6 +33,45 @@
   padding: 32px clamp(20px, 3vw, 48px);
 }
 
+/* Trang "chiếm hết khung": chat và các mặt bằng làm việc cần đúng chiều cao còn
+   lại của shell (đã trừ topbar/tab bar) thay vì tự đặt 100svh — nếu tự đặt thì
+   padding của `.ez-main` cộng thêm và ô nhập bị đẩy xuống dưới màn hình.
+   Chỉ trang nào khai báo `.ez-page-fill` mới đổi sang flex, các trang khác giữ
+   nguyên block layout. */
+.ez-shell:has(.ez-page-fill) {
+  /* Khoá chiều cao: `min-height` để shell tự cao theo nội dung, khi đó `flex: 1`
+     của `.ez-main` không có gì để co lại. Sidebar và danh sách tin nhắn đều tự
+     cuộn nên trang không mất nội dung. */
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ez-shell:has(.ez-page-fill) .ez-shell-main {
+  min-height: 0;
+}
+.ez-main:has(> [data-page-entrance] > .ez-page-fill) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.ez-main:has(> [data-page-entrance] > .ez-page-fill) > [data-page-entrance] {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.ez-page-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* ───────────────────────────────────────────────────────────────────────
    SIDEBAR
    ─────────────────────────────────────────────────────────────────────── */
@@ -440,7 +479,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ez-space-4);
-  background: var(--ez-gradient-cta);
+  background: var(--ez-gradient-shell);
   border-radius: var(--ez-radius-xl);
   padding: var(--ez-space-6);
   margin-bottom: var(--ez-space-6);
