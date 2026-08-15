@@ -123,6 +123,27 @@ dữ liệu mà bộ kiểm stub đang bảo vệ vẫn đúng với backend hi�
 kể cả khi có lỗi console hay phản hồi 500; phải đọc log bằng mắt mới biết. Nay `report()` in danh sách **và**
 khẳng định nó rỗng; riêng loại `thiếu-dữ-liệu` (bảng rỗng vì DB chưa có gì) chỉ in ra, không làm fail.
 
+## Vòng ba: CRUD xuyên ba lớp
+
+Câu hỏi cần trả lời: dữ liệu có thực sự đi hết **giao diện → API → MongoDB** không, hay chỉ có giao diện và
+API đồng ý với nhau?
+
+`e2e/live-crud.spec.ts` chia ba pha `tạo` / `sửa` / `xoá`, chạy xen kẽ với `scripts/qa_crud_check.py` — script
+này mở thẳng MongoDB đọc bản ghi sau mỗi pha:
+
+| Pha | Giao diện làm | MongoDB xác nhận |
+| --- | --- | --- |
+| Tạo | tạo lớp học, ma trận đề (giáo viên), tạo người dùng (quản trị) | ba bản ghi tồn tại, mô tả lưu đúng, `subject_id`/`grade` đúng, **mật khẩu đã băm chứ không lưu thô** |
+| Sửa | đổi tên lớp, sửa họ tên người dùng | tên mới có, tên cũ không còn, `full_name` đã đổi |
+| Xoá | xoá lớp (gõ "XÓA" xác nhận), xoá người dùng (nhập lý do + email) | lớp biến mất; người dùng `status=deleted` kèm `deleted_at` |
+
+Mỗi lượt chạy gắn một mã riêng (`QA_RUN_ID`) vào tên bản ghi. Không có nó thì lần chạy thứ hai hỏng: email đã
+xoá mềm vẫn giữ chỗ trong chỉ mục duy nhất nên không tạo lại được — chính bộ kiểm đầu tiên vấp lỗi này.
+
+Một điểm đáng ghi: xoá người dùng là **xoá mềm**. Bản ghi rời khỏi danh sách mặc định nhưng tra lại được bằng
+bộ lọc trạng thái "Đã xóa" — đúng thiết kế để còn khôi phục. Bài kiểm khẳng định đúng hành vi đó thay vì đòi
+bản ghi biến mất hẳn.
+
 ## Dọn dữ liệu kiểm thử
 
 Đã xoá khỏi MongoDB: 3 tài khoản `qa-live-*`, 5 lớp `QA Live <timestamp>`, 38 `user_activity_logs`,

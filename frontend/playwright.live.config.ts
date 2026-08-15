@@ -11,7 +11,7 @@ const baseURL = 'http://127.0.0.1:5173';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /live-smoke/,
+  testMatch: /live-smoke|live-crud/,
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
