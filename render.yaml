@@ -25,6 +25,13 @@ services:
       # ["https://ezedu.netlify.app"]
       - key: BACKEND_CORS_ORIGINS
         sync: false
+      # Hai phân hệ này mặc định TẮT trong code; máy phát triển bật bằng .env.
+      # Thiếu ở đây thì ngân hàng câu hỏi, ma trận đề và đề thi có giờ đều trả
+      # 403 trên bản chạy thật — giao diện vẫn mở được nên rất khó đoán.
+      - key: ENABLE_EXAM_BLUEPRINT
+        value: "true"
+      - key: ENABLE_TIMED_EXAM
+        value: "true"
       - key: MONGODB_URI
         sync: false
       # Phải khớp tên CSDL bạn dùng trên Atlas. Máy phát triển đang dùng
