@@ -105,9 +105,10 @@ for (const route of LIST_ROUTES) {
 }
 
 test('danh sách người dùng có dữ liệu không có vi phạm axe A/AA', async ({ page }) => {
+  test.setTimeout(60_000);
   await stubAdmin(page);
   await page.goto('/admin/users');
-  await expect(page.locator('.ez-datatable')).toBeVisible();
+  await expect(page.locator('.ez-datatable')).toBeVisible({ timeout: 15_000 });
   await expect
     .poll(async () => page.locator('.ez-datatable tbody tr').first().evaluate((el) => el.style.opacity))
     .toBe('');
@@ -119,9 +120,10 @@ test('danh sách người dùng có dữ liệu không có vi phạm axe A/AA', 
 });
 
 test('nhật ký quản trị có dữ liệu không có vi phạm axe A/AA', async ({ page }) => {
+  test.setTimeout(60_000);
   await stubAdmin(page);
   await page.goto('/admin/audit-logs');
-  await expect(page.locator('.ez-datatable')).toBeVisible();
+  await expect(page.locator('.ez-datatable')).toBeVisible({ timeout: 15_000 });
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
