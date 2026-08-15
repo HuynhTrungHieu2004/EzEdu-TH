@@ -119,6 +119,62 @@ async def create_source_from_web_knowledge(db, web_source_id: str, *, actor_id: 
     return _to_response(doc)
 
 
+async def create_source_from_crawl(
+    db, crawl_item_id: str, *, actor_id: str, is_admin: bool
+) -> CurriculumSourceResponse:
+    """Promote only a reviewed crawl item; raw crawler output never enters the KB."""
+    from app.curriculum_kb.constants.collections import CRAWL_ITEMS
+
+    if not ObjectId.is_valid(crawl_item_id):
+        raise HTTPException(status_code=404, detail="Không tìm thấy nội dung crawl.")
+    item = await db[CRAWL_ITEMS].find_one({"_id": ObjectId(crawl_item_id)})
+    if item is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nội dung crawl.")
+    if not is_admin and item["owner_id"] != actor_id:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền với nội dung này.")
+    if item.get("review_status") != "approved" or item.get("quality_status") != "verified":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nội dung crawl phải được duyệt và xác minh trước khi đưa vào kho tri thức.",
+        )
+    existing = await db[CURRICULUM_SOURCES].find_one(
+        {"origin_type": "web_crawl", "origin_id": crawl_item_id}
+    )
+    if existing is not None:
+        return _to_response(existing)
+
+    now = _now()
+    doc = {
+        "title": item.get("title") or item["canonical_url"],
+        "content_text": item["content_text"],
+        "subject_id": item["subject_id"],
+        "grade": item.get("grade"),
+        "topic_id": item.get("topic_id"),
+        "curriculum_version": None,
+        "citations": [{
+            "title": item.get("title") or item["canonical_url"],
+            "url": item["canonical_url"],
+            "accessed_at": now.isoformat(),
+        }],
+        "origin_type": "web_crawl",
+        "origin_id": crawl_item_id,
+        "review_status": "approved",
+        "quality_status": "verified",
+        "ingest_status": "not_ingested",
+        "chunk_count": 0,
+        "ingest_error": None,
+        "version": 1,
+        "owner_id": item["owner_id"],
+        "created_by": actor_id,
+        "updated_by": actor_id,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db[CURRICULUM_SOURCES].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_response(doc)
+
+
 async def load_owned_source(db, source_id: str, *, actor_id: str, is_admin: bool) -> Dict[str, Any]:
     doc = await db[CURRICULUM_SOURCES].find_one({"_id": ObjectId(source_id)})
     if doc is None:

@@ -36,7 +36,7 @@ CurriculumQualityStatus = Literal["unreviewed", "flagged", "verified"]
 
 CurriculumIngestStatus = Literal["not_ingested", "pending", "ingested", "failed"]
 
-CurriculumOriginType = Literal["web_knowledge", "manual"]
+CurriculumOriginType = Literal["web_knowledge", "web_crawl", "manual"]
 
 
 class CurriculumSourceCreate(BaseModel):
