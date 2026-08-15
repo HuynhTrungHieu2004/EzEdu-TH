@@ -27,8 +27,10 @@ services:
         sync: false
       - key: MONGODB_URI
         sync: false
+      # Phải khớp tên CSDL bạn dùng trên Atlas. Máy phát triển đang dùng
+      # `chuyende02`; đổi ở đây thì phải đổi cả lệnh mongorestore khi di trú.
       - key: MONGODB_DB_NAME
-        value: ai_question_generator
+        value: chuyende02
       - key: JWT_SECRET_KEY
         generateValue: true # Render tự sinh chuỗi ngẫu nhiên đủ dài
       - key: GEMINI_API_KEY

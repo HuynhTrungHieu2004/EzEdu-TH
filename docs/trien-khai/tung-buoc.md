@@ -28,16 +28,39 @@ tới được, nên phải có một CSDL đám mây.
    ```
    mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
    ```
-   Thay `<password>` bằng mật khẩu thật. Mật khẩu có ký tự đặc biệt (`@`, `/`, `:`) thì phải mã hoá URL.
+   Thay `<password>` bằng mật khẩu thật.
+
+6. **Kiểm chuỗi trước khi dán vào Render** — bước này tiết kiệm nhiều thời gian:
+   ```bash
+   cd backend && .venv/bin/python scripts/kiem_tra_mongo.py \
+     --uri "mongodb+srv://..." --db chuyende02
+   ```
+   Script bắt ba lỗi hay gặp: mật khẩu chứa ký tự đặc biệt chưa mã hoá URL (nó in luôn chuỗi thay thế), quên
+   mở Network Access, và gõ nhầm tên CSDL.
 
 ### Chuyển dữ liệu đang có lên Atlas (nếu muốn giữ)
 
+CSDL trên máy tên **`chuyende02`**, tổng **3,7 MB** (0,5 MB dữ liệu + 3,2 MB chỉ mục) — M0 cho 512 MB nên dư
+sức. Phần lớn là nhật ký: 635 `system_error_logs`, 344 `user_activity_logs`. Dữ liệu nghiệp vụ thật chỉ có
+18 người dùng và 5 lớp học.
+
+**Không bắt buộc di trú.** Ứng dụng tự tạo và seed `system_settings`, `feature_flags`, `website_content` khi
+CSDL trống, nên bắt đầu sạch vẫn chạy. Chỉ di trú nếu muốn giữ 18 tài khoản đang có.
+
+Muốn giữ thì bỏ nhật ký lại cho nhẹ:
+
 ```bash
-mongodump --uri="mongodb://127.0.0.1:27017/ai_question_generator" --out=/tmp/ezedu-dump
-mongorestore --uri="<chuỗi Atlas>" --nsFrom='ai_question_generator.*' --nsTo='ai_question_generator.*' /tmp/ezedu-dump
+mongodump --uri="mongodb://127.0.0.1:27017/chuyende02" \
+  --excludeCollection=system_error_logs \
+  --excludeCollection=user_activity_logs \
+  --excludeCollection=system_health_snapshots \
+  --out=/tmp/ezedu-dump
+
+mongorestore --uri="<chuỗi Atlas>" \
+  --nsFrom='chuyende02.*' --nsTo='chuyende02.*' /tmp/ezedu-dump
 ```
 
-Không cần giữ thì bỏ qua — hệ thống tự tạo chỉ mục khi khởi động lần đầu.
+`mongodump`, `mongorestore`, `mongosh` đã có sẵn trên máy bạn.
 
 ---
 
