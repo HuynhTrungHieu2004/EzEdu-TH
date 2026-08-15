@@ -1,0 +1,37 @@
+# Netlify chỉ phục vụ phần frontend (tệp tĩnh). Backend FastAPI phải chạy ở nơi
+# khác — xem docs/trien-khai/netlify.md.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Vite 8 (rolldown) cần Node hiện đại; 22 là bản LTS Netlify hỗ trợ sẵn.
+  NODE_VERSION = "22"
+
+# SPA: mọi đường dẫn đều trả về index.html để React Router tự định tuyến.
+# Thiếu rule này thì mở thẳng /dashboard hay F5 giữa chừng sẽ ra trang 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Tài nguyên có hash trong tên nên cache vĩnh viễn được; index.html thì không,
+# nếu không người dùng sẽ dính bản cũ sau mỗi lần deploy.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
