@@ -229,3 +229,30 @@ test('reduced motion: không confetti và điểm hiện ngay', async ({ browser
 
   await context.close();
 });
+
+test('còn câu chờ AI chấm thì không hiện điểm 0 như điểm thật', async ({ page }) => {
+  // Với backend thật, chấm tự luận là job nền mất hàng chục giây. Trước đây đầu
+  // trang hiện ngay "0%  0 / 4 điểm · 2/3 câu đúng" trong lúc chờ, nên bài làm
+  // đúng trông như bị 0 điểm.
+  await stubExam(page);
+  const pending = () => {
+    const graded = GRADED_ATTEMPT();
+    graded.status = 'submitted';
+    graded.total_score = 2;
+    graded.results[2] = { ...graded.results[2], ai_score: null, ai_confidence: null, ai_feedback: null, final_score: 0 };
+    return graded;
+  };
+  await page.route(`**/api/v1/exam-attempts/${ATTEMPT_ID}/submit`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(pending()) });
+  });
+
+  await page.goto(`/take-exam/${EXAM_ID}`);
+  await page.getByRole('button', { name: 'Nộp bài' }).click();
+  await page.getByRole('button', { name: 'Nộp bài' }).last().click();
+
+  await expect(page.getByText('Đang chấm câu tự luận…')).toBeVisible();
+  await expect(page.locator('.ez-result-score-value')).toHaveText('—');
+  await expect(page.locator('.ez-result-score-meta')).toHaveText('Đã chấm 2/3 câu');
+  await expect(page.locator('[data-result-row]').last().getByText('Đang chấm…')).toBeVisible();
+  await expect(page.locator('.ez-confetti-piece')).toHaveCount(0);
+});

@@ -240,6 +240,9 @@ export default function ExamAttemptPage() {
       : 0;
     const graded = attempt.status === 'graded';
     const correctCount = attempt.results.filter((r) => r.is_correct === true).length;
+    const gradedCount = attempt.results.filter(
+      (r) => r.question_type !== 'short_answer' || r.ai_score !== null || r.teacher_score !== null,
+    ).length;
 
     return (
       <>
@@ -249,12 +252,22 @@ export default function ExamAttemptPage() {
           <CardBody>
             <div className="ez-result-summary-grid">
               <div className="ez-result-score">
+                {/* Còn câu chờ AI chấm thì điểm hiện tại chưa phải điểm thật:
+                    hiện "0%" lúc này khiến bài làm đúng trông như bị 0. */}
                 <span className="ez-result-score-value">
-                  <AnimatedCounter value={percent} formatter={(value) => `${value}%`} />
+                  {graded
+                    ? <AnimatedCounter value={percent} formatter={(value) => `${value}%`} />
+                    : '—'}
                 </span>
                 <span className="ez-result-score-meta">
-                  {attempt.total_score} / {attempt.max_score} điểm
-                  {attempt.results.length > 0 ? ` · ${correctCount}/${attempt.results.length} câu đúng` : ''}
+                  {graded ? (
+                    <>
+                      {attempt.total_score} / {attempt.max_score} điểm
+                      {attempt.results.length > 0 ? ` · ${correctCount}/${attempt.results.length} câu đúng` : ''}
+                    </>
+                  ) : (
+                    `Đã chấm ${gradedCount}/${attempt.results.length} câu`
+                  )}
                 </span>
               </div>
               <div className="ez-result-status">
