@@ -313,11 +313,24 @@ def require_feature_enabled(key: str):
     return dependency
 
 
+# Hai phân hệ này bật/tắt bằng biến môi trường (`app/*/api/deps.py` chặn theo
+# `settings.ENABLE_*`), không qua bảng feature_flags. Vẫn phải báo cho frontend
+# biết, nếu không giao diện hiện form và menu cho tính năng đang tắt rồi mọi
+# thao tác trả 403 mà người dùng không hiểu vì sao.
+_ENV_FEATURE_FLAGS = {
+    "enable_web_knowledge": "ENABLE_WEB_KNOWLEDGE",
+    "enable_curriculum_kb": "ENABLE_CURRICULUM_KB",
+}
+
+
 async def public_runtime_config(database: Any = None) -> dict[str, Any]:
     settings_map = await get_all_settings(database)
     flags_map = await get_all_feature_flags(database)
+    feature_flags = {key: bool(doc.get("enabled")) for key, doc in flags_map.items()}
+    for flag_key, env_key in _ENV_FEATURE_FLAGS.items():
+        feature_flags[flag_key] = bool(getattr(env_settings, env_key, False))
     return {
         "settings": {key: doc["value"] for key, doc in settings_map.items() if doc.get("is_public")},
-        "feature_flags": {key: bool(doc.get("enabled")) for key, doc in flags_map.items()},
+        "feature_flags": feature_flags,
         "generated_at": _now(),
     }
