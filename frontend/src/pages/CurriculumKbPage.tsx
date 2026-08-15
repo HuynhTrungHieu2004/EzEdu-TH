@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { curriculumKbApi } from '../api/curriculumKbApi';
-import type { CurriculumSearchResultItem, CurriculumSource, CurriculumReviewStatus } from '../api/curriculumKbApi';
+import type {
+  CrawlItem,
+  CurriculumSearchResultItem,
+  CurriculumSource,
+  CurriculumReviewStatus,
+} from '../api/curriculumKbApi';
 import { getApiErrorDetail } from '../api/errors';
 import {
   Alert,
@@ -71,6 +76,23 @@ export default function CurriculumKbPage() {
   const [content, setContent] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [crawlUrls, setCrawlUrls] = useState('');
+  const [crawlSubjectId, setCrawlSubjectId] = useState('');
+  const [crawlGrade, setCrawlGrade] = useState('');
+  const [crawlMaxPages, setCrawlMaxPages] = useState(20);
+  const [crawlItems, setCrawlItems] = useState<CrawlItem[]>([]);
+  const [crawlLoading, setCrawlLoading] = useState(false);
+  const [crawlMessage, setCrawlMessage] = useState<string | null>(null);
+
+  async function loadCrawlItems() {
+    if (!isTeacher) return;
+    try {
+      const response = await curriculumKbApi.listCrawlItems();
+      setCrawlItems(response.items);
+    } catch {
+      // The crawler may be disabled during a staged deployment.
+    }
+  }
 
   async function loadMySources() {
     if (!isTeacher) return;
@@ -88,8 +110,58 @@ export default function CurriculumKbPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMySources();
+    void loadCrawlItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTeacher]);
+
+  async function handleStartCrawl() {
+    const seedUrls = crawlUrls.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
+    if (!seedUrls.length || !crawlSubjectId.trim()) return;
+    setCrawlLoading(true);
+    setCrawlMessage(null);
+    try {
+      await curriculumKbApi.createCrawlBatch({
+        seed_urls: seedUrls,
+        subject_id: crawlSubjectId.trim(),
+        grade: crawlGrade ? Number(crawlGrade) : undefined,
+        max_pages: crawlMaxPages,
+      });
+      setCrawlMessage('Đã xếp lịch thu thập. Nội dung tìm được sẽ nằm trong khu cách ly để duyệt.');
+      setCrawlUrls('');
+      window.setTimeout(() => void loadCrawlItems(), 1800);
+    } catch (err) {
+      setActionMessage(getApiErrorDetail(err) ?? 'Không thể bắt đầu thu thập nguồn.');
+    } finally {
+      setCrawlLoading(false);
+    }
+  }
+
+  async function handleCrawlReview(item: CrawlItem, target: 'reviewing' | 'approved' | 'rejected') {
+    setActionId(item.id);
+    setActionMessage(null);
+    try {
+      const updated = await curriculumKbApi.reviewCrawlItem(item.id, target);
+      setCrawlItems((current) => current.map((entry) => entry.id === item.id ? updated : entry));
+    } catch (err) {
+      setActionMessage(getApiErrorDetail(err) ?? 'Không thể cập nhật nội dung cách ly.');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handlePromoteCrawl(item: CrawlItem) {
+    setActionId(item.id);
+    setActionMessage(null);
+    try {
+      await curriculumKbApi.promoteCrawlItem(item.id);
+      setCrawlMessage('Đã chuyển nguồn được duyệt vào kho tri thức. Bạn có thể tiếp tục nạp thành các đoạn tìm kiếm.');
+      await loadMySources();
+    } catch (err) {
+      setActionMessage(getApiErrorDetail(err) ?? 'Không thể chuyển nguồn vào kho tri thức.');
+    } finally {
+      setActionId(null);
+    }
+  }
 
   async function handleSearch() {
     if (!query.trim()) return;
@@ -234,6 +306,69 @@ export default function CurriculumKbPage() {
               <Button loading={creating} onClick={() => void handleCreate()}>
                 Tạo nguồn (bản nháp)
               </Button>
+            </CardBody>
+          </Card>
+
+          <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
+            <CardHeader>
+              <div>
+                <CardTitle as="h2">Thu thập nguồn Internet vào khu cách ly</CardTitle>
+              </div>
+            </CardHeader>
+            <CardBody className="ez-stack">
+              <Alert tone="warning">
+                Nội dung crawl không được dùng để sinh câu hỏi hay trả lời học sinh cho đến khi giáo viên duyệt và chuyển vào kho tri thức.
+              </Alert>
+              <Textarea
+                placeholder={'Mỗi dòng một URL gốc, ví dụ:\nhttps://example.edu/toan-lop-10'}
+                rows={4}
+                value={crawlUrls}
+                onChange={(event) => setCrawlUrls(event.target.value)}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 'var(--ez-space-3)' }}>
+                <Input placeholder="Mã môn (vd: toan)" value={crawlSubjectId} onChange={(event) => setCrawlSubjectId(event.target.value)} />
+                <Input type="number" min={1} max={12} placeholder="Lớp" value={crawlGrade} onChange={(event) => setCrawlGrade(event.target.value)} />
+                <Input type="number" min={1} max={100} value={crawlMaxPages} onChange={(event) => setCrawlMaxPages(Number(event.target.value))} />
+              </div>
+              <Button loading={crawlLoading} onClick={() => void handleStartCrawl()}>
+                Bắt đầu thu thập có kiểm soát
+              </Button>
+              {crawlMessage && <Alert tone="success">{crawlMessage}</Alert>}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--ez-space-3)' }}>
+                <strong>Nội dung đang cách ly ({crawlItems.length})</strong>
+                <Button size="sm" variant="ghost" onClick={() => void loadCrawlItems()}>Làm mới</Button>
+              </div>
+              {crawlItems.length === 0 ? (
+                <EmptyState compact title="Chưa có nội dung crawl" />
+              ) : crawlItems.map((item) => (
+                <div key={item.id} className="dash-row" style={{ alignItems: 'flex-start' }}>
+                  <span className="dash-row-main">
+                    <span className="dash-row-title">{item.title || item.canonical_url}</span>
+                    <span className="dash-row-meta" style={{ wordBreak: 'break-all' }}>{item.canonical_url}</span>
+                    <span className="dash-row-meta">
+                      <Badge variant={item.review_status === 'approved' ? 'success' : item.crawl_status === 'failed' ? 'error' : 'neutral'}>
+                        {item.review_status === 'draft' ? 'Cách ly' : item.review_status === 'reviewing' ? 'Đang duyệt' : item.review_status === 'approved' ? 'Đã duyệt' : 'Đã từ chối'}
+                      </Badge>
+                      <Badge variant="neutral">{item.crawl_status}</Badge>
+                    </span>
+                  </span>
+                  <div style={{ display: 'flex', gap: 'var(--ez-space-2)', flexWrap: 'wrap' }}>
+                    {item.crawl_status === 'fetched' && item.review_status === 'draft' && (
+                      <Button size="sm" variant="outline" loading={actionId === item.id} onClick={() => void handleCrawlReview(item, 'reviewing')}>Gửi duyệt</Button>
+                    )}
+                    {item.review_status === 'reviewing' && (
+                      <>
+                        <Button size="sm" variant="outline" loading={actionId === item.id} onClick={() => void handleCrawlReview(item, 'rejected')}>Từ chối</Button>
+                        <Button size="sm" loading={actionId === item.id} onClick={() => void handleCrawlReview(item, 'approved')}>Duyệt nguồn</Button>
+                      </>
+                    )}
+                    {item.review_status === 'approved' && (
+                      <Button size="sm" loading={actionId === item.id} onClick={() => void handlePromoteCrawl(item)}>Chuyển vào kho</Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </CardBody>
           </Card>
 
