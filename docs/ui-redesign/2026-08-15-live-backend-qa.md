@@ -9,10 +9,13 @@ trên MongoDB thật để xem stub đang che giấu điều gì.
   đều healthy.
 - Frontend: dev server ở cổng **5173** (nằm trong `BACKEND_CORS_ORIGINS`; cổng khác sẽ bị CORS chặn),
   `VITE_API_BASE_URL=http://127.0.0.1:8000`.
-- Tài khoản: đăng ký mới `qa-live-lecturer@example.com` / `qa-live-student@example.com` qua chính API đăng ký
-  (mật khẩu `QaLive#2026`) — dữ liệu cũ trong DB không có mật khẩu đã biết.
+- Tài khoản: `python scripts/qa_live_accounts.py --setup` tạo ba tài khoản `qa-live-lecturer` /
+  `qa-live-student` / `qa-live-admin` (mật khẩu `QaLive#2026`). Tài khoản quản trị phải nâng quyền trực tiếp
+  vì API đăng ký không cho chọn vai trò `admin`; dữ liệu cũ trong DB có admin nhưng không biết mật khẩu.
 - Lệnh: `npm run test:live` (`playwright.live.config.ts` + `e2e/live-smoke.spec.ts`). Bộ này bị loại khỏi
   `npx playwright test` thường vì cần backend đang chạy.
+- Dọn sau khi chạy: `python scripts/qa_live_accounts.py --cleanup` (xem trước bằng cách bỏ cờ). Xoá theo tiền
+  tố `qa-live-` / `QA Live ` và các bản ghi tham chiếu id đó, không đụng dữ liệu thật.
 
 Bài kiểm ghi lại mọi lỗi console, lỗi `pageerror`, mọi phản hồi API ≥ 400, tràn ngang và trang trắng trên
 15 route giáo viên + 10 route học sinh + 6 trang công khai.
@@ -74,10 +77,79 @@ theo cờ; `/personalization` tắt thì không gọi API cá nhân hoá.
 | `npm run test:chat` | PASS — 11/11 |
 | `npx playwright test` | PASS — **915/915** |
 
+## Vòng hai: khu quản trị với backend thật
+
+13 route quản trị (`/admin/dashboard`, `users`, `documents`, `questions`, `exams`, `ai`, `website-content`,
+`settings`, `feature-flags`, `notifications`, `reports`, `activity-logs`, `audit-logs`) cùng ba trang chi
+tiết, thêm một thao tác ghi thật: **khoá rồi mở khoá** tài khoản QA (chỉ thao tác trên tài khoản do bộ kiểm
+tự tạo). Kết quả: 0 lỗi console, 0 `pageerror`, 0 phản hồi ≥ 400, 0 tràn ngang, 0 trang trắng; log của
+FastAPI cũng không có 4xx/5xx nào trong suốt lượt chạy.
+
+### Lỗi thật tìm được: cột "Hành động" trống cho tới khi tải xong từng dòng
+
+`/admin/users` bắn thêm `GET /admin/users/{id}` cho **mỗi dòng** để lấy ba cột đếm (tài liệu, câu hỏi, AI
+usage). Toàn bộ nút thao tác — Sửa, Khóa, Role, Quota, Reset MK, Logout, Xóa — chỉ render khi request đó về.
+Stub trả tức thì nên bộ kiểm cũ không thấy; với backend thật quản trị viên nhìn thấy bảng có dữ liệu nhưng
+không có nút nào trong khoảng thời gian đó.
+
+Sửa: cột hành động dùng chính dòng danh sách (`rowDetails[item.id] ?? item`) — đúng cách các cột khác trong
+file đã làm. `canTouch`/`dangerousSelf`/hộp thoại xác nhận/hộp thoại sửa chỉ đọc `role`, `id`, `status`,
+`email`, `full_name`, `current_quota`, đều có sẵn trong `AdminUserSummary`; chỉ ba cột đếm mới cần
+`AdminUserDetail` và chúng vẫn được phép hiện `...` trong lúc chờ. Khoá lại bằng bài kiểm trong
+`admin-workspace.spec.ts` với route chi tiết **không bao giờ trả về**.
+
+Bài kiểm này ban đầu viết bằng route **không bao giờ trả lời**; ba bài khác trong lượt chạy đầy đủ fail theo
+vì request treo vẫn sống sau khi test kết thúc và làm nghẽn worker. Đổi sang `route.abort()`: trang gom chi
+tiết bằng `Promise.allSettled` nên hỏng cũng chỉ khiến `rowDetails` rỗng — đúng tình huống cần kiểm — mà
+không để lại kết nối treo. Thời gian bài kiểm: 48s xuống 4,5s.
+
+### Bằng chứng bản sửa cờ tính năng ở vòng một có tác dụng
+
+`system_error_logs` trong MongoDB có 48 bản ghi 403 gắn với tài khoản QA — tất cả thuộc lượt chạy **trước**
+khi sửa (`/web-knowledge/sources`, `/curriculum-kb/sources`, `/curriculum-kb/crawl-items`, `/me`,
+`/me/knowledge`, `/recommendations/me`). Lượt chạy sau khi sửa: **0 bản ghi**. Không chỉ trình duyệt không
+thấy lỗi — backend không còn bị gọi.
+
+### Đối chiếu fixture stub với schema thật
+
+So khoá của các fixture trong `admin-workspace.spec.ts` với `model_fields` của Pydantic
+(`AdminUserSummary`, `AdminDocumentSummary`, `AdminQuestionSummary`, `AdminExamSummary`,
+`UserActivityLogItem`, `AdminAuditLogItem`): khớp hoàn toàn, không thiếu không thừa. Nghĩa là phần bảng có
+dữ liệu mà bộ kiểm stub đang bảo vệ vẫn đúng với backend hiện tại.
+
+### Bộ kiểm live trước đây không thể fail
+
+`live-smoke.spec.ts` chỉ `console.log` danh sách vấn đề rồi kết thúc — nghĩa là `npm run test:live` vẫn xanh
+kể cả khi có lỗi console hay phản hồi 500; phải đọc log bằng mắt mới biết. Nay `report()` in danh sách **và**
+khẳng định nó rỗng; riêng loại `thiếu-dữ-liệu` (bảng rỗng vì DB chưa có gì) chỉ in ra, không làm fail.
+
+## Dọn dữ liệu kiểm thử
+
+Đã xoá khỏi MongoDB: 3 tài khoản `qa-live-*`, 5 lớp `QA Live <timestamp>`, 38 `user_activity_logs`,
+48 `system_error_logs`, 4 `admin_audit_logs` của thao tác khoá/mở khoá — tất cả đều do bộ kiểm sinh ra.
+Chạy lại `--setup` rồi `npm run test:live` từ DB sạch: vẫn 5/5 PASS.
+
+## Kiểm chứng vòng hai
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `npm run test:live` (13 route quản trị + khoá/mở khoá thật) | PASS — 5/5 |
+| `npx playwright test` | PASS — **921/921** |
+| `pytest` (backend) | PASS — 673 |
+| `npx tsc -b` / `npm run lint` / `npm run build` | PASS |
+| `npm run test:chat` | PASS — 11/11 |
+
+Ba bài kiểm cũ hay fail rải rác khi chạy song song sáu project đã được nới hạn chờ lên 15s (thống kê dashboard
+quản trị, stagger bảng người dùng, `ErrorState` của audit-logs) — đều là khẳng định chờ dữ liệu bất đồng bộ
+với hạn mặc định 5s, không phải lỗi ứng dụng.
+
 ## Còn lại
 
 - Chưa chạy thử các luồng tốn hạn mức AI với backend thật: tải học liệu → trích xuất → sinh câu hỏi → chấm
   tự luận. Cần cân nhắc chi phí Gemini/Groq trước khi kiểm.
-- Khu quản trị chưa kiểm bằng backend thật: DB có tài khoản admin nhưng không biết mật khẩu, và tự nâng
-  quyền một tài khoản là thao tác ghi vào dữ liệu thật nên không tự làm.
-- Hai tài khoản `qa-live-*@example.com` vẫn còn trong DB (đã dùng để kiểm). Xoá lúc nào cũng được.
+- `/admin/documents`, `/admin/questions`, `/admin/exams` mới kiểm ở trạng thái **rỗng** với backend thật: DB
+  không có học liệu nào, mà tạo học liệu thật thì phải đẩy file lên Cloudinary. Trạng thái có dữ liệu hiện
+  dựa vào bộ kiểm stub — đã đối chiếu khoá fixture với schema thật ở trên.
+- `/admin/users` vẫn gọi một request chi tiết cho mỗi dòng (13 người dùng = 13 request, tối đa 20 theo trang).
+  Bỏ hẳn phải để endpoint danh sách trả sẵn ba số đếm, tức là thêm aggregation ở backend — không làm trong
+  đợt QA này.
