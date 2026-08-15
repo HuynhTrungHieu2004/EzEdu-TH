@@ -104,13 +104,34 @@ for (const route of LIST_ROUTES) {
   });
 }
 
+test('nút hành động hiện ngay, không chờ chi tiết từng dòng', async ({ page }) => {
+  // Lỗi thật thấy khi chạy với backend: mỗi dòng bắn một request chi tiết, mà cả
+  // cột "Hành động" chỉ render sau khi request đó về — stub trả tức thì nên ẩn.
+  await stubApi(page, ADMIN_USER);
+  await page.route('**/api/v1/admin/users/statistics**', (route) => route.fulfill(json(USER_STATS)));
+  await page.route('**/api/v1/admin/users?**', (route) => route.fulfill(json(USERS)));
+  // Chi tiết từng dòng không về được. Dùng `abort` chứ không để treo: trang gom
+  // bằng `Promise.allSettled` nên hỏng cũng chỉ là `rowDetails` rỗng, mà request
+  // treo thì còn sống sau khi test kết thúc và làm nghẽn cả lượt chạy song song.
+  await page.route('**/api/v1/admin/users/68b2f1f77bcf86cd7994500*', (route) => route.abort());
+
+  await page.goto('/admin/users');
+  const row = page.locator('.ez-datatable tbody tr', { hasText: 'a@example.test' });
+  await expect(row.getByRole('button', { name: 'Khóa' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Sửa' })).toBeVisible();
+  // Cột số đếm vẫn được phép chờ
+  await expect(row.getByText('...').first()).toBeVisible();
+});
+
 test('danh sách người dùng có dữ liệu không có vi phạm axe A/AA', async ({ page }) => {
   test.setTimeout(60_000);
   await stubAdmin(page);
   await page.goto('/admin/users');
   await expect(page.locator('.ez-datatable')).toBeVisible({ timeout: 15_000 });
+  // Chờ stagger của bảng chạy xong; 5s mặc định không đủ khi sáu project chạy song song.
   await expect
-    .poll(async () => page.locator('.ez-datatable tbody tr').first().evaluate((el) => el.style.opacity))
+    .poll(async () => page.locator('.ez-datatable tbody tr').first().evaluate((el) => el.style.opacity),
+      { timeout: 15_000 })
     .toBe('');
 
   const results = await new AxeBuilder({ page })
@@ -150,7 +171,7 @@ test('lỗi render của một trang không làm trắng khung ứng dụng', as
   await page.goto('/admin/audit-logs');
 
   // Khung vẫn còn: điều hướng bên trái còn dùng được, nội dung thành ErrorState
-  await expect(page.getByText('Không mở được nội dung trang này')).toBeVisible();
+  await expect(page.getByText('Không mở được nội dung trang này')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('navigation', { name: 'Điều hướng chính' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Người dùng', exact: true }).first().click();
@@ -176,7 +197,8 @@ test('dashboard quản trị đếm số liệu và không giữ transform', asy
   await page.goto('/admin/dashboard');
 
   const totalUsers = page.locator('.ez-stat', { hasText: 'Tổng người dùng' }).locator('.ez-stat-value');
-  await expect(totalUsers).toHaveText('128');
+  // Dashboard chờ ba endpoint rồi mới đếm số; 5s mặc định không đủ khi chạy song song.
+  await expect(totalUsers).toHaveText('128', { timeout: 15_000 });
   await expect
     .poll(async () => page.locator('.stat-card').first().evaluate((el) => getComputedStyle(el).transform))
     .toBe('none');

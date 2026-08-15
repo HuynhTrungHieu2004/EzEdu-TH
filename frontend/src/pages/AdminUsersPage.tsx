@@ -11,6 +11,7 @@ import type {
   AdminUserListResponse,
   AdminUserStatisticsResponse,
   AdminUserStatus,
+  AdminUserSummary,
 } from '../types/adminUsers';
 import { hasPermission, permissionsForRole } from '../utils/adminPermissions';
 import { fmtDateTime, fmtNumber, dateStart, dateEnd, ROLE_LABELS, USER_STATUS_LABELS } from '../utils/adminUtils';
@@ -65,7 +66,8 @@ function isObjectId(value: string) {
 
 interface ConfirmState {
   kind: ActionKind;
-  user: AdminUserDetail;
+  /** Đủ dùng cho hộp thoại: các số đếm chỉ nằm ở cột riêng, không nằm trong hộp thoại. */
+  user: AdminUserSummary;
   nextRole?: AdminRole;
   quotaText?: string;
 }
@@ -180,7 +182,7 @@ function EditUserModal({
   onCancel,
   onSubmit,
 }: {
-  user: AdminUserDetail;
+  user: AdminUserSummary;
   busy: boolean;
   onCancel: () => void;
   onSubmit: (payload: { full_name: string; email: string; email_verified: boolean }) => void;
@@ -311,7 +313,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
-  const [editUser, setEditUser] = useState<AdminUserDetail | null>(null);
+  const [editUser, setEditUser] = useState<AdminUserSummary | null>(null);
   const [createUser, setCreateUser] = useState(false);
   const [reason, setReason] = useState('');
   const [passwordResult, setPasswordResult] = useState<string | null>(null);
@@ -406,17 +408,17 @@ export default function AdminUsersPage() {
     setAppliedFilters(filters);
   };
 
-  const canTouch = useCallback((user: AdminUserDetail) => {
+  const canTouch = useCallback((user: AdminUserSummary) => {
     if (!currentUser) return false;
     if (user.role === 'super_admin' && currentUser.role !== 'super_admin') return false;
     return true;
   }, [currentUser]);
 
-  const dangerousSelf = useCallback((user: AdminUserDetail, kind: ActionKind) => {
+  const dangerousSelf = useCallback((user: AdminUserSummary, kind: ActionKind) => {
     return user.id === currentUser?.id && ['lock', 'delete'].includes(kind);
   }, [currentUser?.id]);
 
-  const openConfirm = useCallback((kind: ActionKind, user: AdminUserDetail) => {
+  const openConfirm = useCallback((kind: ActionKind, user: AdminUserSummary) => {
     setReason('');
     setNotice(null);
     setPasswordResult(null);
@@ -525,34 +527,37 @@ export default function AdminUsersPage() {
       key: 'actions',
       label: 'Hành động',
       render: (item: RowItem) => {
-        const detail = rowDetails[item.id];
+        // Dòng danh sách đã đủ để quyết định nút nào hiện; chờ `rowDetails` thì
+        // với backend thật cả cột "Hành động" trống cho tới khi request từng
+        // dòng về (stub trả tức thì nên trước đây không thấy).
+        const detail = rowDetails[item.id] ?? item;
         return (
           <div className="ez-datatable-cell-actions">
             <Button variant="outline" size="sm" onClick={() => navigate(`/admin/users/${item.id}`)}>Xem</Button>
-            {detail && can('users.update') && canTouch(detail) && (
+            {can('users.update') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => setEditUser(detail)}>Sửa</Button>
             )}
-            {detail && can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
+            {can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm(detail.status === 'locked' ? 'unlock' : 'lock', detail)}>
                 {detail.status === 'locked' ? 'Mở khóa' : 'Khóa'}
               </Button>
             )}
-            {detail && can('users.change_role') && canTouch(detail) && (
+            {can('users.change_role') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('role', detail)}>Role</Button>
             )}
-            {detail && can('users.manage_quota') && canTouch(detail) && (
+            {can('users.manage_quota') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('quota', detail)}>Quota</Button>
             )}
-            {detail && can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
+            {can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('resetPassword', detail)}>Reset MK</Button>
             )}
-            {detail && can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
+            {can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('forceLogout', detail)}>Logout</Button>
             )}
-            {detail && can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
+            {can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
               <Button variant="danger" size="sm" onClick={() => openConfirm('delete', detail)}>Xóa</Button>
             )}
-            {detail && can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
+            {can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
               <Button variant="secondary" size="sm" onClick={() => openConfirm('restore', detail)}>Khôi phục</Button>
             )}
           </div>
