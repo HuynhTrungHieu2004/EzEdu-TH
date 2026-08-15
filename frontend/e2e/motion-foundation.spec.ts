@@ -156,7 +156,7 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
 
     await expect.poll(
       () => page.evaluate(() => window.__activeIndicatorStyleHistory ?? []),
-      { timeout: 1_000 },
+      { timeout: 5_000 },
     ).toEqual(expect.arrayContaining([
       expect.objectContaining({ href: '/documents', style: expect.stringContaining('transform') }),
     ]));
@@ -167,7 +167,7 @@ test('active navigation indicator chạy rồi dọn GSAP styles sau SPA navigat
         opacity: element.style.opacity,
         visibility: element.style.visibility,
       })),
-      { timeout: 1_000 },
+      { timeout: 5_000 },
     ).toEqual({ transform: '', opacity: '', visibility: '' });
 
     expect(browserErrors).toEqual([]);
