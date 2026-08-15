@@ -1,0 +1,56 @@
+# Cấu hình triển khai backend lên Render (https://render.com).
+# Frontend đi Netlify — xem netlify.toml và docs/trien-khai/netlify.md.
+#
+# Render đọc file này khi bạn dùng Blueprint (New → Blueprint → chọn repo).
+# Các biến `sync: false` phải tự điền trong bảng điều khiển: đó là khoá bí mật,
+# không được đặt trong repo.
+
+services:
+  - type: web
+    name: ezedu-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore # gần Việt Nam nhất trong các vùng Render
+    healthCheckPath: /health/ready
+    envVars:
+      - key: APP_ENV
+        value: production
+      # Worker chấm tự luận chạy chung container: gói free không có dịch vụ
+      # background riêng. Trả phí thì đặt 0 ở đây và tạo thêm một worker service.
+      - key: RUN_WORKER
+        value: "1"
+      # Điền sau khi có tên miền Netlify. Dạng JSON, ví dụ:
+      # ["https://ezedu.netlify.app"]
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: ai_question_generator
+      - key: JWT_SECRET_KEY
+        generateValue: true # Render tự sinh chuỗi ngẫu nhiên đủ dài
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      # ChromaDB ghi vào ổ đĩa của container. Gói free KHÔNG có ổ đĩa bền:
+      # mỗi lần deploy hoặc thức dậy sau khi ngủ là mất vector, phải lập chỉ mục
+      # lại học liệu thì hỏi đáp có trích dẫn mới chạy. Muốn giữ: gói trả phí
+      # thêm Persistent Disk gắn vào /app/chroma_db, hoặc đổi sang Chroma Cloud
+      # bằng CHROMA_MODE=http + CHROMA_HOST/CHROMA_PORT/CHROMA_AUTH_TOKEN.
+      - key: CHROMA_PERSIST_DIR
+        value: /app/chroma_db
