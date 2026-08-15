@@ -449,7 +449,7 @@
 }
 
 .stat-sub {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ez-text-muted);
   margin-top: 0.1rem;
 }
@@ -591,7 +591,7 @@
 
 .backend-service small {
   color: var(--ez-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .health-alert-list {
@@ -612,7 +612,7 @@
 .health-alert strong {
   min-width: 4.5rem;
   text-transform: uppercase;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .health-alert--warning {
@@ -881,7 +881,7 @@
 }
 
 .eval-note {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--ez-text-muted);
   font-style: italic;
   margin-left: auto;
@@ -991,5 +991,16 @@
   .admin-tab {
     padding: 0.45rem 0.7rem;
     font-size: 0.78rem;
+  }
+}
+
+/* Khu quản trị chủ yếu dùng trên máy tính nên các nút ở đây tự đặt kích thước
+   riêng (2.35rem ≈ 35px) thay vì dùng `.ez-btn`. Trên thiết bị cảm ứng vẫn phải
+   đủ 44px như phần còn lại của hệ. */
+@media (pointer: coarse) {
+  .preset-btn,
+  .admin-quick-link,
+  .admin-action-btn {
+    min-height: 44px;
   }
 }

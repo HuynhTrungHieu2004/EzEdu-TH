@@ -67,7 +67,7 @@ const styles = {
     border: '1px solid var(--ez-border)',
     backgroundColor: 'var(--ez-surface)',
     color: 'var(--ez-text-muted)',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',

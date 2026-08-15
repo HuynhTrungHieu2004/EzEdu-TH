@@ -812,12 +812,13 @@ const AdvancedChatPage = () => {
             />
           )}
 
-          <div style={styles.responseStyleBar}>
+          <div className="chat-style-bar" style={styles.responseStyleBar}>
             <span style={styles.styleLabel}>Phong cách phản hồi:</span>
             {(['normal', 'concise', 'detailed', 'beginner'] as ResponseStyle[]).map((st) => (
               <button
                 key={st}
                 type="button"
+                className="chat-style-btn"
                 onClick={() => setResponseStyle(st)}
                 style={{
                   ...styles.styleBtn,
@@ -951,7 +952,7 @@ const styles = {
     backgroundColor: 'var(--ez-surface)',
   },
   styleLabel: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '700',
     color: 'var(--ez-text-muted)',
     textTransform: 'uppercase' as const,
@@ -962,7 +963,7 @@ const styles = {
     border: '1px solid var(--ez-border-strong)',
     backgroundColor: 'var(--ez-bg)',
     color: 'var(--ez-text-secondary)',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',

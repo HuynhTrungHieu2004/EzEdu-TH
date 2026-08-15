@@ -20,6 +20,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--ez-font-sans);
   font-size: var(--ez-text-body);
   line-height: var(--ez-leading-body);

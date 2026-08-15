@@ -647,7 +647,7 @@ const styles: Record<string, React.CSSProperties> = {
   typeBadge: {
     padding: '2px 8px',
     borderRadius: '6px',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     backgroundColor: 'var(--ez-bg)',
     color: 'var(--ez-text-secondary)',
@@ -752,7 +752,7 @@ const styles: Record<string, React.CSSProperties> = {
   severityStatBadge: {
     padding: '2px 8px',
     borderRadius: '6px',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     border: '1px solid transparent',
   },

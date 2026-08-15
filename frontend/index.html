@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: không có nó thì mọi `env(safe-area-inset-*)` trong
+         CSS đều trả về 0, tức phần chừa chỗ cho tai thỏ và thanh home của
+         iPhone không có tác dụng. Không đặt maximum-scale/user-scalable=no —
+         người dùng phải phóng to được (WCAG 1.4.4). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>EzEdu AI | Xử lý học liệu thành đề kiểm tra</title>
     <meta name="description" content="EzEdu AI giúp trích xuất, phân tích và chuyển đổi học liệu điện tử thành câu hỏi, đáp án và đề kiểm tra trong một quy trình dễ sử dụng." />
     <meta property="og:title" content="EzEdu AI | Xử lý học liệu thành đề kiểm tra" />

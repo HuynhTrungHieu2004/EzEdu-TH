@@ -220,7 +220,7 @@ const styles = {
     marginBottom: '12px',
   },
   badge: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '700',
     padding: '4px 10px',
     borderRadius: '6px',
@@ -229,7 +229,7 @@ const styles = {
     gap: '5px',
   },
   searchBadge: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     backgroundColor: 'var(--ez-surface-muted)',
     color: 'var(--ez-text-secondary)',
@@ -300,7 +300,7 @@ const styles = {
     flexWrap: 'wrap' as const,
     alignItems: 'center',
     gap: '12px',
-    fontSize: '11px',
+    fontSize: '12px',
     color: 'var(--ez-text-muted)',
     flex: 1,
   },

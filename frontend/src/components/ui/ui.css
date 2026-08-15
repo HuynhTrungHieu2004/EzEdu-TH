@@ -1983,3 +1983,50 @@
   color: var(--ez-text-muted);
   font-size: var(--ez-text-caption);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Thiết bị cảm ứng
+   ═══════════════════════════════════════════════════════════════════════════
+   Hai ràng buộc của phần cứng, không phải lựa chọn thiết kế, nên đặt tập trung
+   ở đây thay vì sửa từng trang:
+
+   1. iOS Safari TỰ PHÓNG TO cả trang khi người dùng chạm vào ô nhập có cỡ chữ
+      dưới 16px — và không thu lại. Trang đo được có ô 15px, 14px, 13px, 11.1px
+      rải rác ở 8 file CSS khác nhau; `!important` ở đây là để chặn mọi rule cũ
+      lẫn rule viết sau vô tình rơi lại xuống dưới 16px.
+   2. Ngón tay cần vùng chạm ~44px (Apple HIG, WCAG 2.5.5). Nút mặc định của hệ
+      là 40px, nút nhỏ 32px — bấm được nhưng hay trượt, nhất là khi hai nút nằm
+      sát nhau trong bảng.
+
+   Dùng `pointer: coarse` chứ không dùng bề rộng: máy tính bảng có bút/chuột
+   không cần nới, còn điện thoại xoay ngang vẫn cần. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: max(16px, 1rem) !important;
+  }
+
+  .ez-btn,
+  .ez-btn-sm {
+    min-height: 44px;
+  }
+
+  .ez-btn-icon,
+  .ez-btn-icon.ez-btn-sm {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  /* Ô chọn và checkbox trong bảng: nới vùng bấm mà không đổi kích thước hình vẽ */
+  .ez-checkbox,
+  .ez-radio {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ez-chip {
+    min-height: 40px;
+  }
+}

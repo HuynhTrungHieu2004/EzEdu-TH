@@ -298,7 +298,7 @@ const styles = {
     transition: 'border-color 0.2s',
   },
   counter: {
-    fontSize: '11px',
+    fontSize: '12px',
     color: 'var(--ez-text-muted)',
     alignSelf: 'flex-end',
   },

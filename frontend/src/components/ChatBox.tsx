@@ -230,7 +230,7 @@ const styles = {
     color: 'var(--ez-text)',
   },
   label: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '700',
     marginBottom: '6px',
     opacity: 0.9,
@@ -238,7 +238,7 @@ const styles = {
     letterSpacing: '0.6px',
   },
   labelAnswer: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '700',
     marginBottom: '6px',
     color: 'var(--ez-primary)',

@@ -1038,3 +1038,17 @@
   font-size: var(--ez-text-body-sm);
   line-height: var(--ez-leading-body);
 }
+
+/* Vùng chạm 44px cho thanh điều hướng và chân trang trên thiết bị cảm ứng. */
+@media (pointer: coarse) {
+  .ezp-brand,
+  .ezp-nav-link,
+  .ezp-footer-link {
+    min-height: 44px;
+    /* Liên kết chữ ngắn ("Báo lỗi") rộng chưa tới 40px nếu không đặt sàn. */
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

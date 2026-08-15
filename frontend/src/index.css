@@ -221,7 +221,8 @@ code, .counter { font-family: var(--mono); }
 
 .sidebar-label {
   padding: 6px 12px 4px;
-  font-size: 10px;
+  /* 12px là ngưỡng đọc được trên di động; nhãn nhóm viết hoa ở 10px phải nheo mắt. */
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;

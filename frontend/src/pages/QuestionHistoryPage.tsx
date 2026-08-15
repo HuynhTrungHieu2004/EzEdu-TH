@@ -403,7 +403,7 @@ const QuestionHistoryPage: React.FC = () => {
                               alignItems: 'center',
                               justifyContent: 'center',
                               color: 'var(--ez-text-on-brand)',
-                              fontSize: '9px',
+                              fontSize: '12px',
                               fontWeight: 600,
                             }}
                           >
@@ -671,7 +671,7 @@ const S: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
   },
   metaBadge: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: 600,
     padding: '3px 10px',
     borderRadius: '16px',

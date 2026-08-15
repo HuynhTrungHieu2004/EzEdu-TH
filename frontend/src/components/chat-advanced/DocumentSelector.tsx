@@ -125,7 +125,7 @@ const styles = {
     color: 'var(--ez-text)',
   },
   warning: {
-    fontSize: '11px',
+    fontSize: '12px',
     color: 'var(--ez-error)',
     fontWeight: '600',
   },
@@ -166,7 +166,7 @@ const styles = {
     whiteSpace: 'nowrap' as const,
   },
   itemBadge: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '700',
     color: 'var(--ez-success)',
     backgroundColor: 'var(--ez-success-subtle)',

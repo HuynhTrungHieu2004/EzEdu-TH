@@ -128,6 +128,10 @@
 /* ═══ HERO ═══ */
 .lp-hero {
   min-height: 100vh;
+  /* Trên di động, 100vh tính cả phần bị thanh URL che: hero cao hơn màn hình
+     nên nút chính bị đẩy khuất. `svh` là chiều cao nhỏ nhất (thanh URL đang
+     hiện) — hero luôn vừa khung ngay khi mới mở. */
+  min-height: 100svh;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; padding:140px 24px 100px;
   background:

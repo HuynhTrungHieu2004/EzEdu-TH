@@ -197,7 +197,7 @@ const styles = {
     boxShadow: 'var(--ez-shadow-md)',
   },
   label: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '700',
     marginBottom: '6px',
     textTransform: 'uppercase' as const,

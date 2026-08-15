@@ -177,8 +177,8 @@ const styles = {
   tabs: { display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' as const },
   tab: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '11px 16px', border: '1px solid var(--ez-border)', borderRadius: '10px', background: 'var(--ez-bg)', color: 'var(--ez-text-muted)', fontWeight: 700, cursor: 'pointer' },
   activeTab: { background: 'var(--ez-primary)', color: 'var(--ez-text-on-brand)', borderColor: 'var(--ez-primary)' },
-  redBadge: { minWidth: '20px', height: '20px', padding: '0 6px', borderRadius: '999px', background: 'var(--ez-error)', color: 'var(--ez-text-on-brand)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-  countBadge: { minWidth: '20px', height: '20px', padding: '0 6px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  redBadge: { minWidth: '20px', height: '20px', padding: '0 6px', borderRadius: '999px', background: 'var(--ez-error)', color: 'var(--ez-text-on-brand)', fontSize: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  countBadge: { minWidth: '20px', height: '20px', padding: '0 6px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', fontSize: '12px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   error: {
     padding: '12px 14px',
     borderRadius: '8px',
@@ -210,8 +210,8 @@ const styles = {
     boxShadow: 'var(--ez-shadow-lg)',
   },
   cardStatus: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' },
-  pendingPill: { color: 'var(--ez-error-text)', background: 'var(--ez-error-subtle)', borderRadius: '999px', padding: '5px 9px', fontSize: '11px', fontWeight: 800 },
-  completedPill: { color: 'var(--ez-success-text)', background: 'var(--ez-success-subtle)', borderRadius: '999px', padding: '5px 9px', fontSize: '11px', fontWeight: 800 },
+  pendingPill: { color: 'var(--ez-error-text)', background: 'var(--ez-error-subtle)', borderRadius: '999px', padding: '5px 9px', fontSize: '12px', fontWeight: 800 },
+  completedPill: { color: 'var(--ez-success-text)', background: 'var(--ez-success-subtle)', borderRadius: '999px', padding: '5px 9px', fontSize: '12px', fontWeight: 800 },
   resultBox: { padding: '10px', marginBottom: '12px', borderRadius: '8px', background: 'var(--ez-surface-muted)', color: 'var(--ez-text)', fontSize: '13px' },
   cardTitle: {
     margin: '0 0 12px',

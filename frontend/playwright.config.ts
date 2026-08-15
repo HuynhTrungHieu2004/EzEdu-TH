@@ -2,6 +2,9 @@ import { defineConfig } from '@playwright/test';
 
 const baseURL = 'http://127.0.0.1:4173';
 
+/** Các bộ cần điều kiện riêng: đo hiệu năng chạy một mình, ba bộ còn lại cần backend thật. */
+const NEEDS_OWN_RUNNER = /motion-performance|live-smoke|live-ai|mobile-audit/;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -46,12 +49,12 @@ export default defineConfig({
   projects: [
     // Ma trận viewport bỏ qua bài đo hiệu năng — số đo sẽ nhiễu khi sáu project
     // chạy song song, và nhịp khung hình không phụ thuộc bề rộng cửa sổ.
-    { name: 'desktop-1440', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 1440, height: 900 } } },
-    { name: 'laptop-1280', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 1280, height: 800 } } },
-    { name: 'tablet-landscape-1024', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 1024, height: 768 } } },
-    { name: 'tablet-portrait-768', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 768, height: 1024 } } },
-    { name: 'mobile-390', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 390, height: 844 } } },
-    { name: 'mobile-360', testIgnore: /motion-performance|live-smoke|live-ai/, use: { viewport: { width: 360, height: 800 } } },
+    { name: 'desktop-1440', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'laptop-1280', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 1280, height: 800 } } },
+    { name: 'tablet-landscape-1024', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 1024, height: 768 } } },
+    { name: 'tablet-portrait-768', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 768, height: 1024 } } },
+    { name: 'mobile-390', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 390, height: 844 } } },
+    { name: 'mobile-360', testIgnore: NEEDS_OWN_RUNNER, use: { viewport: { width: 360, height: 800 } } },
     // Project riêng cho bài đo hiệu năng, chạy tuần tự một mình.
     {
       name: 'perf',

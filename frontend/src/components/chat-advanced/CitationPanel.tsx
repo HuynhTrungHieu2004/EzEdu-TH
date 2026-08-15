@@ -244,7 +244,7 @@ const styles = {
     border: 'none',
     backgroundColor: 'transparent',
     cursor: 'pointer',
-    fontSize: '11px',
+    fontSize: '12px',
     padding: '2px 4px',
     borderRadius: '4px',
     display: 'flex',
@@ -255,7 +255,7 @@ const styles = {
     outline: 'none',
   },
   sourceTag: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '800',
     color: 'var(--ez-primary)',
     backgroundColor: 'var(--ez-primary-subtle)',
@@ -263,7 +263,7 @@ const styles = {
     borderRadius: '4px',
   },
   sourceTagWeb: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '800',
     color: 'var(--ez-secondary)',
     backgroundColor: 'var(--ez-secondary-subtle)',
@@ -298,7 +298,7 @@ const styles = {
   cardFooter: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '10px',
+    fontSize: '12px',
     color: 'var(--ez-text-muted)',
   },
 };

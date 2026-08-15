@@ -334,6 +334,10 @@
   z-index: var(--ez-z-sticky);
   min-height: 64px;
   padding: var(--ez-space-2) clamp(16px, 3vw, 24px);
+  /* Xoay ngang trên máy có tai thỏ: nút ngoài cùng của thanh trên cùng bị che
+     nếu không cộng thêm vùng an toàn hai bên. */
+  padding-left: calc(clamp(16px, 3vw, 24px) + env(safe-area-inset-left));
+  padding-right: calc(clamp(16px, 3vw, 24px) + env(safe-area-inset-right));
   background-color: var(--ez-surface);
   border-bottom: 1px solid var(--ez-border);
 }
@@ -361,8 +365,11 @@
   z-index: var(--ez-z-sticky);
   background-color: var(--ez-surface);
   border-top: 1px solid var(--ez-border);
-  /* Chừa vùng an toàn dưới màn hình iPhone */
+  /* Chừa vùng an toàn dưới màn hình iPhone. Lề trái/phải cần cho lúc xoay
+     ngang: tai thỏ nằm ở cạnh bên, sẽ che mất tab ngoài cùng. */
   padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   box-shadow: 0 -8px 24px rgb(18 50 65 / 7%);
 }
 
@@ -383,7 +390,9 @@
   min-height: 60px;
   padding: var(--ez-space-1) var(--ez-space-1);
   color: var(--ez-text-muted);
-  font-size: 11px;
+  /* 12px là mức nhỏ nhất còn đọc thoải mái ngoài nắng; dưới mức đó nhãn tab
+     phải nheo mắt mới thấy. */
+  font-size: 12px;
   font-weight: var(--ez-weight-medium);
   text-align: center;
   transition: var(--ez-transition-colors);

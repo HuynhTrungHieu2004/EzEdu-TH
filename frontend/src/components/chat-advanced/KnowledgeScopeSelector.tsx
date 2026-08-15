@@ -128,7 +128,7 @@ const styles = {
     color: 'var(--ez-text)',
   },
   helpText: {
-    fontSize: '11px',
+    fontSize: '12px',
     color: 'var(--ez-text-muted)',
     paddingLeft: '24px',
   },

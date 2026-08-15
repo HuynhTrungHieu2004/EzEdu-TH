@@ -11,6 +11,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh; /* di động: 100vh tính cả phần bị thanh URL che */
   /* Transparent so the app-wide crystal gradient/sparkle background (set on
      <body> in index.css) shows through, instead of being hidden behind a
      flat opaque color like before. */
@@ -312,5 +313,19 @@
     gap: 8px;
     text-align: center;
     padding: 14px 16px;
+  }
+}
+
+/* Trang công khai là nơi người dùng chạm vào đầu tiên, phần lớn từ điện thoại:
+   các liên kết/nút ở đây tự đặt padding riêng nên chưa đủ 44px như hệ thiết kế. */
+@media (pointer: coarse) {
+  .pub-nav-cta,
+  .pub-nav-link,
+  .pub-footer-home,
+  .pub-footer-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }

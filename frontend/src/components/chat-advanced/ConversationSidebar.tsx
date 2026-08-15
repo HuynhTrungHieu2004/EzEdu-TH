@@ -133,7 +133,7 @@ const styles = {
     margin: '12px 0',
   },
   label: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '700',
     color: 'var(--ez-text-muted)',
     textTransform: 'uppercase' as const,

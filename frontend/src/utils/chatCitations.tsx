@@ -38,7 +38,7 @@ export const parseCitations = (
               justifyContent: 'center',
               padding: '2px 6px',
               margin: '0 2px',
-              fontSize: '11px',
+              fontSize: '12px',
               fontWeight: '700',
               color: 'var(--ez-primary)',
               backgroundColor: 'var(--ez-primary-subtle)',

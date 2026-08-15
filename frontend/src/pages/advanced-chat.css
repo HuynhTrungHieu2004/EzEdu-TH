@@ -47,3 +47,20 @@
     display: none;
   }
 }
+
+/* Hàng chọn phong cách trả lời: trên màn hẹp bốn lựa chọn bị bóp đến mức chữ vỡ
+   dòng giữa từ ("Bình / thường"). Cho xuống dòng cả cụm thay vì ép trong một hàng. */
+.chat-style-bar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.chat-style-btn {
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .chat-style-btn {
+    min-height: 44px;
+  }
+}

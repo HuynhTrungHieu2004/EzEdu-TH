@@ -157,7 +157,7 @@ const styles = {
     flex: 1,
   },
   badge: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: '800',
     padding: '2px 6px',
     borderRadius: '4px',

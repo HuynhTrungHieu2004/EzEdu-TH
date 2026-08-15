@@ -136,7 +136,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             if (!bloom) return null;
             return (
               <span style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 padding: '3px 10px',
                 borderRadius: '12px',
                 background: `${bloom.color}15`,
@@ -173,7 +173,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 });
               }}
               style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 padding: '3px 10px',
                 borderRadius: '12px',
                 background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'var(--ez-primary-subtle)',
@@ -439,7 +439,7 @@ const cardStyles = {
     border: '1px solid var(--ez-border)',
   },
   tagBadge: {
-    fontSize: '11px',
+    fontSize: '12px',
     color: '#0f766e',
     backgroundColor: 'rgba(20, 184, 166, 0.1)',
     padding: '3px 8px',
