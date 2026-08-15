@@ -33,8 +33,18 @@ ACCOUNTS = [
 EMAIL_PREFIX = "^qa-live-"
 CLASS_PREFIX = "^QA Live "
 # Các collection ghi kèm khi bộ kiểm chạy; xoá theo id tài khoản QA.
-REF_COLLECTIONS = ("user_activity_logs", "system_error_logs", "admin_audit_logs")
-REF_FIELDS = ("user_id", "owner_id", "student_id", "teacher_id", "created_by", "admin_user_id", "target_id", "uploaded_by")
+# Nhóm sau do `live-ai.spec.ts` sinh ra (tải học liệu, sinh câu hỏi, làm đề).
+REF_COLLECTIONS = (
+    "user_activity_logs", "system_error_logs", "admin_audit_logs",
+    "documents", "document_contents", "document_chunks",
+    "question_sets", "questions", "question_attempts",
+    "exam_blueprints", "exams", "exam_attempts",
+    "ai_usage_events",
+)
+REF_FIELDS = (
+    "user_id", "owner_id", "student_id", "teacher_id", "created_by",
+    "admin_user_id", "target_id", "uploaded_by", "created_by_id", "actor_id",
+)
 
 
 async def setup(db) -> None:
@@ -108,6 +118,17 @@ async def main() -> None:
                 encoding="utf-8",
             )
             print(f"đã sao lưu: {args.backup}")
+
+        # Vector trong ChromaDB không nằm trong Mongo — phải xoá riêng, nếu không
+        # học liệu kiểm thử vẫn được RAG truy hồi sau khi bản ghi đã biến mất.
+        for document in plan.get("documents", []):
+            try:
+                from app.services.rag_service import init_chroma_client, _delete_document_vectors
+
+                _delete_document_vectors(init_chroma_client(), str(document["_id"]), str(document.get("owner_id")))
+                print(f"  xóa vector ChromaDB của học liệu {document['_id']}")
+            except Exception as error:  # pragma: no cover - Chroma có thể chưa chạy
+                print(f"  CẢNH BÁO: không xoá được vector của {document['_id']}: {error}")
 
         for name, docs in plan.items():
             if docs:

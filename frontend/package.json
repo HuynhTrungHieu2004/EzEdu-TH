@@ -13,7 +13,8 @@
     "test:e2e:report": "playwright show-report",
     "test:foundation": "playwright test e2e/design-foundation.spec.ts e2e/motion-foundation.spec.ts e2e/student-dashboard-chat.spec.ts e2e/exam-attempt.spec.ts e2e/teacher-workspace.spec.ts e2e/admin-workspace.spec.ts e2e/public-experience.spec.ts e2e/system-qa.spec.ts e2e/accessibility.spec.ts",
     "test:perf": "playwright test --project=perf",
-    "test:live": "playwright test --config=playwright.live.config.ts"
+    "test:live": "playwright test --config=playwright.live.config.ts",
+    "test:ai": "playwright test --config=playwright.ai.config.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
