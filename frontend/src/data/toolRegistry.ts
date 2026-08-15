@@ -30,6 +30,11 @@ export interface ToolDefinition {
   icon: ComponentType<{ size?: number; 'aria-hidden'?: boolean | 'true' | 'false' }>;
   roles: ToolRole[];
   category: ToolCategory;
+  /**
+   * Cờ tính năng phải bật thì công cụ mới dùng được. Thiếu nó thì thẻ vẫn hiện
+   * trong thư viện công cụ dù backend đã tắt phân hệ, bấm vào là gặp 403.
+   */
+  featureFlag?: string;
 }
 
 /**
@@ -129,6 +134,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     icon: Globe,
     roles: ['teacher', 'student'],
     category: 'document',
+    featureFlag: 'enable_web_knowledge',
   },
   {
     id: 'curriculum-kb',
@@ -138,6 +144,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     icon: BookOpen,
     roles: ['teacher', 'student'],
     category: 'document',
+    featureFlag: 'enable_curriculum_kb',
   },
   {
     id: 'progress',
@@ -183,6 +190,14 @@ export function getRecentToolIds(): string[] {
 
 export function toolsForRole(role: ToolRole): ToolDefinition[] {
   return TOOL_REGISTRY.filter((tool) => tool.roles.includes(role));
+}
+
+/** Bỏ công cụ mà phân hệ đứng sau đang tắt — tránh dẫn người dùng tới trang 403. */
+export function toolsEnabledBy(
+  tools: ToolDefinition[],
+  isEnabled: (key: string) => boolean,
+): ToolDefinition[] {
+  return tools.filter((tool) => !tool.featureFlag || isEnabled(tool.featureFlag));
 }
 
 export function searchTools(tools: ToolDefinition[], query: string): ToolDefinition[] {

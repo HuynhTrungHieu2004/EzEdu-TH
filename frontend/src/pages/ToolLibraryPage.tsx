@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import {
   TOOL_CATEGORY_LABEL,
   getRecentToolIds,
   searchTools,
   toolsForRole,
+  toolsEnabledBy,
   trackRecentTool,
 } from '../data/toolRegistry';
 import type { ToolCategory } from '../data/toolRegistry';
@@ -27,7 +29,8 @@ export default function ToolLibraryPage() {
   const [filter, setFilter] = useState<FilterValue>('all');
 
   const role = area === 'teacher' ? 'teacher' : 'student';
-  const myTools = useMemo(() => toolsForRole(role), [role]);
+  const { isEnabled } = useFeatureFlags();
+  const myTools = useMemo(() => toolsEnabledBy(toolsForRole(role), isEnabled), [role, isEnabled]);
 
   const categories = useMemo(() => {
     const set = new Set(myTools.map((t) => t.category));

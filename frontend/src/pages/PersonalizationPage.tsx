@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiErrorDetail } from '../api/errors';
 import { Button, FeatureDisabledState } from '../components/ui';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import {
   personalizationApi,
   type KnowledgeSignal,
@@ -182,6 +183,7 @@ function RecommendationCard({
 
 export default function PersonalizationPage() {
   const navigate = useNavigate();
+  const { isEnabled, loading: flagsLoading } = useFeatureFlags();
   const [profile, setProfile] = useState<PersonalizationProfile | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -244,11 +246,14 @@ export default function PersonalizationPage() {
   }, []);
 
   useEffect(() => {
+    // Biết trước từ runtime-config là tính năng tắt thì không gọi API nữa; trước
+    // đây trang vẫn bắn ba request rồi mới đọc 403 để hiện trạng thái tắt.
+    if (flagsLoading || !isEnabled('enable_personalization')) return undefined;
     const timer = window.setTimeout(() => {
       void loadData();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadData]);
+  }, [loadData, flagsLoading, isEnabled]);
 
   const unassessedCount = profile?.data_quality.unassessed_knowledge_count ?? 0;
   const knowledgeMap = useMemo(() => {
@@ -305,21 +310,7 @@ export default function PersonalizationPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page">
-        <div className="page-wide">
-          <div className="personalization-skeleton" aria-label="Đang tải cá nhân hóa">
-            <span />
-            <span />
-            <span />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (featureDisabled) {
+  if (featureDisabled || (!flagsLoading && !isEnabled('enable_personalization'))) {
     // Không nêu chi tiết kỹ thuật (mã trạng thái, tên cờ tính năng) cho người học;
     // chỉ nói rõ tính năng đang tắt và đưa họ về việc còn làm được.
     return (
@@ -337,6 +328,21 @@ export default function PersonalizationPage() {
       />
     );
   }
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="page-wide">
+          <div className="personalization-skeleton" aria-label="Đang tải cá nhân hóa">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   if (error) {
     return (

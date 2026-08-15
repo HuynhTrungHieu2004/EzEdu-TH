@@ -35,7 +35,8 @@ import { questionApi } from '../../api/questionApi';
 import type { QuestionSetSummary } from '../../api/questionApi';
 import { classesApi } from '../../api/classesApi';
 import { useAuth } from '../../hooks/useAuth';
-import { toolsForRole } from '../../data/toolRegistry';
+import { toolsEnabledBy, toolsForRole } from '../../data/toolRegistry';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { AnimatedCounter, StaggerGroup } from '../../motion';
 import '../dashboard.css';
 
@@ -107,7 +108,8 @@ export default function TeacherDashboardPage() {
   const firstName = user?.full_name?.trim().split(/\s+/).slice(-1)[0] ?? 'bạn';
   const readyDocs = documents.filter((doc) => isDocumentReady(doc.status));
   const isNewcomer = state === 'ready' && documents.length === 0 && questionSets.length === 0;
-  const teacherTools = useMemo(() => toolsForRole('teacher'), []);
+  const { isEnabled } = useFeatureFlags();
+  const teacherTools = useMemo(() => toolsEnabledBy(toolsForRole('teacher'), isEnabled), [isEnabled]);
 
   return (
     <>

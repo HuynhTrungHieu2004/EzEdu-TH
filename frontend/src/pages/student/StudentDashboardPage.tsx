@@ -19,7 +19,8 @@ import { questionApi } from '../../api/questionApi';
 import type { LearningHistoryItem, QuestionSetSummary } from '../../api/questionApi';
 import CharacterIllustration from '../../components/public/CharacterIllustration';
 import { useAuth } from '../../hooks/useAuth';
-import { toolsForRole } from '../../data/toolRegistry';
+import { toolsEnabledBy, toolsForRole } from '../../data/toolRegistry';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { AnimatedCounter, StaggerGroup } from '../../motion';
 import '../dashboard.css';
 
@@ -79,7 +80,8 @@ export default function StudentDashboardPage() {
   const firstName = user?.full_name?.trim().split(/\s+/).slice(-1)[0] ?? 'bạn';
   const nextSet = pending[0];
   const isNewcomer = state === 'ready' && published.length === 0 && history.length === 0;
-  const studentTools = useMemo(() => toolsForRole('student'), []);
+  const { isEnabled } = useFeatureFlags();
+  const studentTools = useMemo(() => toolsEnabledBy(toolsForRole('student'), isEnabled), [isEnabled]);
   const quickActions = [
     { to: nextSet ? `/question-sets/${nextSet.id}` : '/published-questions', label: 'Tiếp tục học', icon: Play },
     { to: '/published-questions', label: 'Luyện tập', icon: ClipboardList },

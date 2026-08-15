@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { curriculumKbApi } from '../api/curriculumKbApi';
 import type {
   CrawlItem,
@@ -17,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
+  FeatureDisabledState,
   Input,
   PageHeader,
   SkeletonText,
@@ -59,6 +62,8 @@ const INGEST_LABEL: Record<string, string> = {
  */
 export default function CurriculumKbPage() {
   const { area } = useAuth();
+  const navigate = useNavigate();
+  const { isEnabled, loading: flagsLoading } = useFeatureFlags();
   const isTeacher = area === 'teacher';
 
   const [query, setQuery] = useState('');
@@ -108,11 +113,13 @@ export default function CurriculumKbPage() {
   }
 
   useEffect(() => {
+    // Phân hệ tắt thì mọi lời gọi chắc chắn 403 — đừng bắn request vô ích.
+    if (flagsLoading || !isEnabled('enable_curriculum_kb')) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMySources();
     void loadCrawlItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTeacher]);
+  }, [isTeacher, flagsLoading, isEnabled]);
 
   async function handleStartCrawl() {
     const seedUrls = crawlUrls.split(/\r?\n/).map((url) => url.trim()).filter(Boolean);
@@ -218,6 +225,26 @@ export default function CurriculumKbPage() {
     } finally {
       setActionId(null);
     }
+  }
+
+  // Hai phân hệ này bật/tắt bằng biến môi trường phía backend. Nếu đang tắt thì
+  // mọi lời gọi trả 403; trước đây trang vẫn render đủ form và danh sách rỗng
+  // nên người dùng tưởng chưa có dữ liệu, bấm gì cũng thất bại không rõ lý do.
+  if (!flagsLoading && !isEnabled('enable_curriculum_kb')) {
+    return (
+      <FeatureDisabledState
+        title="Kho tri thức chuẩn đang tắt"
+        description="Quản trị viên chưa bật phân hệ này nên chưa thêm, thu thập hay tìm kiếm nguồn tri thức chuẩn được. Bạn vẫn dùng kho học liệu và các công cụ khác như bình thường."
+        actions={
+          <>
+            <Button onClick={() => navigate('/documents')}>Tới kho học liệu</Button>
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Về tổng quan
+            </Button>
+          </>
+        }
+      />
+    );
   }
 
   return (
