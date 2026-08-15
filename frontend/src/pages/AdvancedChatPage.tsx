@@ -920,6 +920,9 @@ const styles = {
     flexDirection: 'column' as const,
     flex: 1,
     minHeight: 0,
+    // Cùng lý do với minHeight: flex item mặc định không co nhỏ hơn min-content,
+    // nên một hàng nút dài sẽ đẩy cả cột rộng hơn màn hình.
+    minWidth: 0,
     backgroundColor: 'var(--ez-surface)',
   },
   loadingHistory: {

@@ -38,7 +38,14 @@
   --sparkle-opacity: 0.7;
 
   color: var(--ez-text-secondary);
-  font: 15px/1.6 var(--sans);
+  /* KHÔNG đặt font-size ở đây. Trước đây rule này là `font: 15px/1.6 var(--sans)`
+     — một dòng sót lại từ hệ giao diện cũ — khiến cỡ chữ gốc là 15px thay vì 16px
+     mặc định của trình duyệt, nên MỌI giá trị `rem` trong `tokens.css` nhỏ hơn
+     con số ghi trong chú thích 6,25%: `--ez-text-body: 1rem` chú thích là 16px
+     nhưng thực tế ra 15px. Kèm theo đó, người dùng chỉnh cỡ chữ mặc định trong
+     cài đặt trình duyệt cũng bị ghi đè. */
+  font-family: var(--sans);
+  line-height: 1.6;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

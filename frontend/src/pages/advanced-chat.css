@@ -20,6 +20,11 @@
     padding: var(--ez-space-2) var(--ez-space-4);
     border-bottom: 1px solid var(--ez-border);
     background-color: var(--ez-surface);
+    /* Ba nhãn dài ("Phạm vi kiến thức", "Hội thoại", "Nguồn trích dẫn") cộng lại
+       rộng hơn màn 390px. Cho xuống dòng thay vì để chúng đẩy cả cột chat rộng
+       ra rồi bị khối cha cắt mất mép phải. */
+    flex-wrap: wrap;
+    row-gap: var(--ez-space-2);
   }
 
   .ez-chat-mobile-bar .ez-btn {

@@ -8,8 +8,14 @@ che nội dung, thanh URL ăn mất chiều cao) chưa có gì kiểm.
 
 ## Cách đo
 
-`npm run test:mobile` (`playwright.mobile-audit.config.ts` + `e2e/mobile-audit.spec.ts`) chạy giả lập Pixel 5
-(393×851, có cảm ứng) trên **backend thật**, đi 21 route của ba vai trò cộng 6 trang công khai, và đếm:
+`npm run test:mobile` (`playwright.mobile-audit.config.ts` + `e2e/mobile-audit.spec.ts`) chạy trên **backend
+thật**, đi 21 route của ba vai trò cộng 6 trang công khai, trên **hai máy**:
+
+- **iPhone 12 / WebKit** — đây mới là nơi luật "chạm vào ô nhập nhỏ hơn 16px thì tự phóng to" áp dụng, và là
+  nơi `<select>` bỏ qua kích thước CSS. Cần `npx playwright install webkit`.
+- **Pixel 5 / Chromium** — đại diện máy Android.
+
+Mỗi lượt đếm:
 
 - tràn ngang và phần tử rộng hơn màn hình;
 - vùng chạm nhỏ hơn 40px (ngưỡng khuyến nghị 44px — Apple HIG, WCAG 2.5.5);
@@ -83,14 +89,37 @@ chat 10px → 12px, và bốn giá trị `0.72rem` trong khu quản trị.
 | `npx playwright test` | PASS — 927/927 |
 | `npx tsc -b` / `npm run lint` / `npm run build` | PASS |
 
+## Vòng hai — sửa nốt hai khoản nợ đã ghi
+
+### Cỡ chữ gốc trả về 16px
+
+Xoá `font: 15px/1.6` khỏi `:root` (giữ `font-family` và `line-height`). Từ nay `1rem = 16px`, tức mọi token
+trong `tokens.css` đúng bằng con số ghi trong chú thích, và người dùng chỉnh cỡ chữ mặc định của trình duyệt
+thì giao diện theo đúng — trước đây bị ghi đè.
+
+Cả chữ lẫn khoảng cách phóng to 6,7% trên toàn ứng dụng. Đây là thay đổi rộng nên đo lại toàn bộ: **927/927**
+bài Playwright vẫn xanh (gồm kiểm tràn ngang ở 6 viewport, hẹp nhất 360px), `npm run test:live` 5/5 với backend
+thật, `build` sạch.
+
+Bốn chỗ phát sinh do chữ to hơn, đã sửa:
+
+| Chỗ | Vấn đề | Sửa |
+| --- | --- | --- |
+| `.ez-chat-mobile-bar` | ba nhãn dài đẩy cột chat rộng 408px trong khung 390px, mép phải bị cắt | cho xuống dòng, và thêm `minWidth: 0` cho flex item (`chatArea`) |
+| `<select>` trên Safari | WebKit bỏ qua `padding`/`min-height` khi `appearance: auto`: ô lọc cao 27px dù CSS đặt 44px (Chrome ra 46px) | `appearance: none` + mũi tên tự vẽ, đặt trên chính `select` nên phủ cả 12 ô thô lẫn 36 ô dùng component |
+| ô nhập | mới đặt cỡ chữ, chưa đặt chiều cao | thêm `min-height: 44px` |
+
+### Kiểm bằng Safari thật
+
+Đã cài WebKit; bộ audit chạy song song hai máy. Số vấn đề gộp hai máy: **42**, trong đó 38 là chữ 11px của
+nhãn phụ và 4 là khối trang trí `.pub-blob` (đã bị khối cha cắt, không gây tràn). **0 vùng chạm nhỏ, 0 ô nhập
+gây phóng to, 0 tràn ngang** trên cả hai.
+
 ## Còn lại
 
 - **23/25 vấn đề còn lại là chữ 11px của nhãn phụ**: chữ viết tắt trong avatar (11px trong hình tròn 28px, có
   tính trang trí) và mốc thời gian trong khu quản trị (11,7px). Không chặn dùng.
-- **Cỡ chữ gốc 15px** (`:root { font: 15px/1.6 }` trong `index.css`) vẫn giữ nguyên. Bỏ nó đi thì mọi token
-  `rem` — **cả chữ lẫn khoảng cách** — phóng to 6,7% trên toàn ứng dụng, tức là một đợt chỉnh lại bố cục chứ
-  không phải sửa lỗi mobile. Đáng làm nhưng nên làm riêng và đo lại toàn bộ.
-- Chưa thử trên máy thật, mới là giả lập Chromium. WebKit chưa cài trên máy này nên chưa chạy được giả lập
-  Safari iOS — mà Safari mới là nơi luật "phóng to khi input < 16px" áp dụng.
+- Vẫn là **giả lập**, chưa phải điện thoại vật lý. WebKit của Playwright rất sát Safari nhưng không thay được
+  một lần thử trên máy thật, nhất là phần bàn phím ảo che ô nhập.
 - `.pub-blob` rộng 420px trên màn 393px: khối trang trí đã bị `overflow: hidden` của khối cha cắt, không gây
   tràn trang.
