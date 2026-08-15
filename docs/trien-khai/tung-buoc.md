@@ -61,11 +61,20 @@ Không cần giữ thì bỏ qua — hệ thống tự tạo chỉ mục khi kh�
    Các khoá này đang nằm trong `backend/.env` trên máy bạn — mở ra copy. **Đừng commit file đó.**
 
 4. Bấm **Apply**. Lần build đầu mất khoảng 5–10 phút (126 gói Python).
-5. Xong, Render cấp URL dạng `https://ezedu-backend.onrender.com`. Kiểm ngay:
+5. Xong, Render cấp URL dạng `https://ezedu-backend.onrender.com`. Kiểm bằng một lệnh thay vì mở trình duyệt
+   đoán:
+   ```bash
+   python3 backend/scripts/kiem_tra_trien_khai.py \
+     --api-url https://ezedu-backend.onrender.com \
+     --origin https://ezedu.netlify.app
    ```
-   https://ezedu-backend.onrender.com/health/ready
-   ```
-   Phải thấy `"status": "healthy"` với `mongodb`, `chromadb`, `gemini`, `groq`.
+   Script chỉ đọc, không ghi gì vào CSDL, không cần cài thư viện. Nó kiểm: HTTPS, `/health/ready` từng dịch vụ
+   một, CORS có cho tên miền frontend không, đọc được cấu hình runtime không, và sai mật khẩu có trả 401 không
+   (chứng minh đường xác thực chạm tới MongoDB — HTTP 500 ở đây gần như luôn là `MONGODB_URI` sai hoặc Atlas
+   đang chặn IP).
+
+   Lần chạy đầu có thể chờ tới một phút nếu Render đang ngủ. Ở bước này CORS sẽ **FAIL** vì chưa khai tên miền
+   Netlify — đúng như dự kiến, sửa ở bước 6.
 
 ### Ba điều phải biết về gói free của Render
 
@@ -107,7 +116,14 @@ Không cần giữ thì bỏ qua — hệ thống tự tạo chỉ mục khi kh�
 2. **Google OAuth** (nếu dùng): Google Cloud Console → Credentials → OAuth client → thêm
    `https://<tên-bạn-đặt>.netlify.app` vào **Authorized JavaScript origins**.
 
-3. **Kiểm lại**: mở trang Netlify, đăng ký một tài khoản mới, đăng nhập, tạo thử một lớp học. Vào Atlas →
+3. **Chạy lại lệnh kiểm tra** — lần này mọi mục phải ĐẠT:
+   ```bash
+   python3 backend/scripts/kiem_tra_trien_khai.py \
+     --api-url https://ezedu-backend.onrender.com \
+     --origin https://ezedu.netlify.app
+   ```
+
+4. **Kiểm bằng tay**: mở trang Netlify, đăng ký một tài khoản mới, đăng nhập, tạo thử một lớp học. Vào Atlas →
    Browse Collections → thấy bản ghi vừa tạo là thông suốt cả ba lớp.
 
 ---
@@ -116,6 +132,12 @@ Không cần giữ thì bỏ qua — hệ thống tự tạo chỉ mục khi kh�
 
 - `backend/Dockerfile` đã **build thật** bằng Docker và chạy thử: API và worker cùng lên, `/health/ready` trả
   `healthy` cho cả `mongodb`, `chromadb`, `gemini`, `groq`.
+- Chạy lại container với **đúng cấu hình Render sẽ dùng** (`APP_ENV=production`, `JWT_SECRET_KEY` ngẫu nhiên,
+  `BACKEND_CORS_ORIGINS` chỉ một tên miền Netlify): khởi động sạch, và CORS chặn đúng — origin đã khai được
+  trả header cho phép, origin lạ thì không.
+- `scripts/kiem_tra_trien_khai.py` đã chạy thử với chính container đó: cả năm nhóm kiểm đều báo đúng.
+- Cờ `CREATE_DEFAULT_TEST_USER` mặc định **tắt**. Đừng bật trên bản chạy thật: nó tạo tài khoản
+  `test@test.com` mật khẩu `123456`.
 - Bản build production của frontend đã chạy thử bằng WebKit giả lập iPhone 12, trỏ vào backend thật: đăng nhập
   và ba trang chính không lỗi, F5 ở đường dẫn con vẫn dựng lại đúng (rule SPA hoạt động).
 
