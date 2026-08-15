@@ -124,6 +124,9 @@ test('đăng ký kiểm tra mật khẩu và xác nhận ngay tại trường', 
 });
 
 test('trang công khai không có vi phạm axe A/AA sau khi di trú', async ({ page }) => {
+  // Ba lượt quét axe trong một bài; trang chủ nay có cả dây chuyền dữ liệu nên
+  // quét lâu hơn hạn 30s mặc định khi máy đang chạy song song nhiều project.
+  test.setTimeout(90_000);
   await stubApi(page);
   for (const path of ['/', '/login', '/register']) {
     await page.goto(path);
