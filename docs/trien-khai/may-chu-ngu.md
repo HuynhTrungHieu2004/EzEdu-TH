@@ -3,7 +3,7 @@
 ## Chuyện gì xảy ra
 
 Render tắt web service sau **15 phút** không có request. Lần gọi kế tiếp phải chờ
-**khoảng một phút** để container khởi động lại.
+**một đến hai phút** để container khởi động lại — đo thật ngày 16/08/2026 là 105 giây.
 
 Render có trang chờ riêng, nhưng người dùng EzEdu không bao giờ thấy nó: frontend
 nằm ở Netlify và gọi API bằng XHR, không phải điều hướng trình duyệt. Nên với
@@ -16,7 +16,7 @@ Hai lớp xử lý, độc lập nhau:
 `frontend/src/api/serverWaking.ts` đếm số request đang treo. Quá **4 giây** thì
 `ServerWakingNotice` hiện dải thông báo trên đầu màn hình:
 
-> Máy chủ đang khởi động lại, thường mất khoảng một phút. Bạn không cần tải lại trang.
+> Máy chủ đang khởi động lại, thường mất một đến hai phút. Bạn không cần tải lại trang.
 
 Chỉ báo, không huỷ và không thử lại — request vẫn chạy và sẽ trả về khi máy chủ
 sẵn sàng. Bộ đếm gỡ ở cả nhánh thành công lẫn nhánh lỗi (`client.ts`), nếu chỉ gỡ
@@ -44,7 +44,7 @@ Bấm chạy thử: **Run workflow** (đã bật `workflow_dispatch`).
 
 ## Ngoài giờ
 
-Từ 23:00 tới 06:00 máy chủ vẫn ngủ. Người vào lúc đó chờ ~1 phút và thấy thông
+Từ 23:00 tới 06:00 máy chủ vẫn ngủ. Người vào lúc đó chờ 1-2 phút và thấy thông
 báo ở lớp 1. Đây là đánh đổi có chủ ý, không phải thiếu sót.
 
 ## Khi nào nên bỏ hai lớp này

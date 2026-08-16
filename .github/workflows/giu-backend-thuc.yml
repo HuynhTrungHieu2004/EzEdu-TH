@@ -26,8 +26,9 @@ jobs:
         run: |
           URL="https://ezedu-backend.onrender.com/health/ready"
 
-          # Lần gọi đầu có thể mất tới một phút nếu máy chủ đang ngủ.
-          code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 120 "$URL" || echo "000")
+          # Đo thật ngày 16/08/2026: máy chủ ngủ dậy mất 105 giây. Để 180 cho dư,
+          # 120 suýt chạm trần.
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 180 "$URL" || echo "000")
           echo "HTTP $code"
           cat /tmp/health.json 2>/dev/null || true
           echo
@@ -35,7 +36,7 @@ jobs:
           if [ "$code" != "200" ]; then
             # Thử lại một lần: Render đôi khi trả 502 ngay trước khi sẵn sàng.
             sleep 30
-            code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 120 "$URL" || echo "000")
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 180 "$URL" || echo "000")
             echo "thử lại: HTTP $code"
             cat /tmp/health.json 2>/dev/null || true
             echo

@@ -2,7 +2,7 @@
  * Theo dõi "máy chủ đang ngủ dậy".
  *
  * Backend chạy trên gói miễn phí của Render: không ai gọi trong 15 phút thì nó
- * tắt, và lần gọi kế tiếp phải chờ khoảng một phút để khởi động lại. Render có
+ * tắt, và lần gọi kế tiếp phải chờ 1-2 phút để khởi động lại (đo thật: 105 giây). Render có
  * trang chờ, nhưng chỉ hiện khi trình duyệt điều hướng THẲNG vào backend —
  * frontend nằm ở Netlify và gọi API bằng XHR nên người dùng không thấy gì cả,
  * chỉ thấy ứng dụng đứng im.
