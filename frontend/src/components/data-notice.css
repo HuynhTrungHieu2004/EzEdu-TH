@@ -25,7 +25,7 @@ body.has-data-notice {
 
   background-color: var(--ez-surface);
   border-top: 1px solid var(--ez-border);
-  box-shadow: 0 -8px 24px rgb(18 50 65 / 10%);
+  box-shadow: 0 -8px 24px rgb(51 17 111 / 10%);
 }
 
 /* Chỉ nâng lên khi thanh tab thật sự chiếm đáy màn hình: dưới 1024px VÀ trang

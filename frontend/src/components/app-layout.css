@@ -222,7 +222,7 @@
 
 /* Trạng thái đang xem: không chỉ dựa vào màu — có thêm thanh dọc bên trái */
 .ez-nav-item-active {
-  background-color: rgb(23 125 115 / 42%);
+  background-color: rgb(118 43 250 / 42%);
   color: #fff;
   font-weight: var(--ez-weight-semibold);
 }
@@ -240,7 +240,7 @@
 }
 
 .ez-nav-item-active:hover {
-  background-color: rgb(23 125 115 / 52%);
+  background-color: rgb(118 43 250 / 52%);
   color: #fff;
 }
 
@@ -370,7 +370,7 @@
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  box-shadow: 0 -8px 24px rgb(18 50 65 / 7%);
+  box-shadow: 0 -8px 24px rgb(51 17 111 / 7%);
 }
 
 @media (min-width: 1024px) {

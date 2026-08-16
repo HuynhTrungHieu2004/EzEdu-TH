@@ -979,7 +979,7 @@
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background-color: var(--ez-accent);
-  box-shadow: 0 0 0 6px rgb(229 184 91 / 22%);
+  box-shadow: 0 0 0 6px rgb(255 171 67 / 22%);
 }
 
 .ezp-pipeline-stages {

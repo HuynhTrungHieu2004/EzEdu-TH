@@ -379,10 +379,13 @@
   --ez-surface-active:   var(--ez-indigo-50);
   --ez-surface-inverse:  var(--ez-ink-900);
 
-  /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên cả --ez-surface (#fff) lẫn
-     --ez-bg (#f3f7f7). `--ez-text-muted` từng là #617b82: đạt 4.5:1 trên trắng
-     nhưng chỉ 4.17:1 trên nền trang, nên eyebrow/caption đặt trực tiếp trên nền
-     trang bị axe báo lỗi. #5a747b đạt 4.61:1 trên nền trang và 4.98:1 trên trắng. */
+  /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên CẢ HAI nền: --ez-surface (#fff)
+     lẫn --ez-bg (#fffef0, nền kem). Phải kiểm cả hai chứ không riêng nền trắng:
+     eyebrow và caption hay nằm thẳng trên nền trang, và nền kem tối hơn trắng
+     một chút nên một màu vừa đủ trên trắng có thể tụt dưới ngưỡng ở đó.
+
+       #333333 trên kem 12.45:1 · trên trắng 12.63:1
+       #5c5c5c trên kem  6.59:1 · trên trắng  6.69:1 */
   --ez-text:           #333333;
   --ez-text-secondary: var(--ez-ink-800);
   --ez-text-muted:     #5c5c5c;
