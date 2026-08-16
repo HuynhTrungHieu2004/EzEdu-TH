@@ -207,6 +207,17 @@ async def add_document_chunks(document_id: str, user_id: str, chunks: list[str])
                 "chunk_index": index,
                 "text_preview": preview,
                 "content": chunk,
+                # Lưu luôn vector vào MongoDB, không chỉ vào ChromaDB.
+                #
+                # ChromaDB nằm trên ổ đĩa container, mà gói miễn phí của Render
+                # không có ổ đĩa bền — mỗi lần deploy là mất sạch. Có vector ở
+                # đây thì `rebuild_chroma_from_mongo()` dựng lại được mà không
+                # gọi API nhúng lần nào. Không có thì phải nhúng lại toàn bộ học
+                # liệu sau mỗi lần deploy, đốt hạn mức Gemini.
+                #
+                # Tốn khoảng 6KB mỗi đoạn (768 số thực). Với M0 512MB thì chứa
+                # được cỡ 80.000 đoạn — thừa cho quy mô hiện tại.
+                "embedding": embeddings[index],
                 "created_at": now,
             }
         )

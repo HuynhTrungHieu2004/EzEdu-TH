@@ -156,3 +156,59 @@ class RebuildTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LuuVectorTests(unittest.IsolatedAsyncioTestCase):
+    """Đường ghi chính phải lưu vector vào MongoDB, không chỉ vào ChromaDB.
+
+    Thiếu bước này thì `rebuild_chroma_from_mongo()` chẳng dựng lại được gì:
+    nó cố ý không nhúng lại, nên không có vector trong Mongo là bó tay. Cả tính
+    năng nạp-lại trở thành đồ trang trí, và điều đó chỉ lộ ra sau một lần deploy
+    khi hỏi đáp có trích dẫn im lặng không tìm được gì.
+    """
+
+    async def asyncSetUp(self):
+        self.db = AsyncMongoMockClient()["test_rag"]
+        self.chroma = ChromaGia()
+
+    async def test_add_document_chunks_luu_vector_vao_mongo(self):
+        with patch.object(svc, "get_database", return_value=self.db), \
+             patch.object(svc, "init_chroma_client", return_value=self.chroma), \
+             patch.object(svc, "build_embeddings", return_value=("gemini", [[0.5] * 768, [0.6] * 768])):
+            await svc.add_document_chunks("doc-1", "u1", ["đoạn một", "đoạn hai"])
+
+        luu = [d async for d in self.db["document_chunks"].find({})]
+        self.assertEqual(len(luu), 2)
+        for d in luu:
+            self.assertIn("embedding", d, "thiếu vector thì không dựng lại được sau khi deploy")
+            self.assertEqual(len(d["embedding"]), 768)
+
+    async def test_vector_luu_dung_thu_tu_tung_doan(self):
+        """Gán nhầm vector của đoạn khác thì tìm kiếm trả về đoạn không liên
+        quan, và lỗi đó rất khó nhận ra vì hệ thống vẫn chạy bình thường."""
+        with patch.object(svc, "get_database", return_value=self.db), \
+             patch.object(svc, "init_chroma_client", return_value=self.chroma), \
+             patch.object(svc, "build_embeddings", return_value=("gemini", [[0.1] * 768, [0.9] * 768])):
+            await svc.add_document_chunks("doc-1", "u1", ["đoạn một", "đoạn hai"])
+
+        theo_index = {d["chunk_index"]: d for d in [x async for x in self.db["document_chunks"].find({})]}
+        self.assertAlmostEqual(theo_index[0]["embedding"][0], 0.1)
+        self.assertAlmostEqual(theo_index[1]["embedding"][0], 0.9)
+
+    async def test_ghi_roi_nap_lai_duoc_ngay(self):
+        """Đường đi trọn vẹn: lập chỉ mục, mất Chroma, nạp lại từ Mongo."""
+        with patch.object(svc, "get_database", return_value=self.db), \
+             patch.object(svc, "init_chroma_client", return_value=self.chroma), \
+             patch.object(svc, "build_embeddings", return_value=("gemini", [[0.5] * 768] * 3)):
+            await svc.add_document_chunks("doc-1", "u1", ["a", "b", "c"])
+
+        self.chroma.collections.clear()  # container mới, ổ đĩa trắng
+
+        with patch.object(svc, "get_database", return_value=self.db), \
+             patch.object(svc, "init_chroma_client", return_value=self.chroma), \
+             patch.object(svc, "_managed_collection_names", side_effect=lambda c: list(c.collections.keys())), \
+             patch.object(svc, "get_embeddings") as nhung:
+            kq = await svc.rebuild_chroma_if_empty()
+
+        self.assertEqual(kq["restored"], 3)
+        nhung.assert_not_called()
