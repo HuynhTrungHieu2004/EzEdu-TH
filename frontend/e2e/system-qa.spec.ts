@@ -67,7 +67,12 @@ test('trang bị chặn không lộ nội dung trước khi chuyển hướng', 
 
 async function inlineMotionLeftovers(page: Page) {
   return page.evaluate(() => {
-    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[style]'));
+    // Chỉ soi phần tử lớp motion thật sự chạm vào. Quét mọi `[style]` sẽ bắt
+    // nhầm kiểu dáng hợp lệ của component — ví dụ nút "Gửi câu hỏi" của khung
+    // chat đặt inline `opacity: 0.55` khi bị vô hiệu hoá, không liên quan gì
+    // tới GSAP.
+    const MOTION_TARGETS = '[data-page-entrance], [data-motion-item], [data-active-indicator]';
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>(MOTION_TARGETS));
     return nodes
       .filter((node) => {
         const style = node.style;

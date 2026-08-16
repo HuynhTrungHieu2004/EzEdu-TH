@@ -23,6 +23,7 @@ import LandingPage from './pages/landing';
 import AppLayout from './components/AppLayout';
 import PublicLayout from './components/PublicLayout';
 import DataNotice from './components/DataNotice';
+import ServerWakingNotice from './components/ServerWakingNotice';
 import RoleRoute from './components/RoleRoute';
 import AdminRoute from './components/AdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
@@ -284,6 +285,7 @@ function App() {
         <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
       </Routes>
       </Suspense>
+      <ServerWakingNotice />
       <DataNotice />
       </ToastProvider>
       </AuthProvider>

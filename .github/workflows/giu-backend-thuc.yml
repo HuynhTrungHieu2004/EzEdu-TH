@@ -1,0 +1,62 @@
+name: Giữ backend thức
+
+# Gói miễn phí của Render tắt web service sau 15 phút không có request, và lần
+# gọi kế tiếp phải chờ ~1 phút để khởi động lại. Workflow này gọi /health/ready
+# định kỳ để máy chủ không ngủ trong giờ người dùng hoạt động.
+#
+# VÌ SAO KHÔNG CHẠY 24/7: Render cấp 750 giờ instance mỗi tháng cho cả
+# workspace. Thức suốt ngày đêm tốn ~730 giờ — vừa khít, không còn chỗ cho bất
+# kỳ dịch vụ nào khác, và hết hạn mức thì Render tạm dừng dịch vụ tới tháng sau.
+# Lịch dưới đây phủ 06:00–23:00 giờ Việt Nam, khoảng 520 giờ/tháng, còn dư ~230.
+#
+# Muốn tắt: Actions → "Giữ backend thức" → Disable workflow.
+
+on:
+  schedule:
+    # Cron của GitHub chạy theo UTC. Việt Nam là UTC+7, nên 06:00–23:00 giờ VN
+    # tương ứng 23:00 UTC hôm trước đến 16:00 UTC.
+    - cron: '*/10 23,0-16 * * *'
+  workflow_dispatch: # cho phép bấm chạy tay để thử
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gọi /health/ready
+        run: |
+          URL="https://ezedu-backend.onrender.com/health/ready"
+
+          # Lần gọi đầu có thể mất tới một phút nếu máy chủ đang ngủ.
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 120 "$URL" || echo "000")
+          echo "HTTP $code"
+          cat /tmp/health.json 2>/dev/null || true
+          echo
+
+          if [ "$code" != "200" ]; then
+            # Thử lại một lần: Render đôi khi trả 502 ngay trước khi sẵn sàng.
+            sleep 30
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 120 "$URL" || echo "000")
+            echo "thử lại: HTTP $code"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+          fi
+
+          # Fail để GitHub gửi email — workflow này kiêm luôn việc giám sát.
+          [ "$code" = "200" ]
+
+      - name: Kiểm từng dịch vụ phụ thuộc
+        run: |
+          # /health/ready trả 200 kể cả khi Mongo hay Gemini hỏng; đọc chi tiết
+          # để biết sớm thay vì đợi người dùng báo.
+          python3 - <<'PY'
+          import json, sys
+          with open('/tmp/health.json', encoding='utf-8') as handle:
+              data = json.load(handle)
+          services = data.get('services', {})
+          broken = [name for name, state in services.items() if state != 'healthy']
+          for name, state in services.items():
+              print(f"  {name}: {state}")
+          if broken:
+              print('DỊCH VỤ HỎNG:', ', '.join(broken))
+              sys.exit(1)
+          PY
