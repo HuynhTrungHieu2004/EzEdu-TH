@@ -82,20 +82,24 @@ deploy site**. Biến `VITE_*` được nhúng vào lúc dựng, không phải l
 biến mà không dựng lại thì bản đang chạy vẫn không có gì, đúng lỗi đã gặp hồi
 dựng Google.
 
-### Trước khi làm bước này thì trang web ra sao
+### Trước khi làm bước này thì trang web ra sao — chế độ trưng bày
 
-Không sao cả — nút Facebook không hiện, và **không một dòng mã Facebook nào được
-gửi tới trình duyệt khách**. Vite thay `VITE_FACEBOOK_APP_ID` bằng chuỗi rỗng lúc
-dựng, nhánh "chưa cấu hình" thành hằng số, và trình dựng cắt luôn cả bộ nạp SDK.
+Chưa có App ID thì nút **vẫn hiện**, nhưng bấm vào không đi đâu cả: nó hiện một
+dòng nói rằng chức năng đã lập trình xong và Facebook đòi duyệt ứng dụng kèm xác
+minh doanh nghiệp. Đủ để trình bày trong buổi bảo vệ mà không phải giải thích
+bằng miệng, và không trông như một nút hỏng.
 
-Đã kiểm bằng cách dựng thử hai lần và tìm trong bundle:
+**Bấm vào cũng không chạm tới Facebook.** Vite thay `VITE_FACEBOOK_APP_ID` bằng
+chuỗi rỗng lúc dựng, nên bộ nạp SDK bị cắt hẳn khỏi bundle. Đã kiểm bằng cách
+dựng thử hai lần và tìm chuỗi trong tệp JavaScript sinh ra:
 
-| | không App ID | có App ID |
+| trong bundle | không App ID | có App ID |
 |---|---|---|
-| `facebook-jssdk` | không có | có |
-| `connect.facebook.net` | không có | có |
+| nút `Tiếp tục với Facebook` | có | có |
+| `facebook-jssdk`, `connect.facebook.net` | không có | có |
 
-Nên bạn cứ thong thả, không có nút nào hỏng nằm chờ trên bản chạy thật.
+Không cookie Facebook, không request nào ra ngoài. Có một bài kiểm tự dựng lại
+và soi bundle để canh điều này, xem `e2e/facebook-signin.spec.ts`.
 
 ## Bước 6 — Bật cờ tính năng
 
@@ -119,7 +123,7 @@ Vào lại **Quản trị → Nhật ký hoạt động**, lọc `provider: face
 |---|---|
 | "Đăng nhập bằng Facebook hiện không khả dụng" | Chưa bật cờ ở bước 6 |
 | "Chưa cấu hình đăng nhập Facebook trên máy chủ" | Thiếu biến bên Render, hoặc chưa deploy lại |
-| Nút báo "Chưa cấu hình đăng nhập Facebook" | Thiếu `VITE_FACEBOOK_APP_ID`, hoặc Netlify chưa dựng lại |
+| Bấm nút chỉ hiện lời giải thích về xác minh doanh nghiệp | Đang ở chế độ trưng bày: thiếu `VITE_FACEBOOK_APP_ID`, hoặc Netlify chưa dựng lại sau khi thêm biến |
 | Facebook báo app chưa hoạt động | Tài khoản chưa nằm trong Testers, hoặc chưa bấm chấp nhận lời mời |
 | "Tài khoản Facebook này không chia sẻ email" | Tài khoản Facebook đăng ký bằng số điện thoại. Không sửa được, dùng Google hoặc mật khẩu |
 | "Không liên lạc được với Facebook" | Graph API lỗi hoặc chậm quá 10 giây. Thử lại |

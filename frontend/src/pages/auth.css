@@ -140,14 +140,18 @@
   max-width: 100%;
   justify-content: center;
   gap: var(--ez-space-2);
-  background-color: #1877f2;
-  border-color: #1877f2;
+  /* Xanh #166fe0 chứ không phải #1877f2 của logo Facebook: chữ trắng trên
+     #1877f2 chỉ đạt tương phản 4.23, dưới ngưỡng 4.5 của WCAG AA cho chữ cỡ
+     thường — axe bắt lỗi này trên cả sáu kích thước màn hình. #166fe0 là màu
+     hover chính thức của Facebook nên vẫn đúng nhận diện, và đạt 4.79. */
+  background-color: #166fe0;
+  border-color: #166fe0;
   color: #fff;
 }
 
 .ez-btn-facebook:hover:not(:disabled) {
-  background-color: #166fe0;
-  border-color: #166fe0;
+  background-color: #1461cd;
+  border-color: #1461cd;
   color: #fff;
 }
 

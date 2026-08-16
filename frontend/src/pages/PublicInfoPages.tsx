@@ -142,7 +142,10 @@ const BROWSER_STORAGE = [
   { key: 'access_token', purpose: 'Giữ đăng nhập để mỗi lần mở trang không phải nhập lại mật khẩu.' },
   { key: 'theme-preference', purpose: 'Nhớ bạn chọn giao diện sáng, tối hay theo hệ thống.' },
   { key: 'ez-student-onboarding-draft', purpose: 'Giữ dở phần khai báo hồ sơ học sinh khi bạn thoát giữa chừng.' },
-  { key: 'ez-recent-tools', purpose: 'Đưa công cụ bạn hay dùng lên đầu danh sách.' },
+  { key: 'ezedu_recent_tools', purpose: 'Đưa công cụ bạn hay dùng lên đầu danh sách.' },
+  { key: 'ezedu_announcement_dismissed', purpose: 'Ghi nhớ bạn đã tắt dải thông báo trên đầu trang. Mục này xoá ngay khi bạn đóng tab.' },
+  { key: 'learning-event-offline-queue', purpose: 'Giữ tạm hoạt động học khi mất mạng, gửi lên máy chủ khi có mạng lại.' },
+  { key: 'learning-session:…', purpose: 'Nối các thao tác trong cùng một buổi học vào một phiên, để thống kê thời lượng học.' },
   { key: 'ez-data-notice-v1', purpose: 'Ghi nhớ bạn đã đọc thông báo này, để không hiện lại.' },
 ];
 
@@ -162,7 +165,10 @@ export function DataPolicyPage() {
         </p>
 
         <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>
-          Năm mục được lưu
+          {/* Đếm từ chính danh sách. Viết cứng "Năm mục" đã lệch một lần khi
+              thêm mục mới, và một trang chính sách sai số liệu thì tệ hơn là
+              không có trang nào. */}
+          {BROWSER_STORAGE.length} mục được lưu
         </h2>
         <div className="ez-datatable-wrap">
           <table className="ez-datatable">

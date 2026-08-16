@@ -144,6 +144,18 @@ Frontend e2e: soi theo bộ spec Google đang có.
 5. **App Secret dán thẳng vào Render**, không gửi qua khung chat.
 6. Bật cờ `enable_facebook_login` trong trang quản trị khi muốn dùng.
 
+## Chế độ trưng bày (bổ sung sau khi bàn lại)
+
+Yêu cầu ban đầu là ẩn nút khi chưa cấu hình. Bàn lại: buổi bảo vệ cần nhìn thấy
+nút, còn việc người chấm đăng nhập được hay không thì giải thích được.
+
+Nên khi thiếu `VITE_FACEBOOK_APP_ID`, nút vẫn vẽ ra, bấm vào thì hiện lời giải
+thích về yêu cầu duyệt ứng dụng và xác minh doanh nghiệp — thay vì im lặng, vốn
+trông y hệt một nút hỏng.
+
+Nhánh này không nạp SDK, nên tính chất "không cookie Facebook cho người không
+dùng Facebook" vẫn giữ nguyên. Có bài kiểm dựng lại bundle và soi chuỗi để canh.
+
 ## Ngoài phạm vi
 
 - App Review và Business Verification.

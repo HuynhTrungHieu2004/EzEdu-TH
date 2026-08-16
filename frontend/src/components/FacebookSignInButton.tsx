@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 
+import { Alert } from './ui';
+
 const SCRIPT_ID = 'facebook-jssdk';
 const SCRIPT_SRC = 'https://connect.facebook.net/vi_VN/sdk.js';
 
@@ -112,37 +114,74 @@ export function FacebookSignInButton({ onCredential, disabled }: Props) {
     }
   }, [appId, onCredential, version]);
 
-  // Chưa cấu hình thì biến mất hẳn, không để lại lời nhắn.
+  // Chưa có App ID thì nút vẫn hiện, bấm vào thì nói thẳng lý do.
   //
-  // Khác nút Google: Google đã cấu hình từ lâu nên nhánh này không bao giờ chạy
-  // trên bản thật. Facebook thì sẽ ở trạng thái chưa cấu hình suốt quãng chờ
-  // duyệt app, và "Chưa cấu hình đăng nhập Facebook" là câu nói với lập trình
-  // viên chứ không phải với người vào học — với họ nó chỉ là một lời thú nhận
-  // rằng trang web đang hỏng.
+  // Facebook chỉ cho người ngoài đăng nhập sau khi duyệt ứng dụng và xác minh
+  // doanh nghiệp — một đồ án không có giấy tờ doanh nghiệp để nộp. Nên nút này
+  // là nút trưng bày: nó cho thấy chức năng đã lập trình xong, và tự nói ra
+  // điều kiện còn thiếu thay vì bắt người trình bày giải thích bằng miệng.
   //
-  // Vẫn giữ lời nhắn khi chạy dev, vì lúc đó nút biến mất không lý do sẽ khiến
-  // chính ta đi tìm bug không tồn tại.
+  // Không nạp SDK ở nhánh này, nên Facebook vẫn không đặt cookie của ai.
   if (!appId) {
-    return import.meta.env.DEV ? (
-      <p className="text-muted">Chưa cấu hình đăng nhập Facebook (thiếu VITE_FACEBOOK_APP_ID).</p>
-    ) : null;
+    return <FacebookDemoButton disabled={disabled} />;
   }
 
   return (
     <>
-      <button
-        type="button"
-        className="ez-btn ez-btn-facebook"
-        onClick={() => void bam()}
-        disabled={disabled || dangNap}
-        aria-busy={dangNap}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.96h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
-        </svg>
-        {dangNap ? 'Đang mở Facebook…' : 'Tiếp tục với Facebook'}
-      </button>
+      <NutFacebook onClick={() => void bam()} disabled={disabled || dangNap} dangNap={dangNap} />
       {error && <p className="text-muted">{error}</p>}
+    </>
+  );
+}
+
+/** Phần nhìn thấy được của nút. Dùng chung để bản thật và bản trưng bày giống
+ *  hệt nhau — hai bản vẽ riêng sẽ lệch nhau ngay lần chỉnh giao diện đầu tiên. */
+function NutFacebook({
+  onClick,
+  disabled,
+  dangNap,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  dangNap?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="ez-btn ez-btn-facebook"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={dangNap}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.96h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
+      </svg>
+      {dangNap ? 'Đang mở Facebook…' : 'Tiếp tục với Facebook'}
+    </button>
+  );
+}
+
+/**
+ * Nút trưng bày, dùng khi chưa có App ID.
+ *
+ * Bấm vào không đi đâu cả — chỉ hiện ra điều kiện mà Facebook đặt ra. Viết
+ * thành lời thay vì để nút im lặng: một nút bấm không phản ứng gì trông như
+ * trang web hỏng, còn một nút nói rõ "đang chờ Facebook duyệt" trông như một
+ * quyết định.
+ */
+function FacebookDemoButton({ disabled }: { disabled?: boolean }) {
+  const [daBam, setDaBam] = useState(false);
+
+  return (
+    <>
+      <NutFacebook onClick={() => setDaBam(true)} disabled={disabled} />
+      {daBam && (
+        <Alert tone="info">
+          Chức năng đăng nhập bằng Facebook đã lập trình xong nhưng chưa bật. Facebook chỉ cho
+          người ngoài đăng nhập sau khi duyệt ứng dụng và xác minh doanh nghiệp, việc này cần giấy
+          phép kinh doanh. Bạn có thể đăng nhập bằng Google hoặc bằng email và mật khẩu.
+        </Alert>
+      )}
     </>
   );
 }

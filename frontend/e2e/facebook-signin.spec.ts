@@ -132,3 +132,40 @@ test('nút có mặt ở cả trang đăng ký', async ({ page }) => {
 
   await expect(page.locator(NUT)).toBeVisible();
 });
+
+/**
+ * Bản trưng bày — khi chưa có VITE_FACEBOOK_APP_ID.
+ *
+ * Bộ kiểm chạy với App ID giả trong .env nên nhánh này không tự xuất hiện. Gỡ
+ * biến ra khỏi bundle không làm được lúc chạy, nên ở đây kiểm bằng bản dựng
+ * riêng: xem chuỗi nào có mặt trong tệp JavaScript sinh ra.
+ */
+test('bản dựng thiếu App ID: có nút trưng bày, không có mã chạm tới Facebook', async ({}, testInfo) => {
+  // Kiểm nội dung bản dựng, không liên quan kích thước màn hình. Không chốt lại
+  // thì sáu project dựng lại sáu lần cho cùng một kết quả.
+  test.skip(testInfo.project.name !== 'desktop-1440', 'chỉ cần chạy một lần');
+
+  const { execFileSync } = await import('node:child_process');
+  const { readFileSync, readdirSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+
+  const thuMuc = join('/tmp', 'fb-demo-build');
+  rmSync(thuMuc, { recursive: true, force: true });
+  execFileSync('npx', ['vite', 'build', '--outDir', thuMuc, '--emptyOutDir'], {
+    env: { ...process.env, VITE_FACEBOOK_APP_ID: '' },
+    stdio: 'pipe',
+  });
+
+  const assets = join(thuMuc, 'assets');
+  const goc = readdirSync(assets)
+    .filter((ten) => ten.endsWith('.js'))
+    .map((ten) => readFileSync(join(assets, ten), 'utf8'))
+    .join('');
+
+  expect(goc, 'nút phải có để trưng bày').toContain('Tiếp tục với Facebook');
+  expect(goc, 'phải nói ra điều kiện Facebook đặt ra').toContain('xác minh doanh nghiệp');
+  // Cả hai chuỗi dưới đây chỉ tồn tại trong bộ nạp SDK. Còn chúng nghĩa là bản
+  // trưng bày vẫn kéo Facebook về, và cookie Facebook sẽ đặt lên máy người xem.
+  expect(goc, 'không được nạp SDK ở bản trưng bày').not.toContain('connect.facebook.net');
+  expect(goc, 'không được nạp SDK ở bản trưng bày').not.toContain('facebook-jssdk');
+});
