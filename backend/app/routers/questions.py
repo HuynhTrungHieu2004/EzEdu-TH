@@ -21,6 +21,7 @@ from app.schemas.question import (
     QuestionSetResponse,
     QuestionSetSummary,
     QuestionWorkflowRequest,
+    SubjectCatalogNode,
 )
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
@@ -33,6 +34,12 @@ from app.services.export_service import (
     export_question_set_to_pdf,
 )
 from app.services.activity_log_service import record_activity
+from app.services.subject_catalog_service import (
+    CHUA_PHAN_MON,
+    build_catalog,
+    list_subject_options,
+    validate_taxonomy_ids,
+)
 from app.services.admin_audit_service import record_admin_audit, require_reason
 from app.services.ai_quota_service import enforce_ai_quota
 from app.services.analytics_service import new_attempt_id, new_event_id, new_logical_request_id, record_event
@@ -250,6 +257,29 @@ def _qs_to_response(qs: dict) -> QuestionSetResponse:
     )
 
 
+async def _gan_ten_taxonomy(db, rows: list[dict]) -> None:
+    """Bơm `subject_name`/`chapter_name` vào từng dòng, bằng MỘT truy vấn.
+
+    Tra tên trong `_qs_to_summary` sẽ thành N+1: hàm đó chạy cho mỗi dòng.
+    """
+    can_doc: set[str] = set()
+    for row in rows:
+        for khoa in ("subject_id", "chapter_id"):
+            if row.get(khoa):
+                can_doc.add(str(row[khoa]))
+    hop_le = [ObjectId(i) for i in can_doc if ObjectId.is_valid(i)]
+    if not hop_le:
+        return
+    ten: dict[str, str] = {}
+    async for node in db["curriculum_taxonomy"].find({"_id": {"$in": hop_le}}, {"name": 1}):
+        ten[str(node["_id"])] = node.get("name", "")
+    for row in rows:
+        if row.get("subject_id"):
+            row["subject_name"] = ten.get(str(row["subject_id"]))
+        if row.get("chapter_id"):
+            row["chapter_name"] = ten.get(str(row["chapter_id"]))
+
+
 def _qs_to_summary(qs: dict) -> QuestionSetSummary:
     """Map a raw MongoDB document to a lightweight QuestionSetSummary."""
     counts = qs.get("workflow_counts")
@@ -267,6 +297,12 @@ def _qs_to_summary(qs: dict) -> QuestionSetSummary:
         published_question_count=counts.get("published", 0),
         audience_type=qs.get("audience_type") or "all",
         target_class_ids=qs.get("target_class_ids") or [],
+        subject_id=qs.get("subject_id"),
+        # Tên do nơi gọi bơm sẵn vào dict (`_gan_ten_taxonomy`) chứ không tra ở
+        # đây: hàm này chạy cho từng dòng, tra trong đây là N+1 query.
+        subject_name=qs.get("subject_name"),
+        chapter_id=qs.get("chapter_id"),
+        chapter_name=qs.get("chapter_name"),
         created_at=qs["created_at"],
     )
 
@@ -714,10 +750,32 @@ async def _visible_published_filter(current_user: UserResponse, db) -> dict:
     return await build_visible_question_set_filter(db, current_user.id)
 
 
+@router.get("/taxonomy/subject-options")
+async def list_subject_options_for_tagging(current_user: UserResponse = Depends(get_current_user)):
+    """Cây môn → chương để giáo viên gắn nhãn lúc công bố học liệu."""
+    if not _can_review_questions(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền gắn môn cho học liệu.")
+    return await list_subject_options(get_database())
+
+
+@router.get("/published/subjects", response_model=List[SubjectCatalogNode])
+async def list_published_subjects(current_user: UserResponse = Depends(get_current_user)):
+    """Mục lục "Học theo môn": các môn có nội dung học sinh này xem được.
+
+    Dùng đúng bộ lọc hiển thị của `/published` — gom một chỗ thì dễ lệch, mà
+    lệch ở đây nghĩa là mục lục đếm cả đề của lớp khác.
+    """
+    db = get_database()
+    mongo_filter = await _visible_published_filter(current_user, db)
+    return await build_catalog(db, mongo_filter)
+
+
 @router.get("/published", response_model=HistoryListResponse)
 async def list_published_question_sets(
     current_user: UserResponse = Depends(get_current_user),
     search: Optional[str] = Query(None, max_length=200),
+    subject_id: Optional[str] = Query(None, max_length=64),
+    chapter_id: Optional[str] = Query(None, max_length=64),
     limit: int = Query(20, ge=1, le=50),
 ):
     """
@@ -731,6 +789,15 @@ async def list_published_question_sets(
     if search_trimmed:
         mongo_filter["document_name"] = {"$regex": _escape_regex(search_trimmed[:200]), "$options": "i"}
 
+    if subject_id:
+        # Nhóm "chưa phân môn" gom cả doc thiếu hẳn trường lẫn doc có trường
+        # rỗng/None — dữ liệu cũ tồn tại ở cả ba dạng.
+        mongo_filter["subject_id"] = (
+            {"$in": [None, ""]} if subject_id == CHUA_PHAN_MON else subject_id
+        )
+    if chapter_id:
+        mongo_filter["chapter_id"] = chapter_id
+
     cursor_db = (
         db["question_sets"]
         .find(mongo_filter, {"questions": 0, "keywords": 0, "validation_stats": 0})
@@ -739,6 +806,7 @@ async def list_published_question_sets(
     )
     results = [item async for item in cursor_db]
     page_items = results[:limit]
+    await _gan_ten_taxonomy(db, page_items)
     return HistoryListResponse(
         items=[_qs_to_summary(item) for item in page_items],
         next_cursor=None,
@@ -936,6 +1004,13 @@ async def publish_entire_question_set(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn chỉ có thể giao đề cho lớp học của chính mình.")
         target_class_ids = payload.target_class_ids
 
+    try:
+        subject_id, chapter_id = await validate_taxonomy_ids(
+            db, subject_id=payload.subject_id, chapter_id=payload.chapter_id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     now = datetime.now(timezone.utc)
     for question in questions:
         question["status"] = "published"
@@ -956,9 +1031,15 @@ async def publish_entire_question_set(
             "published_question_count": qs["published_question_count"],
             "audience_type": payload.audience_type,
             "target_class_ids": target_class_ids,
+            # Ghi cả khi None: giáo viên bỏ chọn môn thì phải gỡ được nhãn cũ,
+            # không thì sửa nhầm một lần là dính vĩnh viễn.
+            "subject_id": subject_id,
+            "chapter_id": chapter_id,
             "updated_at": now,
         }},
     )
+    qs["subject_id"] = subject_id
+    qs["chapter_id"] = chapter_id
     await record_activity(
         action="exam_published",
         category="exam",

@@ -63,6 +63,10 @@ export interface QuestionSetSummary {
   published_question_count: number;
   audience_type?: 'all' | 'classes';
   target_class_ids?: string[];
+  subject_id?: string | null;
+  subject_name?: string | null;
+  chapter_id?: string | null;
+  chapter_name?: string | null;
   created_at: string;
 }
 
@@ -131,6 +135,20 @@ export interface QuestionAttemptResponse {
     is_correct: boolean;
   }>;
   created_at: string;
+}
+
+export interface SubjectChapterNode {
+  id: string;
+  name: string;
+  count: number;
+}
+
+/** Một môn trong mục lục "Học theo môn". */
+export interface SubjectCatalogNode {
+  id: string;
+  name: string;
+  count: number;
+  chapters: SubjectChapterNode[];
 }
 
 export interface LearningHistoryItem {
@@ -247,11 +265,25 @@ export const questionApi = {
     return response.data;
   },
 
-  listPublished: async (search = '', signal?: AbortSignal): Promise<HistoryListResponse> => {
+  listPublished: async (
+    search = '',
+    signal?: AbortSignal,
+    loc: { subject_id?: string; chapter_id?: string } = {},
+  ): Promise<HistoryListResponse> => {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (loc.subject_id) params.subject_id = loc.subject_id;
+    if (loc.chapter_id) params.chapter_id = loc.chapter_id;
     const response = await client.get<HistoryListResponse>('/questions/published', {
-      params: search ? { search } : undefined,
+      params: Object.keys(params).length ? params : undefined,
       signal,
     });
+    return response.data;
+  },
+
+  /** Mục lục môn → chương của học liệu học sinh này xem được. */
+  listPublishedSubjects: async (signal?: AbortSignal): Promise<SubjectCatalogNode[]> => {
+    const response = await client.get<SubjectCatalogNode[]>('/questions/published/subjects', { signal });
     return response.data;
   },
 
@@ -275,9 +307,20 @@ export const questionApi = {
     return response.data;
   },
 
+  /** Cây môn → chương để giáo viên gắn nhãn lúc công bố. */
+  listSubjectOptions: async (signal?: AbortSignal): Promise<SubjectCatalogNode[]> => {
+    const response = await client.get<SubjectCatalogNode[]>('/questions/taxonomy/subject-options', { signal });
+    return response.data;
+  },
+
   publishQuestionSet: async (
     id: string,
-    payload?: { audience_type: 'all' | 'classes'; target_class_ids?: string[] },
+    payload?: {
+      audience_type: 'all' | 'classes';
+      target_class_ids?: string[];
+      subject_id?: string | null;
+      chapter_id?: string | null;
+    },
   ): Promise<QuestionSetResponse> => {
     const response = await client.post<QuestionSetResponse>(`/questions/${id}/publish`, payload ?? { audience_type: 'all' });
     return response.data;

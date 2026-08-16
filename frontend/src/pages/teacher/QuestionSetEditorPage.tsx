@@ -16,6 +16,7 @@ import type {
   QuestionItemUpdatePayload,
   QuestionSetQualityResponse,
   QuestionSetResponse,
+  SubjectCatalogNode,
 } from '../../api/questionApi';
 import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../../api/learningEventApi';
 import QuestionCard from '../../components/QuestionCard';
@@ -118,6 +119,9 @@ export default function QuestionSetEditorPage() {
   const [publishingSet, setPublishingSet] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishAudience, setPublishAudience] = useState<'all' | 'classes'>('all');
+  const [subjectOptions, setSubjectOptions] = useState<SubjectCatalogNode[]>([]);
+  const [publishSubjectId, setPublishSubjectId] = useState('');
+  const [publishChapterId, setPublishChapterId] = useState('');
   const [myClasses, setMyClasses] = useState<ClassSummary[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
 
@@ -288,6 +292,18 @@ export default function QuestionSetEditorPage() {
     setSelectedClassIds((prev) => (prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]));
   }
 
+  useEffect(() => {
+    if (!showPublishModal || subjectOptions.length > 0) return;
+    const controller = new AbortController();
+    // Lỗi ở đây không chặn việc công bố: gắn môn là tuỳ chọn, và chặn giáo viên
+    // ban hành đề chỉ vì không tải được danh sách môn là đánh đổi tồi.
+    questionApi
+      .listSubjectOptions(controller.signal)
+      .then(setSubjectOptions)
+      .catch(() => {});
+    return () => controller.abort();
+  }, [showPublishModal, subjectOptions.length]);
+
   async function confirmPublish() {
     if (!questionSet) return;
     if (publishAudience === 'classes' && selectedClassIds.length === 0) {
@@ -300,6 +316,10 @@ export default function QuestionSetEditorPage() {
       const updated = await questionApi.publishQuestionSet(questionSet.id, {
         audience_type: publishAudience,
         target_class_ids: publishAudience === 'classes' ? selectedClassIds : [],
+        // Chuỗi rỗng thành null: backend phân biệt "không gắn" với "gắn id rỗng",
+        // và gửi chuỗi rỗng lên sẽ trượt validate.
+        subject_id: publishSubjectId || null,
+        chapter_id: publishChapterId || null,
       });
       setQuestionSet(updated);
       setShowPublishModal(false);
@@ -709,6 +729,39 @@ export default function QuestionSetEditorPage() {
           </DialogFooter>
         }
       >
+        <div className="ez-stack" style={{ marginBottom: 'var(--ez-space-5)' }}>
+          {/* Gắn môn là TUỲ CHỌN. Ép buộc sẽ chặn giáo viên công bố nhanh một bộ
+              luyện tập, và học liệu chưa gắn vẫn tới được học sinh qua nhóm
+              "Chưa phân môn" trong trang Học theo môn. */}
+          <FormField label="Môn học (không bắt buộc)">
+            <Select
+              value={publishSubjectId}
+              onChange={(event) => {
+                setPublishSubjectId(event.target.value);
+                // Đổi môn phải xoá chương: chương của môn cũ không thuộc môn mới
+                // nên backend sẽ từ chối, và giáo viên không hiểu vì sao.
+                setPublishChapterId('');
+              }}
+            >
+              <option value="">— Chưa phân môn —</option>
+              {subjectOptions.map((mon) => (
+                <option key={mon.id} value={mon.id}>{mon.name}</option>
+              ))}
+            </Select>
+          </FormField>
+
+          {publishSubjectId && (
+            <FormField label="Chương (không bắt buộc)">
+              <Select value={publishChapterId} onChange={(event) => setPublishChapterId(event.target.value)}>
+                <option value="">— Cả môn —</option>
+                {(subjectOptions.find((m) => m.id === publishSubjectId)?.chapters ?? []).map((chuong) => (
+                  <option key={chuong.id} value={chuong.id}>{chuong.name}</option>
+                ))}
+              </Select>
+            </FormField>
+          )}
+        </div>
+
         <div className="qs-audience-list">
           <RadioCard
             name="publish-audience"

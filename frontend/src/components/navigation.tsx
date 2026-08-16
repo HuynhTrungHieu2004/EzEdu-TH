@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import {
   BarChart3,
   Bell,
+  BookOpen,
   ClipboardList,
   Database,
   FileQuestion,
@@ -57,6 +58,10 @@ export function buildNavigation({
     const items: NavItem[] = [
       { to: '/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
       { to: '/tools', label: 'Công cụ AI', icon: <Sparkles size={ICON} /> },
+      // Đặt TRƯỚC "Bài luyện tập": đây là đường vào có cấu trúc (môn → chương),
+      // còn "Bài luyện tập" là danh sách phẳng xếp theo ngày. Học sinh mở ứng
+      // dụng để ôn một môn, không phải để xem cái gì vừa được công bố.
+      { to: '/hoc-theo-mon', label: 'Học theo môn', icon: <BookOpen size={ICON} /> },
       {
         to: '/published-questions',
         label: 'Bài luyện tập',

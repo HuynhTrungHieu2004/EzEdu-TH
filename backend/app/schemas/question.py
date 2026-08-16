@@ -68,6 +68,11 @@ PublishAudienceType = Literal["all", "classes"]
 class PublishQuestionSetRequest(BaseModel):
     audience_type: PublishAudienceType = "all"
     target_class_ids: List[str] = Field(default_factory=list, max_length=50)
+    # Id node trong `curriculum_taxonomy`. Không bắt buộc: học liệu công bố
+    # trước tính năng "Học theo môn" đều chưa có, và ép buộc sẽ chặn giáo viên
+    # công bố nhanh một bộ luyện tập.
+    subject_id: Optional[str] = None
+    chapter_id: Optional[str] = None
 
     @field_validator("target_class_ids")
     @classmethod
@@ -144,6 +149,10 @@ class QuestionSetResponse(BaseModel):
     published_question_count: int = 0
     audience_type: PublishAudienceType = "all"
     target_class_ids: List[str] = Field(default_factory=list)
+    subject_id: Optional[str] = None
+    subject_name: Optional[str] = None
+    chapter_id: Optional[str] = None
+    chapter_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -161,7 +170,25 @@ class QuestionSetSummary(BaseModel):
     published_question_count: int = 0
     audience_type: PublishAudienceType = "all"
     target_class_ids: List[str] = Field(default_factory=list)
+    subject_id: Optional[str] = None
+    subject_name: Optional[str] = None
+    chapter_id: Optional[str] = None
+    chapter_name: Optional[str] = None
     created_at: datetime
+
+
+class SubjectChapterNode(BaseModel):
+    id: str
+    name: str
+    count: int
+
+
+class SubjectCatalogNode(BaseModel):
+    """Một môn trong mục lục "Học theo môn", kèm các chương có nội dung."""
+    id: str
+    name: str
+    count: int
+    chapters: List[SubjectChapterNode] = Field(default_factory=list)
 
 
 class HistoryListResponse(BaseModel):

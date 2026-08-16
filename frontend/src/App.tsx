@@ -59,6 +59,7 @@ const ExamGradingPage = lazy(() => import('./pages/teacher/ExamGradingPage'));
 const ContentHistoryPage = lazy(() => import('./pages/teacher/ContentHistoryPage'));
 const ExamAttemptPage = lazy(() => import('./pages/student/ExamAttemptPage'));
 const AttemptReviewPage = lazy(() => import('./pages/student/AttemptReviewPage'));
+const SubjectCatalogPage = lazy(() => import('./pages/student/SubjectCatalogPage'));
 const WebKnowledgePage = lazy(() => import('./pages/WebKnowledgePage'));
 const CurriculumKbPage = lazy(() => import('./pages/CurriculumKbPage'));
 const ToolLibraryPage = lazy(() => import('./pages/ToolLibraryPage'));
@@ -216,6 +217,11 @@ function App() {
         <Route
           path="/take-exam/:examId"
           element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><ExamAttemptPage /></RoleRoute></AppLayout>}
+        />
+        {/* Học theo môn — mục lục Môn → Chương của học liệu đã công bố. */}
+        <Route
+          path="/hoc-theo-mon"
+          element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><SubjectCatalogPage /></RoleRoute></AppLayout>}
         />
         {/* Xem lại bài đã nộp — chỉ đọc. Tách khỏi /take-exam vì trang đó gọi
             startAttempt và chạy autosave; mở bài cũ bằng nó là mời gọi ghi đè. */}
