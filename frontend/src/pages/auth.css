@@ -124,20 +124,28 @@
   background-color: var(--ez-border);
 }
 
+/* Khung chứa các nút đăng nhập mạng xã hội.
+
+   Bề ngang khoá ở đây, một chỗ duy nhất, rồi cả hai nút đều rộng 100% của nó —
+   nên chúng luôn thẳng mép nhau. Trước đây mỗi nút tự đặt 320px: nút Facebook
+   có `max-width: 100%` nên co được trên máy hẹp, còn nút Google là iframe cố
+   định nên không co, và trên máy 360px nó tràn khỏi thẻ. */
 .ez-auth-alt {
   display: grid;
+  /* `minmax(0, 1fr)` chứ không để cột tự do: cột grid mặc định giãn theo nội
+     dung, nên nhãn "Tiếp tục với Facebook" đẩy cột rộng 298px trong khung
+     278px và cả hai nút cùng tràn ra. minmax(0, …) cho phép cột co lại. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ez-space-3);
-  justify-items: center;
+  justify-items: stretch;
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
 }
 
-/* Nút Facebook.
-
-   Rộng 320px để khớp nút Google ngay bên trên — nút đó do thư viện Google tự
-   render với chiều rộng cố định, ta không đổi được, nên nút này phải theo. Hai
-   nút lệch nhau vài chục pixel trông như lỗi dựng trang. */
+/* Nút Facebook. Bề ngang do `.ez-auth-alt` quyết định — xem ghi chú ở đó. */
 .ez-btn-facebook {
-  width: 320px;
-  max-width: 100%;
+  width: 100%;
   justify-content: center;
   gap: var(--ez-space-2);
   /* Xanh #166fe0 chứ không phải #1877f2 của logo Facebook: chữ trắng trên

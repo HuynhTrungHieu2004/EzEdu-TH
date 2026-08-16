@@ -77,9 +77,11 @@ function loadFacebookScript(): Promise<void> {
 interface Props {
   onCredential: (accessToken: string) => void;
   disabled?: boolean;
+  /** Khớp cách nói của nút Google ngay trên nó. */
+  label?: string;
 }
 
-export function FacebookSignInButton({ onCredential, disabled }: Props) {
+export function FacebookSignInButton({ onCredential, disabled, label = 'Đăng nhập bằng Facebook' }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [dangNap, setDangNap] = useState(false);
   const appId = import.meta.env.VITE_FACEBOOK_APP_ID as string | undefined;
@@ -123,12 +125,12 @@ export function FacebookSignInButton({ onCredential, disabled }: Props) {
   //
   // Không nạp SDK ở nhánh này, nên Facebook vẫn không đặt cookie của ai.
   if (!appId) {
-    return <FacebookDemoButton disabled={disabled} />;
+    return <FacebookDemoButton disabled={disabled} label={label} />;
   }
 
   return (
     <>
-      <NutFacebook onClick={() => void bam()} disabled={disabled || dangNap} dangNap={dangNap} />
+      <NutFacebook onClick={() => void bam()} disabled={disabled || dangNap} dangNap={dangNap} label={label} />
       {error && <p className="text-muted">{error}</p>}
     </>
   );
@@ -140,10 +142,12 @@ function NutFacebook({
   onClick,
   disabled,
   dangNap,
+  label,
 }: {
   onClick: () => void;
   disabled?: boolean;
   dangNap?: boolean;
+  label: string;
 }) {
   return (
     <button
@@ -156,7 +160,7 @@ function NutFacebook({
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.96h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.09 24 18.1 24 12.07z" />
       </svg>
-      {dangNap ? 'Đang mở Facebook…' : 'Tiếp tục với Facebook'}
+      {dangNap ? 'Đang mở Facebook…' : label}
     </button>
   );
 }
@@ -169,12 +173,12 @@ function NutFacebook({
  * trang web hỏng, còn một nút nói rõ "đang chờ Facebook duyệt" trông như một
  * quyết định.
  */
-function FacebookDemoButton({ disabled }: { disabled?: boolean }) {
+function FacebookDemoButton({ disabled, label }: { disabled?: boolean; label: string }) {
   const [daBam, setDaBam] = useState(false);
 
   return (
     <>
-      <NutFacebook onClick={() => setDaBam(true)} disabled={disabled} />
+      <NutFacebook onClick={() => setDaBam(true)} disabled={disabled} label={label} />
       {daBam && (
         <Alert tone="info">
           Chức năng đăng nhập bằng Facebook đã lập trình xong nhưng chưa bật. Facebook chỉ cho

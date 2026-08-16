@@ -6,6 +6,8 @@ const SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 /** Cache ở phạm vi module: mọi lời gọi loadGoogleScript() dùng chung một promise. */
 let scriptPromise: Promise<void> | null = null;
 
+type GoogleButtonText = 'signin_with' | 'signup_with';
+
 type GoogleCredentialResponse = {
   credential?: string;
 };
@@ -23,7 +25,7 @@ type GoogleIdentityServices = {
           theme: 'outline';
           size: 'large';
           width: number;
-          text: 'continue_with';
+          text: GoogleButtonText;
           locale: string;
         },
       ) => void;
@@ -91,9 +93,32 @@ function loadGoogleScript(): Promise<void> {
 interface Props {
   onCredential: (idToken: string) => void;
   disabled?: boolean;
+  /**
+   * Nhãn GSI vẽ lên nút. Mặc định `signin_with` — KHÔNG dùng `continue_with`:
+   * bản tiếng Việt của nó là "Tiếp tục sử dụng dịch vụ bằng Google", dài tới
+   * mức GSI không chịu vẽ hẹp hơn 298px, tràn khỏi thẻ trên máy 360px và lệch
+   * hẳn so với nút Facebook. `signin_with` / `signup_with` vừa 278px.
+   */
+  text?: GoogleButtonText;
 }
 
-export function GoogleSignInButton({ onCredential, disabled }: Props) {
+/**
+ * Chiều rộng truyền cho GSI, theo chỗ trống thật sự có.
+ *
+ * Nút Google là iframe do thư viện Google vẽ với chiều rộng CỐ ĐỊNH — CSS bên
+ * ngoài không co nó lại được. Để nguyên 320px thì trên máy 360px nó tràn khỏi
+ * thẻ và lệch hẳn so với nút Facebook bên dưới (nút đó là HTML của ta nên co
+ * bình thường).
+ *
+ * GSI chỉ nhận khoảng 200–400px; ngoài khoảng đó nó lặng lẽ bỏ qua tham số và
+ * quay về mặc định, nên phải kẹp lại chứ không truyền thẳng số đo.
+ */
+function beRong(container: HTMLElement | null): number {
+  const doDuoc = container?.getBoundingClientRect().width ?? 320;
+  return Math.round(Math.min(400, Math.max(200, doDuoc)));
+}
+
+export function GoogleSignInButton({ onCredential, disabled, text = 'signin_with' }: Props) {
   const holder = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -101,6 +126,7 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
   useEffect(() => {
     if (!clientId) return;
     let huy = false;
+    let quanSat: ResizeObserver | null = null;
 
     loadGoogleScript()
       .then(() => {
@@ -113,20 +139,33 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
             if (res.credential) onCredential(res.credential);
           },
         });
-        google.accounts.id.renderButton(holder.current, {
-          theme: 'outline',
-          size: 'large',
-          width: 320,
-          text: 'continue_with',
-          locale: 'vi',
-        });
+
+        const ve = () => {
+          if (huy || !holder.current) return;
+          google.accounts!.id!.renderButton(holder.current, {
+            theme: 'outline',
+            size: 'large',
+            width: beRong(holder.current.parentElement),
+            text,
+            locale: 'vi',
+          });
+        };
+        ve();
+
+        // Vẽ lại khi khung đổi bề ngang — xoay ngang máy, mở bàn phím ảo, hoặc
+        // kéo cửa sổ. Không có bước này thì nút giữ nguyên bề ngang lúc mới nạp.
+        if (holder.current.parentElement && 'ResizeObserver' in window) {
+          quanSat = new ResizeObserver(ve);
+          quanSat.observe(holder.current.parentElement);
+        }
       })
       .catch(() => setError('Không tải được thư viện Google. Kiểm tra kết nối mạng.'));
 
     return () => {
       huy = true;
+      quanSat?.disconnect();
     };
-  }, [clientId, onCredential]);
+  }, [clientId, onCredential, text]);
 
   const message = clientId ? error : 'Chưa cấu hình đăng nhập Google.';
   if (message) return <p className="text-muted">{message}</p>;
@@ -139,7 +178,14 @@ export function GoogleSignInButton({ onCredential, disabled }: Props) {
     <div
       ref={holder}
       aria-busy={disabled}
-      style={{ minHeight: 44, opacity: disabled ? 0.6 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
+      style={{
+        // Chiếm trọn bề ngang khung để iframe của Google canh đúng mép với nút
+        // Facebook bên dưới; bề ngang thật của iframe do `beRong()` quyết định.
+        width: '100%',
+        minHeight: 44,
+        opacity: disabled ? 0.6 : 1,
+        pointerEvents: disabled ? 'none' : 'auto',
+      }}
     />
   );
 }

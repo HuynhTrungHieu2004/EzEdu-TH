@@ -31,7 +31,7 @@ test('desktop dùng navy sidebar và mobile dùng bottom navigation', async ({ p
   await expect(page.locator('.ez-sidebar')).toBeVisible();
   await expect(page.locator('.ez-tabbar')).toBeHidden();
   await expect(page.locator('.ez-sidebar')).toHaveCSS('width', '272px');
-  await expect(page.locator('.ez-sidebar')).toHaveCSS('background-color', 'rgb(18, 50, 65)');
+  await expect(page.locator('.ez-sidebar')).toHaveCSS('background-color', 'rgb(51, 17, 111)');
 
   await page.setViewportSize({ width: 1024, height: 768 });
   await expect(page.locator('.ez-sidebar')).toBeVisible();
@@ -197,7 +197,7 @@ test('admin navigation giữ lựa chọn thu gọn khi điều hướng trong c
   await expect(sidebar.getByRole('button', { name: 'Nội dung' })).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('academic semantic palette thắng CSS legacy', async ({ page }) => {
+test('bảng màu MagicSchool thắng CSS legacy', async ({ page }) => {
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
   const colors = await page.evaluate(() => {
@@ -213,9 +213,9 @@ test('academic semantic palette thắng CSS legacy', async ({ page }) => {
     probe.remove();
     return result;
   });
-  expect(colors.primary).toBe('rgb(23, 125, 115)');
-  expect(colors.text).toBe('rgb(18, 45, 58)');
-  expect(colors.nav).toBe('#123241');
+  expect(colors.primary).toBe('rgb(118, 43, 250)');
+  expect(colors.text).toBe('rgb(51, 51, 51)');
+  expect(colors.nav).toBe('#33116f');
 });
 
 test('base academic tokens override the legacy body cascade', async ({ page }) => {
@@ -230,12 +230,12 @@ test('base academic tokens override the legacy body cascade', async ({ page }) =
     };
   });
 
-  expect(bodyStyle.backgroundColor).toBe('rgb(243, 247, 247)');
+  expect(bodyStyle.backgroundColor).toBe('rgb(255, 254, 240)');
   expect(bodyStyle.backgroundImage).toBe('none');
-  expect(bodyStyle.color).toBe('rgb(18, 45, 58)');
+  expect(bodyStyle.color).toBe('rgb(51, 51, 51)');
 });
 
-test('dark theme keeps the academic teal and gold semantic palette', async ({ page }) => {
+test('dark theme keeps the MagicSchool violet and orange semantic palette', async ({ page }) => {
   await stubApi(page, TEACHER_USER);
   await page.goto('/dashboard');
   const colors = await page.evaluate(() => {
@@ -252,8 +252,10 @@ test('dark theme keeps the academic teal and gold semantic palette', async ({ pa
     return result;
   });
 
-  expect(colors.primary).toBe('rgb(23, 125, 115)');
-  expect(colors.accent).toBe('rgb(229, 184, 91)');
+  // Ở chế độ tối primary được nâng sáng (indigo-300) chứ không giữ nguyên
+  // màu bản sáng — xem ghi chú tương phản trong tokens.css.
+  expect(colors.primary).toBe('rgb(178, 135, 252)');
+  expect(colors.accent).toBe('rgb(255, 171, 67)');
 });
 
 // `/documents` đã bỏ wrapper legacy `.page` khi di trú sang DataTable dùng chung,

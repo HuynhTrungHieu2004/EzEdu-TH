@@ -201,9 +201,9 @@ const RegisterPage = () => {
           <div className="ez-auth-divider">hoặc</div>
 
           <div className="ez-auth-alt">
-            <GoogleSignInButton onCredential={google.onCredential} disabled={dangDangNhap} />
+            <GoogleSignInButton onCredential={google.onCredential} disabled={dangDangNhap} text="signup_with" />
             {google.error && <Alert tone="error">{google.error}</Alert>}
-            <FacebookSignInButton onCredential={facebook.onCredential} disabled={dangDangNhap} />
+            <FacebookSignInButton onCredential={facebook.onCredential} disabled={dangDangNhap} label="Đăng ký bằng Facebook" />
             {facebook.error && <Alert tone="error">{facebook.error}</Alert>}
           </div>
           {google.dialogProps && <SocialRoleDialog {...google.dialogProps} />}

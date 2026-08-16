@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { STUDENT_USER, stubApi } from './helpers';
 
-test('landing dùng nền học thuật navy, không còn gradient forest', async ({ page }) => {
+test('landing dùng nền tím đậm của bảng màu mới, không còn gradient cũ', async ({ page }) => {
   await stubApi(page);
   await page.goto('/');
 
@@ -10,10 +10,12 @@ test('landing dùng nền học thuật navy, không còn gradient forest', asyn
   await cta.scrollIntoViewIfNeeded();
   await expect(cta).toBeVisible();
   const background = await cta.evaluate((el) => getComputedStyle(el).backgroundImage);
-  expect(background).toContain('rgb(18, 50, 65)');
-  expect(background).toContain('rgb(15, 111, 104)');
-  // #1d3b2c là forest-600 của hệ cũ
+  // #33116f (ink-900) và #762bfa (indigo-600) của bảng màu MagicSchool.
+  expect(background).toContain('rgb(51, 17, 111)');
+  expect(background).toContain('rgb(89, 6, 235)');
+  // #1d3b2c forest-600 và #0f6f68 teal của hai hệ màu cũ — không được quay lại.
   expect(background).not.toContain('rgb(29, 59, 44)');
+  expect(background).not.toContain('rgb(15, 111, 104)');
 });
 
 test('landing reveal theo cuộn và dọn sạch transform sau khi chạy', async ({ page }) => {
@@ -95,7 +97,9 @@ test('đăng nhập báo lỗi cạnh từng trường, không gộp một dòng
   const form = page.locator('#pub-main-content');
 
   await expect(page.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
-  await form.getByRole('button', { name: 'Đăng nhập' }).click();
+  // `exact` là bắt buộc từ khi có nút "Đăng nhập bằng Facebook": tên không
+  // exact khớp cả hai nút và Playwright từ chối vì mơ hồ.
+  await form.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
 
   await expect(page.getByText('Nhập email đăng nhập.')).toBeVisible();
   await expect(page.getByText('Nhập mật khẩu.')).toBeVisible();
@@ -103,7 +107,7 @@ test('đăng nhập báo lỗi cạnh từng trường, không gộp một dòng
 
   await page.getByLabel('Email đăng nhập').fill('sai-dinh-dang');
   await page.getByLabel('Mật khẩu').fill('mat-khau');
-  await form.getByRole('button', { name: 'Đăng nhập' }).click();
+  await form.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByText('Email chưa đúng định dạng.')).toBeVisible();
   await expect(page.getByText('Nhập mật khẩu.')).toHaveCount(0);
 });

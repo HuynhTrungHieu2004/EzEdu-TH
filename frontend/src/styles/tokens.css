@@ -24,55 +24,55 @@
 :root {
   /* Academic foundation primitives — giữ các thang legacy bên dưới để các
      trang chưa di trú tiếp tục hoạt động qua lớp alias. */
-  --ez-ink-950: #0b202b;
-  --ez-ink-900: #123241;
-  --ez-ink-800: #1a4352;
-  --ez-mineral-700: #0f6f68;
-  --ez-mineral-600: #177d73;
-  --ez-mineral-100: #dcefeb;
-  --ez-gold-500: #e5b85b;
-  --ez-paper-50: #f3f7f7;
-  --ez-paper-100: #eaf1f0;
+  --ez-ink-950: #1f0a45;
+  --ez-ink-900: #33116f;
+  --ez-ink-800: #452093;
+  --ez-mineral-700: #5906eb;
+  --ez-mineral-600: #762bfa;
+  --ez-mineral-100: #ece0ff;
+  --ez-gold-500: #ffab43;
+  --ez-paper-50: #fffef0;
+  --ez-paper-100: #f7f4e4;
 
   /* Indigo/Violet — primary (MagicSchool #6D5DFB) */
-  --ez-indigo-50:  #f1f0ff;
-  --ez-indigo-100: #dfdcfe;
-  --ez-indigo-200: #c5befd;
-  --ez-indigo-300: #a59cfc;
-  --ez-indigo-400: #8679fc;
-  --ez-indigo-500: #796bfa;
-  --ez-indigo-600: #6d5dfb;
-  --ez-indigo-700: #5546e8;
-  --ez-indigo-800: #3625d0;
-  --ez-indigo-900: #32279b;
-  --ez-indigo-950: #251e67;
+  --ez-indigo-50:  #f5f0ff;
+  --ez-indigo-100: #ece0ff;
+  --ez-indigo-200: #d2b9fd;
+  --ez-indigo-300: #b287fc;
+  --ez-indigo-400: #9256fb;
+  --ez-indigo-500: #8341fa;
+  --ez-indigo-600: #762bfa;
+  --ez-indigo-700: #5906eb;
+  --ez-indigo-800: #4504b7;
+  --ez-indigo-900: #33116f;
+  --ez-indigo-950: #250261;
 
   /* Teal — không còn dùng làm secondary (xem Sky bên dưới), giữ lại cho
      alias --mint-* tương thích ngược với CSS legacy chưa di trú. */
-  --ez-teal-50:  #e6f7f5;
-  --ez-teal-100: #c8efe9;
-  --ez-teal-200: #93ded4;
-  --ez-teal-300: #57c8bb;
-  --ez-teal-400: #24aea0;
-  --ez-teal-500: #0e9f8e;
-  --ez-teal-600: #0a7f72;
-  --ez-teal-700: #09665c;
-  --ez-teal-800: #0a5049;
-  --ez-teal-900: #08403b;
+  --ez-teal-50:  #f5f0ff;
+  --ez-teal-100: #ece0ff;
+  --ez-teal-200: #d2b9fd;
+  --ez-teal-300: #b287fc;
+  --ez-teal-400: #9256fb;
+  --ez-teal-500: #8341fa;
+  --ez-teal-600: #762bfa;
+  --ez-teal-700: #5906eb;
+  --ez-teal-800: #4504b7;
+  --ez-teal-900: #33116f;
 
   /* Sky blue — secondary (MagicSchool #3B82F6). Bậc 500 giữ đúng mã đặc tả;
      bậc 600 (dùng làm nền nút đặc + chữ trắng) đậm hơn một chút vì #3B82F6
      nguyên bản chỉ đạt 3.68:1 với chữ trắng — không đủ AA 4.5:1. */
-  --ez-sky-50:  #ebf3fe;
-  --ez-sky-100: #d3e3fd;
-  --ez-sky-200: #accafc;
-  --ez-sky-300: #7bacf9;
-  --ez-sky-400: #5996f7;
-  --ez-sky-500: #3b82f6;
-  --ez-sky-600: #216fed;
-  --ez-sky-700: #1659c5;
-  --ez-sky-800: #164a9c;
-  --ez-sky-900: #183a72;
+  --ez-sky-50:  #eeecff;
+  --ez-sky-100: #dad5ff;
+  --ez-sky-200: #b9b0ff;
+  --ez-sky-300: #9182ff;
+  --ez-sky-400: #6e56ff;
+  --ez-sky-500: #4f23ff;
+  --ez-sky-600: #3f14eb;
+  --ez-sky-700: #340fc2;
+  --ez-sky-800: #2b0f9b;
+  --ez-sky-900: #251277;
 
   /* Amber — accent (MagicSchool #F59E0B) */
   --ez-amber-50:  #fff6e5;
@@ -114,18 +114,18 @@
 
   /* Neutral — hơi lệch xanh để hoà với indigo, không phải xám chết */
   --ez-neutral-0:   #ffffff;
-  --ez-neutral-25:  #fbfcfe;
-  --ez-neutral-50:  #f6f7fb;
-  --ez-neutral-100: #eef0f6;
-  --ez-neutral-200: #e2e5ef;
-  --ez-neutral-300: #cbd0de;
-  --ez-neutral-400: #9ba3b8;
-  --ez-neutral-500: #667085;
-  --ez-neutral-600: #545b73;
-  --ez-neutral-700: #40465c;
-  --ez-neutral-800: #2a2f42;
-  --ez-neutral-900: #1a1e2e;
-  --ez-neutral-950: #10131f;
+  --ez-neutral-25:  #fdfcf7;
+  --ez-neutral-50:  #f9f7f0;
+  --ez-neutral-100: #f4f1e6;
+  --ez-neutral-200: #e6e2d4;
+  --ez-neutral-300: #cfcaba;
+  --ez-neutral-400: #9d978a;
+  --ez-neutral-500: #6b665c;
+  --ez-neutral-600: #55514a;
+  --ez-neutral-700: #403d38;
+  --ez-neutral-800: #2b2926;
+  --ez-neutral-900: #1c1a18;
+  --ez-neutral-950: #121110;
 
   /* Trạng thái — success/danger neo đúng #16A34A/#DC2626 theo MagicSchool */
   --ez-green-50:  #e5faed;
@@ -268,14 +268,14 @@
   /* Trang công khai dùng chung hướng "Học thuật hiện đại" với khung sau đăng
      nhập: navy mực nền, teal khoáng nhấn. Trước đây hai token này còn neo vào
      thang forest của hệ cũ nên landing/login nhìn lệch hẳn với app. */
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-950) 0%, var(--ez-ink-800) 55%, var(--ez-mineral-700) 100%);
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-900) 0%, var(--ez-ink-800) 45%, var(--ez-indigo-600) 100%);
   --ez-gradient-cta:  linear-gradient(120deg, var(--ez-ink-900) 0%, var(--ez-mineral-700) 100%);
   /* Nền nhấn của khung sau đăng nhập */
   --ez-gradient-shell: linear-gradient(120deg, var(--ez-ink-900) 0%, var(--ez-ink-800) 58%, var(--ez-mineral-700) 100%);
 }
 
 [data-theme='dark'] {
-  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-950) 0%, var(--ez-ink-900) 55%, var(--ez-mineral-700) 100%);
+  --ez-gradient-hero: linear-gradient(135deg, var(--ez-ink-950) 0%, var(--ez-ink-900) 55%, var(--ez-indigo-700) 100%);
   --ez-gradient-cta:  linear-gradient(120deg, var(--ez-ink-950) 0%, var(--ez-mineral-700) 100%);
   --ez-gradient-shell: linear-gradient(120deg, var(--ez-ink-950) 0%, var(--ez-ink-900) 58%, var(--ez-mineral-700) 100%);
 }
@@ -363,8 +363,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
   --ez-nav-bg:         var(--ez-ink-900);
-  --ez-nav-text:       #dceae8;
-  --ez-nav-text-muted: #9fb7b5;
+  --ez-nav-text:       #f0e9ff;
+  --ez-nav-text-muted: #bda9e0;
 
   /* Nền học thuật */
   --ez-bg:            var(--ez-paper-50);
@@ -376,25 +376,25 @@
   --ez-surface-subtle:   var(--ez-paper-50);
   --ez-surface-muted:    var(--ez-paper-100);
   --ez-surface-hover:    var(--ez-paper-100);
-  --ez-surface-active:   var(--ez-mineral-100);
+  --ez-surface-active:   var(--ez-indigo-50);
   --ez-surface-inverse:  var(--ez-ink-900);
 
   /* Chữ — tất cả đều đạt tối thiểu 4.5:1 trên cả --ez-surface (#fff) lẫn
      --ez-bg (#f3f7f7). `--ez-text-muted` từng là #617b82: đạt 4.5:1 trên trắng
      nhưng chỉ 4.17:1 trên nền trang, nên eyebrow/caption đặt trực tiếp trên nền
      trang bị axe báo lỗi. #5a747b đạt 4.61:1 trên nền trang và 4.98:1 trên trắng. */
-  --ez-text:           #122d3a;
+  --ez-text:           #333333;
   --ez-text-secondary: var(--ez-ink-800);
-  --ez-text-muted:     #5a747b;
+  --ez-text-muted:     #5c5c5c;
   --ez-text-inverse:   var(--ez-neutral-0);
   --ez-text-on-brand:  var(--ez-neutral-0);
-  --ez-text-link:      var(--ez-mineral-700);
+  --ez-text-link:      var(--ez-indigo-600);
 
   /* Viền */
-  --ez-border:        #dce6e5;
+  --ez-border:        #dedede;
   --ez-border-subtle: var(--ez-paper-100);
-  --ez-border-strong: #b9cecb;
-  --ez-border-focus:  var(--ez-mineral-600);
+  --ez-border-strong: #c4c0b0;
+  --ez-border-focus:  var(--ez-indigo-600);
 
   /* Primary — mineral teal */
   --ez-primary:         var(--ez-mineral-600);
@@ -415,8 +415,8 @@
   /* Accent — gold */
   --ez-accent:        var(--ez-gold-500);
   --ez-accent-hover:  var(--ez-gold-500);
-  --ez-accent-subtle: rgba(229, 184, 91, 0.18);
-  --ez-accent-border: rgba(229, 184, 91, 0.42);
+  --ez-accent-subtle: rgba(255, 171, 67, 0.18);
+  --ez-accent-border: rgba(255, 171, 67, 0.42);
   --ez-accent-text:   var(--ez-ink-900);
 
   /* Success / Warning / Error / Info */
@@ -442,7 +442,7 @@
   --ez-info-text:      var(--ez-blue-700);
 
   /* Lớp phủ */
-  --ez-overlay: rgba(16, 19, 31, 0.48);
+  --ez-overlay: rgba(31, 10, 69, 0.52);
 
   /* Skeleton */
   --ez-skeleton-base:  var(--ez-neutral-100);
@@ -466,48 +466,52 @@
 
   --ez-surface:         var(--ez-ink-900);
   --ez-surface-subtle:  var(--ez-ink-800);
-  --ez-surface-muted:   #214e5d;
-  --ez-surface-hover:   #214e5d;
-  --ez-surface-active:  #2b5d6d;
+  --ez-surface-muted:   #2a1856;
+  --ez-surface-hover:   #2a1856;
+  --ez-surface-active:  #371f6b;
   --ez-surface-inverse: var(--ez-paper-50);
 
   --ez-text:           var(--ez-paper-50);
-  --ez-text-secondary: #c4d6d5;
+  --ez-text-secondary: #cfc3e8;
   --ez-text-muted:     var(--ez-nav-text-muted);
   --ez-text-inverse:   var(--ez-ink-950);
-  /* Ở chế độ tối, các màu thương hiệu được nâng sáng lên để nổi trên nền tối.
-     Hệ quả: chữ TRẮNG trên nút primary không đủ mức AA 4.5:1 cho chữ thường.
-     Vì vậy nhãn trên nền thương hiệu dùng màu gần đen:
-       trên primary (#8679fc)   → 5.42:1
-       trên secondary (#7bacf9) → 8.03:1
-       trên error (#f2726f)     → 6.57:1
-     Đây cũng là quy ước quen thuộc của giao diện tối: nền nhấn sáng, nhãn tối. */
-  --ez-text-on-brand:  var(--ez-paper-50);
-  --ez-text-link:      var(--ez-mineral-100);
+  /* Ở chế độ tối, màu thương hiệu được NÂNG SÁNG và nhãn trên nó dùng màu gần
+     đen. Không phải chuyện thẩm mỹ: cùng một biến vừa làm nền nút vừa làm màu
+     chữ. Giữ #762bfa như bản sáng thì nút trông ổn nhưng chữ tím trên nền tối
+     chỉ đạt 2.94:1, dưới ngưỡng 3.0 — axe bắt đúng lỗi này. Nâng lên #b287fc
+     thì chữ đạt 6.54:1, và nhãn #1a0733 trên nút đạt 6.92:1.
 
-  --ez-border:        #2b5662;
-  --ez-border-subtle: #214e5d;
-  --ez-border-strong: #417180;
-  --ez-border-focus:  var(--ez-mineral-600);
+       chữ #b287fc trên nền tối    6.54:1
+       nhãn #1a0733 trên primary   6.92:1
+       nhãn #1a0733 trên secondary 6.10:1
+       nhãn #1a0733 trên error     6.61:1
+       nhãn #1a0733 trên cam       9.94:1 */
+  --ez-text-on-brand:  #1a0733;
+  --ez-text-link:      var(--ez-indigo-200);
 
-  --ez-primary:         var(--ez-mineral-600);
-  --ez-primary-hover:   var(--ez-mineral-700);
-  --ez-primary-active:  var(--ez-mineral-700);
-  --ez-primary-subtle:  rgba(23, 125, 115, 0.22);
-  --ez-primary-border:  rgba(23, 125, 115, 0.48);
-  --ez-primary-text:    var(--ez-mineral-100);
+  --ez-border:        #3d2a63;
+  --ez-border-subtle: #2a1856;
+  --ez-border-strong: #5b4489;
+  --ez-border-focus:  var(--ez-indigo-400);
+
+  --ez-primary:         var(--ez-indigo-300);
+  --ez-primary-hover:   var(--ez-indigo-200);
+  --ez-primary-active:  var(--ez-indigo-100);
+  --ez-primary-subtle:  rgba(178, 135, 252, 0.20);
+  --ez-primary-border:  rgba(178, 135, 252, 0.46);
+  --ez-primary-text:    var(--ez-indigo-200);
 
   --ez-secondary:        var(--ez-sky-300);
   --ez-secondary-hover:  var(--ez-sky-200);
   --ez-secondary-active: var(--ez-sky-100);
-  --ez-secondary-subtle: rgba(123, 172, 249, 0.14);
-  --ez-secondary-border: rgba(123, 172, 249, 0.32);
+  --ez-secondary-subtle: rgba(145, 130, 255, 0.16);
+  --ez-secondary-border: rgba(145, 130, 255, 0.34);
   --ez-secondary-text:   var(--ez-sky-200);
 
   --ez-accent:        var(--ez-gold-500);
   --ez-accent-hover:  var(--ez-gold-500);
-  --ez-accent-subtle: rgba(229, 184, 91, 0.18);
-  --ez-accent-border: rgba(229, 184, 91, 0.42);
+  --ez-accent-subtle: rgba(255, 171, 67, 0.18);
+  --ez-accent-border: rgba(255, 171, 67, 0.42);
   --ez-accent-text:   var(--ez-gold-500);
 
   --ez-success:        #4ec98a;
@@ -531,10 +535,10 @@
   --ez-info-border:    rgba(98, 166, 236, 0.30);
   --ez-info-text:      #9cc7f3;
 
-  --ez-overlay: rgba(6, 8, 14, 0.66);
+  --ez-overlay: rgba(14, 5, 32, 0.68);
 
-  --ez-skeleton-base:  #262c40;
-  --ez-skeleton-sheen: #313850;
+  --ez-skeleton-base:  #2a1856;
+  --ez-skeleton-sheen: #371f6b;
 
   /* Bóng trên nền tối phải đậm hơn mới thấy được */
   --ez-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.30);

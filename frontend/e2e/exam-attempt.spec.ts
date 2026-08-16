@@ -144,10 +144,10 @@ test('dải chọn câu và tiến độ phản ánh câu đã trả lời', asy
   await expect(page.getByRole('button', { name: 'Câu 1 — đã trả lời' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Câu 2 — chưa trả lời' })).toBeVisible();
 
-  // Câu đang mở giữ nền navy dù đã trả lời (style current phải thắng [data-answered])
+  // Câu đang mở giữ nền tím đậm dù đã trả lời (style current phải thắng [data-answered])
   const currentChip = page.locator('.ez-question-chip-current');
   await expect(currentChip).toHaveAttribute('data-answered', 'true');
-  await expect(currentChip).toHaveCSS('background-color', 'rgb(18, 50, 65)');
+  await expect(currentChip).toHaveCSS('background-color', 'rgb(51, 17, 111)');
 });
 
 test('vòng đếm ngược hiện thời gian còn lại và không dùng animation JS', async ({ page }) => {

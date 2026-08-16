@@ -9,7 +9,9 @@ import { stubApi } from './helpers';
  * xử lý ra sao khi người dùng bấm Huỷ — chứ không kiểm SDK của Facebook.
  */
 
-const NUT = 'button:has-text("Tiếp tục với Facebook")';
+// Bám vào chữ "Facebook" thôi: nhãn đổi theo trang ("Đăng nhập bằng
+// Facebook" / "Đăng ký bằng Facebook"), chốt cả câu là hỏng ngay lần đổi chữ.
+const NUT = 'button.ez-btn-facebook';
 const SDK = '**/connect.facebook.net/**';
 
 /** Đếm số lần trang xin nạp SDK, và trả về một SDK giả khi có. */
@@ -162,7 +164,7 @@ test('bản dựng thiếu App ID: có nút trưng bày, không có mã chạm t
     .map((ten) => readFileSync(join(assets, ten), 'utf8'))
     .join('');
 
-  expect(goc, 'nút phải có để trưng bày').toContain('Tiếp tục với Facebook');
+  expect(goc, 'nút phải có để trưng bày').toContain('bằng Facebook');
   expect(goc, 'phải nói ra điều kiện Facebook đặt ra').toContain('xác minh doanh nghiệp');
   // Cả hai chuỗi dưới đây chỉ tồn tại trong bộ nạp SDK. Còn chúng nghĩa là bản
   // trưng bày vẫn kéo Facebook về, và cookie Facebook sẽ đặt lên máy người xem.

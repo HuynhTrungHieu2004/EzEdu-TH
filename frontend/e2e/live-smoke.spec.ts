@@ -51,7 +51,7 @@ async function login(page: Page, user: { email: string; password: string }) {
   await page.goto('/login');
   await page.getByLabel('Email đăng nhập').fill(user.email);
   await page.getByLabel('Mật khẩu').fill(user.password);
-  await page.locator('#pub-main-content').getByRole('button', { name: 'Đăng nhập' }).click();
+  await page.locator('#pub-main-content').getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await page.waitForURL(/\/(dashboard|published-questions|student-onboarding|admin\/dashboard)/, { timeout: 20_000 });
 }
 

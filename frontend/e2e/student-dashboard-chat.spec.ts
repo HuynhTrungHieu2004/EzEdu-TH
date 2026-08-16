@@ -102,15 +102,15 @@ test('panel bên của chat theo bề ngang: ba cột desktop, drawer trên mobi
   await expect(page.getByRole('dialog', { name: 'Hội thoại' })).toBeVisible();
 });
 
-test('banner dashboard dùng nền học thuật navy, không còn gradient forest', async ({ page }) => {
+test('banner dashboard dùng nền tím đậm của bảng màu mới', async ({ page }) => {
   await stubStudentDashboard(page);
   await page.goto('/dashboard');
 
   const banner = page.locator('.ez-dashboard-banner');
   await expect(banner).toBeVisible();
   const backgroundImage = await banner.evaluate((el) => getComputedStyle(el).backgroundImage);
-  expect(backgroundImage).toContain('rgb(18, 50, 65)');
-  expect(backgroundImage).toContain('rgb(15, 111, 104)');
+  expect(backgroundImage).toContain('rgb(51, 17, 111)');
+  expect(backgroundImage).toContain('rgb(89, 6, 235)');
 });
 
 test('stat tile của học sinh đếm tới giá trị thật và không giữ transform', async ({ page }) => {
