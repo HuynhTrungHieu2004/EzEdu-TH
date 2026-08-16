@@ -9,6 +9,9 @@ from mongomock_motor import AsyncMongoMockClient
 from app.services.subject_catalog_service import (
     CHUA_PHAN_MON,
     build_catalog,
+    create_taxonomy_node,
+    delete_taxonomy_node,
+    rename_taxonomy_node,
     validate_taxonomy_ids,
 )
 
@@ -138,6 +141,82 @@ class ValidateTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await validate_taxonomy_ids(self.db, subject_id="không-phải-id", chapter_id=None)
 
+
+
+class QuanTriDanhMucTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.db = AsyncMongoMockClient()["test_catalog"]
+
+    async def _tao_mon(self, ten="Toán"):
+        return await create_taxonomy_node(
+            self.db, node_type="subject", name=ten, parent_id=None, created_by="admin-1"
+        )
+
+    async def test_tao_mon_va_chuong(self):
+        mon = await self._tao_mon()
+        chuong = await create_taxonomy_node(
+            self.db, node_type="chapter", name="Hàm số", parent_id=str(mon["_id"]), created_by="admin-1"
+        )
+        self.assertEqual(chuong["parent_id"], str(mon["_id"]))
+
+    async def test_trung_ten_cung_cap_bi_tu_choi(self):
+        """Hai môn "Toán" thì mục lục của học sinh có hai thẻ giống hệt nhau và
+        không cách nào biết bài nào thuộc thẻ nào."""
+        await self._tao_mon()
+        with self.assertRaises(ValueError) as ctx:
+            await self._tao_mon()
+        self.assertIn("đã tồn tại", str(ctx.exception))
+
+    async def test_trung_ten_khac_cap_thi_duoc(self):
+        """"Viết" là chương của cả Ngữ văn lẫn Tiếng Anh — hợp lệ."""
+        van = await self._tao_mon("Ngữ văn")
+        anh = await self._tao_mon("Tiếng Anh")
+        await create_taxonomy_node(self.db, node_type="chapter", name="Viết", parent_id=str(van["_id"]), created_by="a")
+        await create_taxonomy_node(self.db, node_type="chapter", name="Viết", parent_id=str(anh["_id"]), created_by="a")
+        self.assertEqual(await self.db["curriculum_taxonomy"].count_documents({"name": "Viết"}), 2)
+
+    async def test_chuong_khong_co_mon_cha_bi_tu_choi(self):
+        with self.assertRaises(ValueError):
+            await create_taxonomy_node(self.db, node_type="chapter", name="Hàm số", parent_id=None, created_by="a")
+
+    async def test_parent_id_sai_dinh_dang_khong_no_500(self):
+        """`ObjectId()` ném InvalidId chứ không trả None — không chặn thì id gõ
+        sai thành lỗi 500 thay vì một câu nhắc đọc được."""
+        with self.assertRaises(ValueError):
+            await create_taxonomy_node(
+                self.db, node_type="chapter", name="Hàm số", parent_id="không-phải-id", created_by="a"
+            )
+
+    async def test_doi_ten(self):
+        mon = await self._tao_mon()
+        kq = await rename_taxonomy_node(self.db, str(mon["_id"]), name="Toán học")
+        self.assertEqual(kq["name"], "Toán học")
+
+    async def test_xoa_mon_con_chuong_bi_tu_choi(self):
+        """Xoá bừa thì chương mồ côi, và học liệu gắn vào chương đó biến mất
+        khỏi mọi nhóm trong mục lục."""
+        mon = await self._tao_mon()
+        await create_taxonomy_node(self.db, node_type="chapter", name="Hàm số", parent_id=str(mon["_id"]), created_by="a")
+        with self.assertRaises(ValueError) as ctx:
+            await delete_taxonomy_node(self.db, str(mon["_id"]))
+        self.assertIn("còn 1 chương", str(ctx.exception))
+
+    async def test_xoa_mon_con_hoc_lieu_bi_tu_choi(self):
+        """Học liệu mang subject_id không còn tồn tại sẽ hiện dưới một môn không
+        tên. Bắt dọn trước thì người dùng biết mình đang làm gì."""
+        mon = await self._tao_mon()
+        await self.db["question_sets"].insert_one({
+            "_id": ObjectId(), "document_id": "d", "document_name": "T",
+            "subject_id": str(mon["_id"]), "created_at": datetime.now(timezone.utc),
+        })
+        with self.assertRaises(ValueError) as ctx:
+            await delete_taxonomy_node(self.db, str(mon["_id"]))
+        self.assertIn("học liệu", str(ctx.exception))
+
+    async def test_xoa_mon_trong_thi_duoc(self):
+        mon = await self._tao_mon()
+        await delete_taxonomy_node(self.db, str(mon["_id"]))
+        self.assertEqual(await self.db["curriculum_taxonomy"].count_documents({}), 0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -177,6 +177,16 @@ class QuestionSetSummary(BaseModel):
     created_at: datetime
 
 
+class TaxonomyNodeWriteRequest(BaseModel):
+    node_type: Literal["subject", "chapter"]
+    name: str = Field(min_length=1, max_length=200)
+    parent_id: Optional[str] = None
+
+
+class TaxonomyNodeRenameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class SubjectChapterNode(BaseModel):
     id: str
     name: str

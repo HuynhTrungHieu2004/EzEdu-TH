@@ -13,6 +13,7 @@ sẵn và đang được ngân hàng đề dùng. Ở đây chỉ mượn hai t�
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from bson import ObjectId
@@ -171,3 +172,120 @@ async def list_subject_options(db) -> list[dict]:
     for m in ket:
         m["chapters"].sort(key=lambda c: c["name"])
     return ket
+
+
+# ─── Quản trị cây môn → chương ──────────────────────────────────────────────
+#
+# Đặt ở đây thay vì `exam_bank/services/taxonomy_service.py`: bên đó khoá sau cờ
+# ENABLE_EXAM_BLUEPRINT. Tắt cờ ma trận đề mà mất luôn khả năng quản lý môn học
+# thì tính năng "Học theo môn" chết theo, dù hai thứ chẳng liên quan gì nhau.
+
+LOAI_HOP_LE = {"subject", "chapter"}
+
+
+async def create_taxonomy_node(
+    db, *, node_type: str, name: str, parent_id: Optional[str], created_by: str
+) -> dict:
+    """Tạo một môn hoặc một chương."""
+    ten = (name or "").strip()
+    if not ten:
+        raise ValueError("Tên không được để trống.")
+    if node_type not in LOAI_HOP_LE:
+        raise ValueError("Chỉ tạo được môn hoặc chương.")
+
+    if node_type == "subject":
+        if parent_id:
+            raise ValueError("Môn học không có node cha.")
+        parent_id = None
+    else:
+        if not parent_id:
+            raise ValueError("Chương phải thuộc một môn.")
+        if not ObjectId.is_valid(parent_id):
+            # `ObjectId()` ném InvalidId chứ không trả None; không chặn ở đây thì
+            # id gõ sai thành lỗi 500 thay vì một câu nhắc đọc được.
+            raise ValueError("Môn học không hợp lệ.")
+        cha = await db["curriculum_taxonomy"].find_one({"_id": ObjectId(parent_id)})
+        if cha is None or cha.get("node_type") != "subject":
+            raise ValueError("Môn học không hợp lệ.")
+
+    # Trùng tên trong cùng một cấp là lỗi người dùng hay gặp nhất khi nhập tay,
+    # và hai môn "Toán" thì mục lục của học sinh có hai thẻ giống hệt nhau.
+    da_co = await db["curriculum_taxonomy"].find_one(
+        {"node_type": node_type, "name": ten, "parent_id": parent_id}
+    )
+    if da_co is not None:
+        raise ValueError("Tên này đã tồn tại ở cùng cấp.")
+
+    now = datetime.now(timezone.utc)
+    doc = {
+        "node_type": node_type,
+        "name": ten,
+        "parent_id": parent_id,
+        "grade": None,
+        "curriculum_version": None,
+        "created_by": created_by,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db["curriculum_taxonomy"].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return doc
+
+
+async def rename_taxonomy_node(db, node_id: str, *, name: str) -> dict:
+    ten = (name or "").strip()
+    if not ten:
+        raise ValueError("Tên không được để trống.")
+    if not ObjectId.is_valid(node_id):
+        raise ValueError("Không tìm thấy mục này.")
+
+    doc = await db["curriculum_taxonomy"].find_one({"_id": ObjectId(node_id)})
+    if doc is None or doc.get("node_type") not in LOAI_HOP_LE:
+        raise ValueError("Không tìm thấy mục này.")
+
+    trung = await db["curriculum_taxonomy"].find_one({
+        "_id": {"$ne": ObjectId(node_id)},
+        "node_type": doc["node_type"],
+        "name": ten,
+        "parent_id": doc.get("parent_id"),
+    })
+    if trung is not None:
+        raise ValueError("Tên này đã tồn tại ở cùng cấp.")
+
+    await db["curriculum_taxonomy"].update_one(
+        {"_id": ObjectId(node_id)},
+        {"$set": {"name": ten, "updated_at": datetime.now(timezone.utc)}},
+    )
+    doc["name"] = ten
+    return doc
+
+
+async def delete_taxonomy_node(db, node_id: str) -> None:
+    """Xoá một môn hoặc chương.
+
+    Từ chối khi còn thứ đang trỏ vào nó. Xoá bừa thì học liệu mang một
+    `subject_id` không còn tồn tại: mục lục hiện một môn không tên, hoặc học
+    liệu biến mất khỏi mọi nhóm. Bắt người dùng dọn trước thì họ biết mình đang
+    làm gì.
+    """
+    if not ObjectId.is_valid(node_id):
+        raise ValueError("Không tìm thấy mục này.")
+    oid = ObjectId(node_id)
+
+    doc = await db["curriculum_taxonomy"].find_one({"_id": oid})
+    if doc is None or doc.get("node_type") not in LOAI_HOP_LE:
+        raise ValueError("Không tìm thấy mục này.")
+
+    if doc["node_type"] == "subject":
+        so_chuong = await db["curriculum_taxonomy"].count_documents(
+            {"node_type": "chapter", "parent_id": node_id}
+        )
+        if so_chuong:
+            raise ValueError(f"Môn này còn {so_chuong} chương. Xoá chương trước.")
+
+    khoa = "subject_id" if doc["node_type"] == "subject" else "chapter_id"
+    so_hoc_lieu = await db["question_sets"].count_documents({khoa: node_id})
+    if so_hoc_lieu:
+        raise ValueError(f"Còn {so_hoc_lieu} học liệu đang gắn vào mục này. Gỡ nhãn trước khi xoá.")
+
+    await db["curriculum_taxonomy"].delete_one({"_id": oid})

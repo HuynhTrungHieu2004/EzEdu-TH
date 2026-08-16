@@ -22,6 +22,8 @@ from app.schemas.question import (
     QuestionSetSummary,
     QuestionWorkflowRequest,
     SubjectCatalogNode,
+    TaxonomyNodeRenameRequest,
+    TaxonomyNodeWriteRequest,
 )
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
@@ -37,7 +39,10 @@ from app.services.activity_log_service import record_activity
 from app.services.subject_catalog_service import (
     CHUA_PHAN_MON,
     build_catalog,
+    create_taxonomy_node,
+    delete_taxonomy_node,
     list_subject_options,
+    rename_taxonomy_node,
     validate_taxonomy_ids,
 )
 from app.services.admin_audit_service import record_admin_audit, require_reason
@@ -748,6 +753,65 @@ async def _visible_published_filter(current_user: UserResponse, db) -> dict:
     sớm muộn chúng lệch nhau.
     """
     return await build_visible_question_set_filter(db, current_user.id)
+
+
+def _can_manage_taxonomy(current_user: UserResponse) -> bool:
+    """Chỉ quản trị mới sửa được cây môn học.
+
+    Giáo viên GẮN nhãn được (xem `_can_review_questions`) nhưng không tạo/xoá
+    môn: cây này dùng chung cho toàn hệ thống, mỗi giáo viên tự thêm một biến
+    thể "Toán 10" / "Toán lớp 10" thì mục lục của học sinh vỡ vụn.
+    """
+    return getattr(current_user, "role", "user") in {"admin", "super_admin"}
+
+
+@router.post("/taxonomy/nodes", status_code=201)
+async def create_taxonomy_node_endpoint(
+    payload: TaxonomyNodeWriteRequest,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if not _can_manage_taxonomy(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ quản trị viên được sửa danh mục môn.")
+    try:
+        doc = await create_taxonomy_node(
+            get_database(),
+            node_type=payload.node_type,
+            name=payload.name,
+            parent_id=payload.parent_id,
+            created_by=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return {"id": str(doc["_id"]), "name": doc["name"], "node_type": doc["node_type"]}
+
+
+@router.patch("/taxonomy/nodes/{node_id}")
+async def rename_taxonomy_node_endpoint(
+    node_id: str,
+    payload: TaxonomyNodeRenameRequest,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if not _can_manage_taxonomy(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ quản trị viên được sửa danh mục môn.")
+    try:
+        doc = await rename_taxonomy_node(get_database(), node_id, name=payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return {"id": str(doc["_id"]), "name": doc["name"], "node_type": doc["node_type"]}
+
+
+@router.delete("/taxonomy/nodes/{node_id}", status_code=204)
+async def delete_taxonomy_node_endpoint(
+    node_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if not _can_manage_taxonomy(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ quản trị viên được sửa danh mục môn.")
+    try:
+        await delete_taxonomy_node(get_database(), node_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return None
 
 
 @router.get("/taxonomy/subject-options")

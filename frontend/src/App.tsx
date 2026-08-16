@@ -60,6 +60,7 @@ const ContentHistoryPage = lazy(() => import('./pages/teacher/ContentHistoryPage
 const ExamAttemptPage = lazy(() => import('./pages/student/ExamAttemptPage'));
 const AttemptReviewPage = lazy(() => import('./pages/student/AttemptReviewPage'));
 const SubjectCatalogPage = lazy(() => import('./pages/student/SubjectCatalogPage'));
+const AdminSubjectsPage = lazy(() => import('./pages/AdminSubjectsPage'));
 const WebKnowledgePage = lazy(() => import('./pages/WebKnowledgePage'));
 const CurriculumKbPage = lazy(() => import('./pages/CurriculumKbPage'));
 const ToolLibraryPage = lazy(() => import('./pages/ToolLibraryPage'));
@@ -268,6 +269,10 @@ function App() {
         <Route
           path="/admin/website-content"
           element={<AppLayout><AdminRoute><AdminWebsiteContentPage /></AdminRoute></AppLayout>}
+        />
+        <Route
+          path="/admin/mon-hoc"
+          element={<AppLayout><AdminRoute><AdminSubjectsPage /></AdminRoute></AppLayout>}
         />
         <Route
           path="/admin/settings"

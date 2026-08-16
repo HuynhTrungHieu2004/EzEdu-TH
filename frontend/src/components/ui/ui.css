@@ -2054,3 +2054,10 @@ select {
     min-height: 40px;
   }
 }
+
+/* Ô nhập chiếm hết chỗ trống trong hàng ngang cùng nút bấm. Đặt thành lớp vì
+   `FormField` chỉ nhận `className`, không nhận `style`. */
+.ez-flex-1 {
+  flex: 1;
+  min-width: 0;
+}

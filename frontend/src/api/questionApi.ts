@@ -313,6 +313,24 @@ export const questionApi = {
     return response.data;
   },
 
+  createTaxonomyNode: async (payload: {
+    node_type: 'subject' | 'chapter';
+    name: string;
+    parent_id?: string | null;
+  }): Promise<{ id: string; name: string; node_type: string }> => {
+    const response = await client.post('/questions/taxonomy/nodes', payload);
+    return response.data;
+  },
+
+  renameTaxonomyNode: async (nodeId: string, name: string): Promise<{ id: string; name: string }> => {
+    const response = await client.patch(`/questions/taxonomy/nodes/${nodeId}`, { name });
+    return response.data;
+  },
+
+  deleteTaxonomyNode: async (nodeId: string): Promise<void> => {
+    await client.delete(`/questions/taxonomy/nodes/${nodeId}`);
+  },
+
   publishQuestionSet: async (
     id: string,
     payload?: {

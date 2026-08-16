@@ -116,6 +116,9 @@ export function buildNavigation({
   if (hasPermission(role, 'questions.view', permissions)) {
     content.push({ to: '/admin/questions', label: 'Câu hỏi', icon: <FileQuestion size={ICON} /> });
     content.push({ to: '/admin/exams', label: 'Đề thi', icon: <ClipboardList size={ICON} /> });
+    // Danh mục môn quyết định mục lục "Học theo môn" của học sinh, nên nằm cùng
+    // nhóm Nội dung chứ không phải nhóm Hệ thống.
+    content.push({ to: '/admin/mon-hoc', label: 'Danh mục môn', icon: <BookOpen size={ICON} /> });
   }
   if (content.length > 0) {
     groups.push({ id: 'admin-content', label: 'Nội dung', collapsible: true, items: content });

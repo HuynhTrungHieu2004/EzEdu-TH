@@ -97,12 +97,16 @@ test('học liệu chưa gắn môn vẫn đến được, và nằm cuối danh
 
   await page.goto('/hoc-theo-mon');
 
-  // Chờ đủ ba thẻ rồi mới đọc. `allInnerTexts()` không tự chờ, nên đọc sớm sẽ
-  // bắt được danh sách render dở và "cuối danh sách" là một môn khác.
+  // Hai chốt, hai lý do khác nhau:
+  //  - `toHaveCount` vì `allTextContents()` không tự chờ; đọc sớm thì danh sách
+  //    còn render dở và "cuối danh sách" là một môn khác.
+  //  - `allTextContents()` chứ KHÔNG phải `allInnerTexts()`: innerText phụ thuộc
+  //    hiển thị, mà các thẻ vào bằng hiệu ứng GSAP nên thẻ chưa hiện xong trả về
+  //    chuỗi rỗng. Ở đây kiểm THỨ TỰ trong DOM, không kiểm đã vẽ xong hay chưa.
   const the = page.locator('[data-subject-card] h2');
   await expect(the).toHaveCount(3);
 
-  const ten = await the.allInnerTexts();
+  const ten = await the.allTextContents();
   expect(ten).toContain('Chưa phân môn');
   expect(ten[ten.length - 1], 'chỗ chứa tạm phải xuống cuối, không che các môn thật').toBe(
     'Chưa phân môn',
