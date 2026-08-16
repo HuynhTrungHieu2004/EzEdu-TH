@@ -92,6 +92,39 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(reloaded.started_at.tzinfo)
         self.assertGreater(reloaded.due_at, reloaded.server_now)
 
+    async def test_another_student_cannot_read_my_attempt(self):
+        """Chốt bảo mật của trang "Xem lại bài làm".
+
+        Trang đó nhận attempt_id từ URL, nên id là thứ người dùng gõ được. Không
+        có chốt này thì đổi một chữ số trong địa chỉ là đọc được bài làm, điểm
+        và nhận xét AI của bạn cùng lớp.
+
+        Phải là 403 chứ không phải 404: 404 cũng chặn được đọc, nhưng lẫn với ca
+        "không tồn tại" nên người vận hành đọc log không phân biệt được ai đang
+        dò id của người khác.
+        """
+        exam = await self._publish_exam()
+        cua_toi = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+
+        with self.assertRaises(HTTPException) as ctx:
+            await attempt_service.get_attempt(self.db, cua_toi.id, student_id="student-2")
+
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_another_student_cannot_write_to_my_attempt(self):
+        """Đọc bị chặn thì ghi cũng phải bị chặn. Autosave và submit đi qua cùng
+        `_load_own_attempt`, nhưng cùng-đường-hôm-nay không có nghĩa là
+        cùng-đường-mãi-mãi — chốt riêng để việc tách ra sau này không âm thầm
+        mở cửa."""
+        exam = await self._publish_exam()
+        cua_toi = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+
+        with self.assertRaises(HTTPException) as ctx:
+            await attempt_service.autosave(
+                self.db, cua_toi.id, version=1, answers={"q": "x"}, student_id="student-2"
+            )
+        self.assertEqual(ctx.exception.status_code, 403)
+
     async def test_start_twice_returns_same_attempt(self):
         exam = await self._publish_exam()
         first = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
