@@ -64,10 +64,16 @@ export default function PublicFooter({ content, identity }: PublicFooterProps) {
       title: 'Pháp lý',
       links:
         policies.length > 0
-          ? policies.map((item) => ({ label: item.label, to: item.href, external: true }))
+          // CMS chứa được cả liên kết ngoài lẫn đường dẫn nội bộ: đường dẫn bắt
+          // đầu bằng '/' phải đi qua router, không tải lại cả trang.
+          ? policies.map((item) => ({
+              label: item.label,
+              to: item.href,
+              external: !item.href.startsWith('/'),
+            }))
           : [
               { label: 'Điều khoản sử dụng', to: '/faq#dieu-khoan' },
-              { label: 'Chính sách quyền riêng tư', to: '/faq#quyen-rieng-tu' },
+              { label: 'Chính sách quyền riêng tư', to: '/chinh-sach-du-lieu' },
             ],
     },
     {

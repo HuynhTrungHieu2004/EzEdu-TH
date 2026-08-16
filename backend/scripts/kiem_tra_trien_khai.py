@@ -27,9 +27,21 @@ def show(status: str, label: str, detail: str = "") -> bool:
     return status != FAIL
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """Python cài từ python.org trên macOS không dùng chứng chỉ gốc của hệ điều
+    hành: gọi HTTPS sẽ báo CERTIFICATE_VERIFY_FAILED dù máy chủ hoàn toàn bình
+    thường. Dùng bộ chứng chỉ của `certifi` nếu có, giống app/database/mongodb.py."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def request(url: str, *, method: str = "GET", headers: dict | None = None, body: bytes | None = None):
     req = urllib.request.Request(url, method=method, data=body, headers=headers or {})
-    context = ssl.create_default_context()
+    context = _ssl_context()
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=context) as response:
             return response.status, dict(response.headers), response.read()

@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 const baseURL = 'http://127.0.0.1:4173';
 
 /** Các bộ cần điều kiện riêng: đo hiệu năng chạy một mình, ba bộ còn lại cần backend thật. */
-const NEEDS_OWN_RUNNER = /motion-performance|live-smoke|live-ai|mobile-audit/;
+const NEEDS_OWN_RUNNER = /motion-performance|live-smoke|live-crud|live-ai|mobile-audit/;
 
 export default defineConfig({
   testDir: './e2e',

@@ -18,10 +18,11 @@ import MaintenancePage from './pages/MaintenancePage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 import ProgressPage from './pages/student/ProgressPage';
-import { FaqPage, FeaturesPage, HowItWorksPage } from './pages/PublicInfoPages';
+import { DataPolicyPage, FaqPage, FeaturesPage, HowItWorksPage } from './pages/PublicInfoPages';
 import LandingPage from './pages/landing';
 import AppLayout from './components/AppLayout';
 import PublicLayout from './components/PublicLayout';
+import DataNotice from './components/DataNotice';
 import RoleRoute from './components/RoleRoute';
 import AdminRoute from './components/AdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
@@ -96,6 +97,7 @@ function App() {
         <Route path="/how-it-works" element={<HowItWorksPage />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/faq" element={<FaqPage />} />
+        <Route path="/chinh-sach-du-lieu" element={<DataPolicyPage />} />
 
         <Route
           path="/login"
@@ -282,6 +284,7 @@ function App() {
         <Route path="*" element={<PublicLayout><NotFoundPage /></PublicLayout>} />
       </Routes>
       </Suspense>
+      <DataNotice />
       </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

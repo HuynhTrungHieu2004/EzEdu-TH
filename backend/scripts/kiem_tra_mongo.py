@@ -11,9 +11,11 @@ Chỉ đọc. Bắt sớm ba lỗi hay gặp nhất:
 """
 
 import argparse
+import re
 import sys
 from urllib.parse import quote_plus
 
+import certifi
 from pymongo import MongoClient
 from pymongo.errors import ConfigurationError, OperationFailure, PyMongoError, ServerSelectionTimeoutError
 
@@ -35,6 +37,10 @@ def canh_bao_mat_khau(uri: str) -> None:
     if ":" not in userinfo:
         return
     password = userinfo.split(":", 1)[1]
+    # Bỏ qua nếu đã mã hoá sẵn (có %XX): mã hoá lần nữa sẽ thành %25XX và lời
+    # khuyên in ra sẽ sai.
+    if re.search(r"%[0-9A-Fa-f]{2}", password):
+        return
     if password and quote_plus(password) != password:
         print("  CẢNH BÁO  mật khẩu có ký tự cần mã hoá URL")
         print(f"            thay phần mật khẩu bằng: {quote_plus(password)}")
@@ -49,7 +55,10 @@ def main() -> None:
     canh_bao_mat_khau(args.uri)
 
     try:
-        client = MongoClient(args.uri, serverSelectionTimeoutMS=15000)
+        # Giống app/database/mongodb.py: Python trên macOS không dùng chứng chỉ
+        # gốc của hệ điều hành, thiếu dòng này thì Atlas báo CERTIFICATE_VERIFY_FAILED
+        # dù chuỗi kết nối hoàn toàn đúng.
+        client = MongoClient(args.uri, serverSelectionTimeoutMS=15000, tlsCAFile=certifi.where())
         info = client.admin.command("ping")
         version = client.server_info().get("version", "?")
     except ServerSelectionTimeoutError as error:

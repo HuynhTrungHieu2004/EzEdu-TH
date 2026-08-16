@@ -34,7 +34,21 @@ type AuthFixtureUser = Omit<typeof ADMIN_USER, 'role'> & {
 export async function stubApi(
   page: Page,
   user: AuthFixtureUser | null = null,
+  options: { showDataNotice?: boolean } = {},
 ) {
+  // Dải thông báo dữ liệu hiện trên MỌI trang và nằm cố định ở đáy, nên nó chắn
+  // nút ở cuối trang trong những bài kiểm không liên quan. Mặc định đánh dấu là
+  // đã đọc; bài kiểm của chính dải đó truyền `showDataNotice: true`.
+  if (!options.showDataNotice) {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('ez-data-notice-v1', 'ack');
+      } catch {
+        // Trình duyệt chặn localStorage — bỏ qua.
+      }
+    });
+  }
+
   await page.route('**/api/v1/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
 

@@ -131,3 +131,80 @@ export function FaqPage() {
     </PublicInfoShell>
   );
 }
+
+/**
+ * Chính sách dữ liệu — liệt kê đúng những gì app lưu trên trình duyệt.
+ *
+ * Viết tay thay vì lấy từ CMS: nội dung này phải khớp với mã nguồn (bốn khoá
+ * localStorage), nên để cạnh mã dễ giữ đồng bộ hơn là để quản trị viên sửa.
+ */
+const BROWSER_STORAGE = [
+  { key: 'access_token', purpose: 'Giữ đăng nhập để mỗi lần mở trang không phải nhập lại mật khẩu.' },
+  { key: 'theme-preference', purpose: 'Nhớ bạn chọn giao diện sáng, tối hay theo hệ thống.' },
+  { key: 'ez-student-onboarding-draft', purpose: 'Giữ dở phần khai báo hồ sơ học sinh khi bạn thoát giữa chừng.' },
+  { key: 'ez-recent-tools', purpose: 'Đưa công cụ bạn hay dùng lên đầu danh sách.' },
+  { key: 'ez-data-notice-v1', purpose: 'Ghi nhớ bạn đã đọc thông báo này, để không hiện lại.' },
+];
+
+export function DataPolicyPage() {
+  return (
+    <PublicInfoShell
+      eyebrow="Quyền riêng tư"
+      title="Dữ liệu lưu trên trình duyệt"
+      description="Trang này liệt kê chính xác những gì EzEdu AI lưu trên máy bạn, dùng để làm gì và cách xoá."
+    >
+      <section className="ezp-container" style={{ paddingBottom: 'var(--ez-space-10)' }}>
+        <h2 className="ezp-section-title">Không dùng cookie</h2>
+        <p className="ezp-lede">
+          EzEdu AI không đặt cookie nào, không gắn công cụ phân tích lưu lượng, không có mã theo dõi quảng
+          cáo. Những gì lưu trên máy bạn nằm trong <code>localStorage</code> của trình duyệt và chỉ phục vụ
+          việc dùng ứng dụng.
+        </p>
+
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>
+          Năm mục được lưu
+        </h2>
+        <div className="ez-datatable-wrap">
+          <table className="ez-datatable">
+            <thead>
+              <tr>
+                <th scope="col">Tên mục</th>
+                <th scope="col">Dùng để làm gì</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BROWSER_STORAGE.map((item) => (
+                <tr key={item.key}>
+                  <td><code>{item.key}</code></td>
+                  <td>{item.purpose}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Cách xoá</h2>
+        <p className="ezp-lede">
+          Bấm <strong>Đăng xuất</strong> là xoá phần giữ đăng nhập. Muốn xoá sạch, dùng chức năng xoá dữ liệu
+          trang web của trình duyệt: Chrome và Edge ở mục <em>Cài đặt → Quyền riêng tư → Dữ liệu duyệt web</em>,
+          Safari ở <em>Cài đặt → Nâng cao → Dữ liệu trang web</em>.
+        </p>
+
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Đăng nhập bằng Google</h2>
+        <p className="ezp-lede">
+          Nếu bạn dùng nút đăng nhập bằng Google, trình duyệt sẽ tải mã của Google Identity Services và Google
+          có thể lưu dữ liệu theo chính sách riêng của họ. Mã này chỉ được tải ở trang đăng nhập và đăng ký.
+          Không dùng nút đó thì không có gì của Google chạy.
+        </p>
+
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Dữ liệu học tập</h2>
+        <p className="ezp-lede">
+          Học liệu bạn tải lên, câu hỏi được sinh ra, bài làm và kết quả nằm trên máy chủ chứ không nằm trong
+          trình duyệt. Xoá dữ liệu trình duyệt không xoá những thứ đó; muốn xoá tài khoản và dữ liệu kèm theo,
+          liên hệ quản trị viên.
+        </p>
+      </section>
+      <FinalCta />
+    </PublicInfoShell>
+  );
+}

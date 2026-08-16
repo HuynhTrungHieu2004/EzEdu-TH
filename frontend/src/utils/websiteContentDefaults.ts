@@ -51,7 +51,7 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContentBundle = {
     email: 'support@ezedu.ai',
     socials: [],
     policies: [
-      { label: 'Chính sách bảo mật', href: '#privacy', visible: true },
+      { label: 'Chính sách bảo mật', href: '/chinh-sach-du-lieu', visible: true },
       { label: 'Điều khoản sử dụng', href: '#terms', visible: true },
     ],
     copyright: '© 2026 EzEdu AI. Biến học liệu thành đề thi dễ dàng.',
