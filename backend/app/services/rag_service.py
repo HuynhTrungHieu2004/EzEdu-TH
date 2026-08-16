@@ -349,3 +349,107 @@ def ping_chroma() -> bool:
         return True
     except Exception:
         return False
+
+# ─── Dựng lại kho vector sau khi container mất ổ đĩa ────────────────────────
+
+async def dem_vector_va_doan() -> dict:
+    """Đếm song song: Mongo có bao nhiêu đoạn, Chroma đang giữ bao nhiêu vector.
+
+    Hai con số này phải bằng nhau. Lệch nghĩa là kho vector đã mất — và
+    `ping_chroma()` KHÔNG phát hiện được, vì nó chỉ bắt tay với Chroma chứ
+    không nhìn vào dữ liệu.
+    """
+    db = get_database()
+    so_doan = await db["document_chunks"].count_documents({})
+
+    so_vector = 0
+    try:
+        client = init_chroma_client()
+        for ten in _managed_collection_names(client):
+            so_vector += client.get_collection(ten).count()
+    except Exception:  # noqa: BLE001 - Chroma hỏng thì coi như rỗng
+        so_vector = 0
+
+    return {"mongo_chunks": so_doan, "chroma_vectors": so_vector}
+
+
+async def rebuild_chroma_from_mongo() -> dict:
+    """Nạp lại kho vector từ `document_chunks` trong MongoDB.
+
+    Gói miễn phí của Render không có ổ đĩa bền: mỗi lần deploy là container mới
+    và thư mục Chroma trắng trơn. Trước đây phải lập chỉ mục lại toàn bộ học
+    liệu bằng tay, và hỏi đáp có trích dẫn im lặng không tìm được gì cho tới khi
+    ai đó nhận ra.
+
+    KHÔNG gọi API nhúng lần nào: `document_chunks` đã lưu sẵn `embedding` cùng
+    `content`. Nếu phải nhúng lại thì mỗi lần container khởi động lại sẽ đốt hạn
+    mức Gemini, và Render free khởi động lại rất thường — cách đó tệ hơn cả việc
+    để kho vector rỗng.
+
+    Idempotent: dùng `upsert` theo đúng id `"{document_id}:{chunk_index}"` mà
+    `add_document_chunks` sinh ra, nên chạy nhiều lần không nhân đôi.
+    """
+    db = get_database()
+    theo_kich_thuoc: dict[int, dict[str, list]] = {}
+    bo_qua = 0
+
+    cursor = db["document_chunks"].find(
+        {}, {"document_id": 1, "user_id": 1, "chunk_index": 1, "content": 1, "embedding": 1, "text_preview": 1}
+    )
+    async for doc in cursor:
+        vector = doc.get("embedding")
+        if not vector:
+            # Đoạn cũ lưu trước khi hệ thống bắt đầu giữ vector. Bỏ qua thay vì
+            # nhúng lại: nhúng lại ở đây biến hàm "dựng lại miễn phí" thành hàm
+            # đốt hạn mức, đúng thứ ghi chú phía trên nói phải tránh.
+            bo_qua += 1
+            continue
+
+        nhom = theo_kich_thuoc.setdefault(
+            len(vector), {"ids": [], "documents": [], "embeddings": [], "metadatas": []}
+        )
+        nhom["ids"].append(f"{doc['document_id']}:{doc.get('chunk_index', 0)}")
+        nhom["documents"].append(doc.get("content") or "")
+        nhom["embeddings"].append(vector)
+        nhom["metadatas"].append({
+            "document_id": doc["document_id"],
+            "user_id": doc.get("user_id", ""),
+            "chunk_index": doc.get("chunk_index", 0),
+            "text_preview": doc.get("text_preview") or (doc.get("content") or "")[:TEXT_PREVIEW_LENGTH],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    da_nap = 0
+    for kich_thuoc, nhom in theo_kich_thuoc.items():
+        if not nhom["ids"]:
+            continue
+        # Tên collection mã hoá cả nguồn nhúng lẫn số chiều. Số chiều suy từ
+        # chính vector đã lưu; đoán sai thì Chroma từ chối vì lệch chiều.
+        nguon = "gemini" if kich_thuoc != EMBEDDING_DIMENSION else "local"
+        collection = _get_collection(nguon, kich_thuoc)
+        collection.upsert(
+            ids=nhom["ids"],
+            documents=nhom["documents"],
+            embeddings=nhom["embeddings"],
+            metadatas=nhom["metadatas"],
+        )
+        da_nap += len(nhom["ids"])
+
+    if da_nap or bo_qua:
+        logger.info("Đã nạp lại %s vector từ MongoDB, bỏ qua %s đoạn không có vector.", da_nap, bo_qua)
+    return {"restored": da_nap, "skipped": bo_qua}
+
+
+async def rebuild_chroma_if_empty() -> dict:
+    """Chỉ nạp lại khi Chroma thiếu so với Mongo. Gọi lúc khởi động.
+
+    So sánh số lượng thay vì luôn nạp: nạp lại mỗi lần khởi động sẽ ghi đè kho
+    vector đang lành bằng đúng nội dung của nó — vô hại nhưng tốn thời gian
+    khởi động một cách vô ích khi kho đang đầy đủ.
+    """
+    dem = await dem_vector_va_doan()
+    if dem["chroma_vectors"] >= dem["mongo_chunks"]:
+        return {"restored": 0, "skipped": 0, **dem}
+    ket_qua = await rebuild_chroma_from_mongo()
+    return {**ket_qua, **dem}
+

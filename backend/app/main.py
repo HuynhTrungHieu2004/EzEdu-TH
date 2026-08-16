@@ -69,6 +69,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Lỗi khi tạo index cho khám phá kiến thức Internet: {e}")
 
+    # Nạp lại kho vector nếu nó rỗng so với MongoDB.
+    #
+    # Gói miễn phí của Render không có ổ đĩa bền: mỗi lần deploy là container
+    # mới và thư mục Chroma trắng trơn. Không có bước này thì hỏi đáp có trích
+    # dẫn im lặng không tìm được gì, và chỉ lộ ra khi có người dùng thử.
+    #
+    # Không gọi API nhúng: vector đã lưu sẵn trong `document_chunks`. Bọc try
+    # để kho vector hỏng không chặn cả máy chủ khởi động — phần còn lại của ứng
+    # dụng vẫn chạy được mà không cần Chroma.
+    try:
+        from app.services.rag_service import rebuild_chroma_if_empty
+
+        ket_qua = await rebuild_chroma_if_empty()
+        if ket_qua.get("restored"):
+            logger.info("Đã nạp lại %s vector vào ChromaDB khi khởi động.", ket_qua["restored"])
+    except Exception as e:
+        logger.error(f"Lỗi khi nạp lại kho vector: {e}")
+
     # Index cho kho tri thức chuẩn (giai đoạn 7).
     try:
         from app.curriculum_kb.repositories.indexes import ensure_curriculum_kb_indexes
@@ -290,13 +308,28 @@ async def readiness_check():
 
     mongo_ok = await ping_database()
     chroma_ok = ping_chroma()
+    # `ping_chroma()` chỉ bắt tay, nên nó báo "healthy" với một kho vector rỗng
+    # trơn. Đếm thêm để trạng thái nói đúng sự thật: workflow giám sát đọc
+    # /health/ready sẽ thấy được lúc kho vector mất.
+    try:
+        from app.services.rag_service import dem_vector_va_doan
+
+        dem_vector = await dem_vector_va_doan()
+    except Exception:  # noqa: BLE001 - đếm hỏng không được làm hỏng health check
+        dem_vector = {"mongo_chunks": 0, "chroma_vectors": 0}
     indexes_ok = is_indexes_ready()
     gemini_ok = is_gemini_available()
     groq_ok = is_groq_available()
 
     services_status = {
         "mongodb": "healthy" if mongo_ok else "unavailable",
-        "chromadb": "healthy" if chroma_ok else "unavailable",
+        # "degraded" khi Chroma sống nhưng thiếu vector so với MongoDB: hỏi đáp
+        # có trích dẫn sẽ không tìm được gì dù dịch vụ vẫn trả lời.
+        "chromadb": (
+            "healthy" if chroma_ok and dem_vector["chroma_vectors"] >= dem_vector["mongo_chunks"]
+            else "degraded" if chroma_ok
+            else "unavailable"
+        ),
         "mongodb_indexes": "healthy" if indexes_ok else "degraded",
         "gemini": "healthy" if gemini_ok else "unavailable",
         "groq": "healthy" if groq_ok else "unavailable"
@@ -305,7 +338,12 @@ async def readiness_check():
     if not mongo_ok or not chroma_ok:
         status_str = "unavailable"
         status_code = 503
-    elif not indexes_ok or not gemini_ok or not groq_ok:
+    elif (
+        not indexes_ok
+        or not gemini_ok
+        or not groq_ok
+        or services_status["chromadb"] == "degraded"
+    ):
         status_str = "degraded"
         status_code = 200
     else:
@@ -317,7 +355,10 @@ async def readiness_check():
     return Response(
         content=json.dumps({
             "status": status_str,
-            "services": services_status
+            "services": services_status,
+            # Số liệu thật để đọc log biết ngay kho vector thiếu bao nhiêu, thay
+            # vì chỉ thấy chữ "degraded" rồi phải đi tìm nguyên nhân.
+            "vector_store": dem_vector,
         }),
         media_type="application/json",
         status_code=status_code
