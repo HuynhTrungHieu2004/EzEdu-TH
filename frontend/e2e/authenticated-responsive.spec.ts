@@ -129,6 +129,10 @@ test('AppShell giữ khoảng cách nhóm và touch target ở breakpoint mobile
     await accountTrigger.click();
     const accountMenu = page.getByRole('menu', { name: 'Tài khoản và cài đặt' });
     await expect(accountMenu).toBeVisible();
+    // Chờ có mục rồi mới đo. `evaluateAll` không tự chờ như `expect`: menu vừa
+    // hiện mà mục chưa render xong thì nó trả mảng rỗng, vòng lặp bên dưới
+    // không chạy lần nào, và bài kiểm vùng chạm 44px xanh mà chưa đo gì cả.
+    await expect(accountMenu.getByRole('menuitem').first()).toBeVisible();
     const accountSizes = await accountMenu.getByRole('menuitem').evaluateAll((items) =>
       items.map((item) => {
         const rect = item.getBoundingClientRect();
@@ -141,6 +145,7 @@ test('AppShell giữ khoảng cách nhóm và touch target ở breakpoint mobile
     await moreButton.click();
     const moreDrawer = page.getByRole('dialog', { name: 'Thêm' });
     await expect(moreDrawer).toBeVisible();
+    await expect(moreDrawer.locator('button, a[href]').first()).toBeVisible();
     const drawerSizes = await moreDrawer.locator('button, a[href]').evaluateAll((items) =>
       items.map((item) => {
         const rect = item.getBoundingClientRect();
@@ -152,6 +157,11 @@ test('AppShell giữ khoảng cách nhóm và touch target ở breakpoint mobile
       }),
     );
     await moreDrawer.getByRole('button', { name: 'Đóng' }).click();
+
+    expect(
+      accountSizes.length + drawerSizes.length,
+      'không đo được vùng chạm nào — bài kiểm này sẽ xanh mà chưa kiểm gì',
+    ).toBeGreaterThan(0);
 
     for (const target of [...accountSizes, ...drawerSizes]) {
       const measurementTolerance = 0.001;
