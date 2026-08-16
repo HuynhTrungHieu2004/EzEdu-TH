@@ -56,6 +56,13 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+      # Đăng nhập Facebook. Khác Google: backend BUỘC phải có App Secret, vì
+      # access token của Facebook là chuỗi đục, muốn biết nó là gì thì phải
+      # hỏi ngược Graph API bằng chính danh nghĩa của app.
+      - key: FACEBOOK_APP_ID
+        sync: false
+      - key: FACEBOOK_APP_SECRET
+        sync: false
       # ChromaDB ghi vào ổ đĩa của container. Gói free KHÔNG có ổ đĩa bền:
       # mỗi lần deploy hoặc thức dậy sau khi ngủ là mất vector, phải lập chỉ mục
       # lại học liệu thì hỏi đáp có trích dẫn mới chạy. Muốn giữ: gói trả phí

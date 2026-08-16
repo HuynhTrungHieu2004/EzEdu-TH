@@ -13,14 +13,24 @@ from app.personalization.constants.collections import LEARNER_PROFILES
 from app.schemas.auth import (
     UserRegister, UserLogin, UserResponse, Token, TokenPayload,
     GoogleLoginRequest, GoogleLoginResponse,
+    FacebookLoginRequest, FacebookLoginResponse,
 )
 from app.services.activity_log_service import record_activity
 from app.services.system_settings_service import get_setting_value, is_feature_enabled
 from app.services.google_auth_service import (
     GoogleAuthError,
-    create_google_user,
-    find_or_link_google_user,
     verify_google_id_token,
+)
+from app.services.google_auth_service import to_social_identity as google_to_social
+from app.services.facebook_auth_service import (
+    FacebookAuthError,
+    verify_facebook_access_token,
+)
+from app.services.facebook_auth_service import to_social_identity as facebook_to_social
+from app.services.social_auth_service import (
+    SocialIdentity,
+    create_social_user,
+    find_or_link_social_user,
 )
 
 router = APIRouter()
@@ -357,39 +367,31 @@ async def login_swagger(request: Request, form_data: OAuth2PasswordRequestForm =
     )
     return Token(access_token=access_token, token_type="bearer")
 
-@router.post("/google", response_model=GoogleLoginResponse)
-async def google_login(payload: GoogleLoginRequest, request: Request):
-    """Đăng nhập/đăng ký bằng tài khoản Google.
+async def _dang_nhap_mang_xa_hoi(
+    *,
+    identity: SocialIdentity,
+    role: Optional[str],
+    provider: str,
+    request: Request,
+    started: float,
+    db,
+) -> GoogleLoginResponse:
+    """Phần chung của mọi luồng đăng nhập mạng xã hội, tính từ sau bước xác minh.
 
-    Gọi lần đầu chỉ với `id_token`. Nếu là người dùng mới, trả `needs_role` và
-    KHÔNG tạo gì; frontend hỏi vai rồi gọi lại cùng endpoint kèm `role`.
+    Nhà cung cấp nào cũng chỉ khác nhau ở cách chứng minh "người này là ai".
+    Chứng minh xong rồi thì mọi thứ còn lại giống hệt: hỏi vai nếu là người mới,
+    tôn trọng cổng chặn đăng ký, tôn trọng `default_role`, chặn tài khoản bị khoá
+    hoặc đã xoá, chặn lúc bảo trì, ghi nhật ký.
+
+    Để chung một chỗ chứ không chép cho từng nhà cung cấp: khối này mang mấy chốt
+    bảo mật mà ai đọc lướt sẽ không thấy. Hai bản sao sẽ lệch nhau ngay lần sửa
+    đầu tiên, và bản không ai sờ tới sẽ âm thầm giữ nguyên lỗi.
     """
-    started = time.perf_counter()
-    db = get_database()
-
-    if not await is_feature_enabled("enable_google_login", database=db):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Đăng nhập bằng Google hiện không khả dụng.",
-        )
-
-    try:
-        identity = verify_google_id_token(payload.id_token)
-    except GoogleAuthError as exc:
-        await record_activity(
-            action="login_failed", category="auth", status="failure",
-            user_id=None, resource_type="user", resource_id=None, request=request,
-            duration_ms=int((time.perf_counter() - started) * 1000),
-            error_code="GOOGLE_TOKEN_REJECTED",
-            metadata={"provider": "google"}, database=db,
-        )
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
-    user, _ = await find_or_link_google_user(db, identity)
+    user, _ = await find_or_link_social_user(db, identity)
     la_nguoi_moi = user is None
 
     if la_nguoi_moi:
-        if payload.role is None:
+        if role is None:
             # Chưa tạo gì cả — chỉ hỏi vai rồi chờ lần gọi thứ hai.
             return GoogleLoginResponse(
                 needs_role=True, email=identity.email, full_name=identity.full_name
@@ -402,10 +404,10 @@ async def google_login(payload: GoogleLoginRequest, request: Request):
             )
         # Cài đặt default_role khoá vai tự chọn, giống hệt luồng /register —
         # thiếu chốt này thì quản trị đặt default_role=student vẫn không ngăn
-        # được người mới tự phong lecturer qua nút Google.
+        # được người mới tự phong lecturer qua nút mạng xã hội.
         forced_role = str(await get_setting_value("default_role", "", database=db))
-        vai = forced_role if forced_role in {"student", "lecturer"} else payload.role
-        user = await create_google_user(db, identity, role=vai)
+        vai = forced_role if forced_role in {"student", "lecturer"} else role
+        user = await create_social_user(db, identity, role=vai)
 
     user_status = _normalize_user_status(user)
     if user.get("is_active", True) is False or user_status in {"locked", "deleted"}:
@@ -415,7 +417,7 @@ async def google_login(payload: GoogleLoginRequest, request: Request):
             user_id=str(user["_id"]), resource_type="user", resource_id=str(user["_id"]),
             request=request, duration_ms=int((time.perf_counter() - started) * 1000),
             error_code="ACCOUNT_BLOCKED",
-            metadata={"provider": "google", "status": user_status, "role": user.get("role", "user")},
+            metadata={"provider": provider, "status": user_status, "role": user.get("role", "user")},
             database=db,
         )
         raise HTTPException(
@@ -440,13 +442,91 @@ async def google_login(payload: GoogleLoginRequest, request: Request):
         category="auth", status="success",
         user_id=str(user["_id"]), resource_type="user", resource_id=str(user["_id"]),
         request=request, duration_ms=int((time.perf_counter() - started) * 1000),
-        metadata={"provider": "google", "role": user.get("role", "user")},
+        metadata={"provider": provider, "role": user.get("role", "user")},
         database=db,
     )
     return GoogleLoginResponse(
         needs_role=False,
         access_token=create_access_token(subject=str(user["_id"])),
         token_type="bearer",
+    )
+
+
+async def _ghi_nhan_token_bi_tu_choi(*, provider: str, error_code: str, request: Request,
+                                     started: float, db) -> None:
+    await record_activity(
+        action="login_failed", category="auth", status="failure",
+        user_id=None, resource_type="user", resource_id=None, request=request,
+        duration_ms=int((time.perf_counter() - started) * 1000),
+        error_code=error_code,
+        metadata={"provider": provider}, database=db,
+    )
+
+
+@router.post("/google", response_model=GoogleLoginResponse)
+async def google_login(payload: GoogleLoginRequest, request: Request):
+    """Đăng nhập/đăng ký bằng tài khoản Google.
+
+    Gọi lần đầu chỉ với `id_token`. Nếu là người dùng mới, trả `needs_role` và
+    KHÔNG tạo gì; frontend hỏi vai rồi gọi lại cùng endpoint kèm `role`.
+    """
+    started = time.perf_counter()
+    db = get_database()
+
+    if not await is_feature_enabled("enable_google_login", database=db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đăng nhập bằng Google hiện không khả dụng.",
+        )
+
+    try:
+        identity = verify_google_id_token(payload.id_token)
+    except GoogleAuthError as exc:
+        await _ghi_nhan_token_bi_tu_choi(
+            provider="google", error_code="GOOGLE_TOKEN_REJECTED",
+            request=request, started=started, db=db,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return await _dang_nhap_mang_xa_hoi(
+        identity=google_to_social(identity), role=payload.role, provider="google",
+        request=request, started=started, db=db,
+    )
+
+
+@router.post("/facebook", response_model=FacebookLoginResponse)
+async def facebook_login(payload: FacebookLoginRequest, request: Request):
+    """Đăng nhập/đăng ký bằng tài khoản Facebook.
+
+    Luồng hai bước giống hệt `/google`: gọi lần đầu chỉ với `access_token`, nếu
+    là người mới thì trả `needs_role` và KHÔNG tạo gì, frontend hỏi vai rồi gọi
+    lại kèm `role`.
+
+    Khác Google ở chỗ `verify_facebook_access_token` phải gọi ngược Graph API
+    (xem `facebook_auth_service`), nên nó là hàm bất đồng bộ và có thể ném 503
+    khi không liên lạc được với Facebook.
+    """
+    started = time.perf_counter()
+    db = get_database()
+
+    if not await is_feature_enabled("enable_facebook_login", database=db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đăng nhập bằng Facebook hiện không khả dụng.",
+        )
+
+    try:
+        identity = await verify_facebook_access_token(payload.access_token)
+    except FacebookAuthError as exc:
+        await _ghi_nhan_token_bi_tu_choi(
+            provider="facebook", error_code="FACEBOOK_TOKEN_REJECTED",
+            request=request, started=started, db=db,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    return await _dang_nhap_mang_xa_hoi(
+        identity=facebook_to_social(identity), role=payload.role, provider="facebook",
+        request=request, started=started, db=db,
     )
 
 

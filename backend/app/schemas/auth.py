@@ -75,3 +75,17 @@ class GoogleLoginResponse(BaseModel):
     # Hai trường dưới chỉ dùng để hiện lời chào ở màn chọn vai.
     email: Optional[str] = None
     full_name: Optional[str] = None
+
+
+class FacebookLoginRequest(BaseModel):
+    # Access token của Facebook, không phải ID token như Google. Dài hơn nhiều
+    # nên nới trần lên; token dài thật của Facebook vượt xa 4096.
+    access_token: str = Field(..., min_length=1, max_length=8192)
+    # Chỉ gửi ở lần gọi thứ hai, sau khi người dùng mới chọn vai. Literal chặn
+    # sẵn việc tự phong 'admin' bằng cách sửa request.
+    role: Optional[Literal["student", "lecturer"]] = None
+
+
+#: Facebook trả về đúng hình dạng như Google — cùng luồng hai bước, cùng màn hỏi
+#: vai. Đặt bí danh thay vì định nghĩa lại một lớp giống hệt.
+FacebookLoginResponse = GoogleLoginResponse

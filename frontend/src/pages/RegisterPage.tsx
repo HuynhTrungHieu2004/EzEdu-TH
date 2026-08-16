@@ -7,8 +7,10 @@ import { getApiErrorDetail } from '../api/errors';
 import { useAuth } from '../hooks/useAuth';
 import { Alert, Button, Card, CardBody, FormField, Input, Select } from '../components/ui';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
-import { GoogleRoleDialog } from '../components/GoogleRoleDialog';
+import { FacebookSignInButton } from '../components/FacebookSignInButton';
+import { SocialRoleDialog } from '../components/SocialRoleDialog';
 import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
+import { useFacebookSignIn } from '../hooks/useFacebookSignIn';
 import './auth.css';
 
 const BRAND_POINTS = [
@@ -40,6 +42,11 @@ const RegisterPage = () => {
   const navigate = useNavigate();
   const { refresh } = useAuth();
   const google = useGoogleSignIn('Đăng ký bằng Google thất bại.');
+  const facebook = useFacebookSignIn('Đăng ký bằng Facebook thất bại.');
+  // Đang xử lý một nhà cung cấp thì khoá cả hai nút: bấm nút kia giữa
+  // chừng sẽ chạy hai luồng đăng nhập song song, và luồng nào về sau sẽ
+  // ghi đè access_token của luồng về trước.
+  const dangDangNhap = google.dangXuLy || facebook.dangXuLy;
 
   useEffect(() => {
     // If already logged in, redirect to dashboard
@@ -194,10 +201,13 @@ const RegisterPage = () => {
           <div className="ez-auth-divider">hoặc</div>
 
           <div className="ez-auth-alt">
-            <GoogleSignInButton onCredential={google.onCredential} disabled={google.dangXuLy} />
+            <GoogleSignInButton onCredential={google.onCredential} disabled={dangDangNhap} />
             {google.error && <Alert tone="error">{google.error}</Alert>}
+            <FacebookSignInButton onCredential={facebook.onCredential} disabled={dangDangNhap} />
+            {facebook.error && <Alert tone="error">{facebook.error}</Alert>}
           </div>
-          {google.dialogProps && <GoogleRoleDialog {...google.dialogProps} />}
+          {google.dialogProps && <SocialRoleDialog {...google.dialogProps} />}
+          {facebook.dialogProps && <SocialRoleDialog {...facebook.dialogProps} />}
 
           <p className="ez-auth-footer">
             Đã có tài khoản?{' '}

@@ -130,6 +130,31 @@
   justify-items: center;
 }
 
+/* Nút Facebook.
+
+   Rộng 320px để khớp nút Google ngay bên trên — nút đó do thư viện Google tự
+   render với chiều rộng cố định, ta không đổi được, nên nút này phải theo. Hai
+   nút lệch nhau vài chục pixel trông như lỗi dựng trang. */
+.ez-btn-facebook {
+  width: 320px;
+  max-width: 100%;
+  justify-content: center;
+  gap: var(--ez-space-2);
+  background-color: #1877f2;
+  border-color: #1877f2;
+  color: #fff;
+}
+
+.ez-btn-facebook:hover:not(:disabled) {
+  background-color: #166fe0;
+  border-color: #166fe0;
+  color: #fff;
+}
+
+.ez-btn-facebook:disabled {
+  opacity: 0.6;
+}
+
 .ez-auth-footer {
   margin-top: var(--ez-space-5);
   text-align: center;

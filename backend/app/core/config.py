@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     # thì một token Google hợp lệ cấp cho ứng dụng KHÁC cũng đăng nhập được vào đây.
     GOOGLE_CLIENT_ID: str = ""
 
+    # App ID của Facebook. KHÔNG phải bí mật — nó nằm công khai trong mã frontend.
+    FACEBOOK_APP_ID: str = ""
+    # App Secret thì LÀ bí mật. Google không cần thứ tương đương vì ID token của
+    # Google tự kiểm được bằng khoá công khai; access token của Facebook thì đục,
+    # muốn biết nó là gì phải hỏi ngược Facebook bằng chính danh nghĩa của app.
+    FACEBOOK_APP_SECRET: str = ""
+    # Phiên bản Graph API. Facebook chỉ đỡ mỗi phiên bản khoảng hai năm rồi khoá,
+    # nên để chỉnh được bằng biến môi trường thay vì nằm cứng trong mã. Số đúng
+    # xem ở App Dashboard, mục Settings → Advanced → Upgrade API Version.
+    FACEBOOK_GRAPH_VERSION: str = "v21.0"
+
     # JWT configurations
     JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
     JWT_ALGORITHM: str = "HS256"

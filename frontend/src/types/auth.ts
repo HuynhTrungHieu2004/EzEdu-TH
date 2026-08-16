@@ -18,10 +18,14 @@ export interface Token {
   token_type: string;
 }
 
-export interface GoogleLoginResponse {
+export interface SocialLoginResponse {
   needs_role: boolean;
   access_token: string | null;
   token_type: string;
   email: string | null;
   full_name: string | null;
 }
+
+/** Backend trả về cùng một hình dạng cho Google và Facebook. */
+export type GoogleLoginResponse = SocialLoginResponse;
+export type FacebookLoginResponse = SocialLoginResponse;

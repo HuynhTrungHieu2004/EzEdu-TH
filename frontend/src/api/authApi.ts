@@ -1,5 +1,5 @@
 import client from './client';
-import type { GoogleLoginResponse, Token, UserResponse } from '../types/auth';
+import type { FacebookLoginResponse, GoogleLoginResponse, Token, UserResponse } from '../types/auth';
 
 export interface RegisterPayload {
   email: string;
@@ -34,6 +34,14 @@ export const authApi = {
     role?: 'student' | 'lecturer';
   }): Promise<GoogleLoginResponse> => {
     const response = await client.post<GoogleLoginResponse>('/auth/google', payload);
+    return response.data;
+  },
+
+  loginWithFacebook: async (payload: {
+    access_token: string;
+    role?: 'student' | 'lecturer';
+  }): Promise<FacebookLoginResponse> => {
+    const response = await client.post<FacebookLoginResponse>('/auth/facebook', payload);
     return response.data;
   },
 };
