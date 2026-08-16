@@ -42,6 +42,15 @@ JSON.
 Muốn tắt: **Actions → "Giữ backend thức" → Disable workflow**.
 Bấm chạy thử: **Run workflow** (đã bật `workflow_dispatch`).
 
+Hai điểm cần biết về cron của GitHub Actions:
+
+- Lịch có thể trễ 5–15 phút khi GitHub tải nặng. Không sao, khoảng ngủ là 15 phút
+  và ta gọi mỗi 10 phút nên vẫn còn biên.
+- **GitHub tự tắt workflow theo lịch nếu kho không có commit nào trong 60 ngày.**
+  Đây là cái dễ làm hỏng âm thầm nhất: máy chủ ngủ lại mà không ai biết. Kho
+  không còn hoạt động thì vào Actions bật lại bằng tay, hoặc cứ để vậy và dựa vào
+  lớp 1.
+
 ## Ngoài giờ
 
 Từ 23:00 tới 06:00 máy chủ vẫn ngủ. Người vào lúc đó chờ 1-2 phút và thấy thông
