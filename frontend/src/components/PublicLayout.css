@@ -47,20 +47,6 @@
   text-decoration: none;
 }
 
-.pub-logo-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--ez-radius-md);
-  background: var(--ez-gradient-cta);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  flex-shrink: 0;
-}
 
 .pub-logo-text {
   font-size: 16px;

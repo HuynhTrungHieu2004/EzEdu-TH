@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { questionApi } from '../api/questionApi';
 import { useAuth } from '../hooks/useAuth';
+import { BrandMark } from './BrandMark';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
 import { MOTION_DURATION, MOTION_EASE, PageEntrance, useMotion } from '../motion';
@@ -275,9 +276,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <aside ref={sidebarRef} className="ez-sidebar">
         <Link to={area === 'admin' ? '/admin/dashboard' : '/dashboard'} className="ez-brand">
-          <span className="ez-brand-mark" aria-hidden="true" translate="no">
-            Ez
-          </span>
+          <BrandMark size={32} />
           <span className="ez-brand-text">
             <span className="ez-brand-name">EzEdu AI</span>
             {area === 'admin' ? <span className="ez-brand-area">Quản trị</span> : null}

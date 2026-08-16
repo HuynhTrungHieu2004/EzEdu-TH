@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { FooterContent, SiteIdentityContent } from '../../types/websiteContent';
+import { BrandMark } from '../BrandMark';
 
 interface PublicFooterProps {
   content: FooterContent;
@@ -91,9 +92,7 @@ export default function PublicFooter({ content, identity }: PublicFooterProps) {
         <div className="ezp-footer-grid">
           <div className="ezp-footer-about">
             <Link to="/" className="ezp-brand">
-              <span className="ezp-brand-mark" aria-hidden="true" translate="no">
-                {identity.logo_text?.slice(0, 2) || 'Ez'}
-              </span>
+              <BrandMark size={34} />
               <span className="ezp-brand-name">{identity.site_name || 'EzEdu AI'}</span>
             </Link>
             <p className="ezp-footer-slogan">

@@ -4,6 +4,7 @@ import { ChevronRight, Menu } from 'lucide-react';
 import { Button, Drawer } from '../ui';
 import { useAuth } from '../../hooks/useAuth';
 import type { HeaderContent, SiteIdentityContent } from '../../types/websiteContent';
+import { BrandMark } from '../BrandMark';
 
 interface PublicHeaderProps {
   content: HeaderContent;
@@ -76,9 +77,7 @@ export default function PublicHeader({ content, identity }: PublicHeaderProps) {
 
   const brand = (
     <Link to="/" className="ezp-brand">
-      <span className="ezp-brand-mark" aria-hidden="true" translate="no">
-        {identity.logo_text?.slice(0, 2) || 'Ez'}
-      </span>
+      <BrandMark size={34} />
       <span className="ezp-brand-name">{identity.site_name || 'EzEdu AI'}</span>
     </Link>
   );

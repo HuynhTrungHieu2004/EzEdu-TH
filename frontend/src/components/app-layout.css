@@ -113,31 +113,7 @@
   text-decoration: none;
 }
 
-.ez-brand-mark {
-  position: relative;
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--ez-radius-sm);
-  background: var(--ez-primary);
-  color: var(--ez-text-on-brand);
-  font-size: var(--ez-text-body-sm);
-  font-weight: var(--ez-weight-bold);
-  letter-spacing: var(--ez-tracking-tight);
-}
 
-.ez-brand-mark::after {
-  content: '';
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 5px;
-  height: 5px;
-  background: var(--ez-accent);
-}
 
 .ez-brand-text {
   display: flex;

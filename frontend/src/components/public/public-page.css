@@ -125,20 +125,6 @@
 
 .ezp-brand:hover { text-decoration: none; }
 
-.ezp-brand-mark {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--ez-radius-sm);
-  background-color: var(--ez-primary);
-  color: var(--ez-text-on-brand);
-  font-size: var(--ez-text-body-sm);
-  font-weight: var(--ez-weight-bold);
-  letter-spacing: var(--ez-tracking-tight);
-}
 
 .ezp-brand-name {
   font-size: var(--ez-text-h5);

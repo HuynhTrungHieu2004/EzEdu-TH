@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import './PublicLayout.css';
 import { ArrowLeft } from 'lucide-react';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
+import { BrandMark } from './BrandMark';
 
 interface PublicLayoutProps {
   children: React.ReactNode;
@@ -41,7 +42,7 @@ export default function PublicLayout({ children }: PublicLayoutProps) {
           onClick={() => navigate('/')}
           aria-label="Về trang chủ EzEdu AI"
         >
-          <span className="pub-logo-mark" translate="no">Ez</span>
+          <BrandMark size={34} />
           <span className="pub-logo-text" translate="no">EzEdu AI</span>
         </button>
 
