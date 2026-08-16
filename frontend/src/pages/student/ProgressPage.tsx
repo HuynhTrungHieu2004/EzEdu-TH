@@ -59,11 +59,21 @@ function verdictOf(percent: number): { label: string; variant: 'success' | 'warn
   return { label: 'Cần ôn tập', variant: 'error' };
 }
 
-/** Đích điều hướng khi bấm vào 1 dòng lịch sử — khác nhau theo loại. */
-function retakePathOf(item: LearningHistoryItem): string {
+/**
+ * Đích điều hướng khi bấm vào 1 dòng lịch sử: XEM LẠI, không phải làm lại.
+ *
+ * Trước đây dòng lịch sử trỏ thẳng vào đường làm lại. Với đề không cho làm
+ * lại, backend trả 403 "Đề thi này không cho phép làm lại" — học sinh bấm vào
+ * lịch sử của chính mình và bị từ chối. Với đề cho làm lại thì mở ra một lượt
+ * mới tinh, bài cũ và nhận xét AI biến mất.
+ *
+ * Đường làm lại không mất đi: nó nằm trong chính trang xem lại, và chỉ hiện khi
+ * đề cho phép.
+ */
+function reviewPathOf(item: LearningHistoryItem): string {
   return item.item_type === 'practice'
-    ? `/question-sets/${item.question_set_id}`
-    : `/take-exam/${item.exam_id}`;
+    ? `/bai-lam/${item.id}?loai=practice&bo=${item.question_set_id ?? ''}`
+    : `/bai-lam/${item.id}${item.can_retake ? '?lam_lai=1' : ''}`;
 }
 
 /**
@@ -311,7 +321,7 @@ export default function ProgressPage() {
                       );
                     }
                     return (
-                      <Link key={item.id} to={retakePathOf(item)} className="dash-row">
+                      <Link key={item.id} to={reviewPathOf(item)} className="dash-row">
                         {rowContent}
                       </Link>
                     );

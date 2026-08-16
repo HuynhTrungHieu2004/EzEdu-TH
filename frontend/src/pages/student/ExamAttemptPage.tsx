@@ -8,7 +8,6 @@ import type { Attempt, ExamPreviewQuestionItem } from '../../api/examBankApi';
 import { getApiErrorDetail } from '../../api/errors';
 import {
   Alert,
-  Badge,
   Button,
   Card,
   CardBody,
@@ -24,14 +23,13 @@ import {
   Textarea,
   TimerRing,
 } from '../../components/ui';
-import { AnimatedCounter, Confetti, MOTION_DURATION, MOTION_EASE, StaggerGroup, useMotion } from '../../motion';
+import { MOTION_DURATION, MOTION_EASE, useMotion } from '../../motion';
+import { AttemptResults } from '../../components/student/AttemptResults';
 import '../question-set.css';
 import '../exam-attempt.css';
 
 const AUTOSAVE_INTERVAL_MS = 10_000;
 const POLL_GRADING_MS = 5_000;
-/** Từ mốc này coi là thành tích đáng ăn mừng (spec §7.4 "confetti tiết chế"). */
-const CELEBRATE_PERCENT = 80;
 
 /**
  * Làm bài thi có giới hạn thời gian — đồng hồ đếm ngược tính từ `due_at` do
@@ -235,97 +233,12 @@ export default function ExamAttemptPage() {
   }
 
   if (attempt.status !== 'in_progress') {
-    const percent = attempt.max_score > 0
-      ? Math.round((attempt.total_score / attempt.max_score) * 100)
-      : 0;
-    const graded = attempt.status === 'graded';
-    const correctCount = attempt.results.filter((r) => r.is_correct === true).length;
-    const gradedCount = attempt.results.filter(
-      (r) => r.question_type !== 'short_answer' || r.ai_score !== null || r.teacher_score !== null,
-    ).length;
-
     return (
       <>
         <PageHeader eyebrow={`Mã đề ${attempt.exam_code}`} title="Kết quả bài làm" />
-
-        <Card className="ez-result-summary" style={{ marginBottom: 'var(--ez-space-6)' }}>
-          <CardBody>
-            <div className="ez-result-summary-grid">
-              <div className="ez-result-score">
-                {/* Còn câu chờ AI chấm thì điểm hiện tại chưa phải điểm thật:
-                    hiện "0%" lúc này khiến bài làm đúng trông như bị 0. */}
-                <span className="ez-result-score-value">
-                  {graded
-                    ? <AnimatedCounter value={percent} formatter={(value) => `${value}%`} />
-                    : '—'}
-                </span>
-                <span className="ez-result-score-meta">
-                  {graded ? (
-                    <>
-                      {attempt.total_score} / {attempt.max_score} điểm
-                      {attempt.results.length > 0 ? ` · ${correctCount}/${attempt.results.length} câu đúng` : ''}
-                    </>
-                  ) : (
-                    `Đã chấm ${gradedCount}/${attempt.results.length} câu`
-                  )}
-                </span>
-              </div>
-              <div className="ez-result-status">
-                <Badge variant={graded ? 'success' : 'warning'}>
-                  {graded ? 'Đã chấm xong' : 'Đang chấm câu tự luận…'}
-                </Badge>
-                {attempt.auto_submitted && <span>Bài đã được tự động nộp khi hết giờ.</span>}
-              </div>
-            </div>
-            {/* Chỉ ăn mừng khi đã chấm xong và đạt ngưỡng — không nổ khi còn đang chấm */}
-            <Confetti active={graded && percent >= CELEBRATE_PERCENT} />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle as="h2">Chi tiết từng câu</CardTitle>
-            </div>
-          </CardHeader>
-          <CardBody>
-            <StaggerGroup className="ez-stack">
-              {attempt.results.map((r, idx) => (
-                <div
-                  key={r.question_id}
-                  className="dash-row"
-                  style={{ alignItems: 'flex-start' }}
-                  data-motion-item
-                  data-result-row
-                >
-                  <span className="dash-row-main">
-                    <span className="dash-row-title">Câu {idx + 1}</span>
-                    <span className="dash-row-meta">
-                      {r.question_type === 'short_answer' ? (
-                        r.ai_score === null ? (
-                          <span>Đang chấm…</span>
-                        ) : (
-                          <>
-                            <span>
-                              {r.final_score} / {r.points_possible} điểm
-                            </span>
-                            {r.ai_confidence !== null && <span>Độ tin cậy AI: {Math.round(r.ai_confidence * 100)}%</span>}
-                            {r.teacher_score !== null && <Badge variant="info">Giáo viên đã chấm lại</Badge>}
-                            {r.ai_feedback && <span>{r.ai_feedback}</span>}
-                          </>
-                        )
-                      ) : (
-                        <Badge variant={r.is_correct ? 'success' : 'error'}>
-                          {r.is_correct ? 'Đúng' : 'Sai'} · {r.final_score}/{r.points_possible} điểm
-                        </Badge>
-                      )}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </StaggerGroup>
-          </CardBody>
-        </Card>
+        {/* `vuaNop` bật: đây là màn hình ngay sau khi nộp, nên có confetti và
+            điểm chạy dần. Trang xem lại dùng cùng component này với cờ tắt. */}
+        <AttemptResults attempt={attempt} vuaNop />
       </>
     );
   }

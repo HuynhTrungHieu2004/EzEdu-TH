@@ -58,6 +58,7 @@ const ExamBlueprintDetailPage = lazy(() => import('./pages/teacher/ExamBlueprint
 const ExamGradingPage = lazy(() => import('./pages/teacher/ExamGradingPage'));
 const ContentHistoryPage = lazy(() => import('./pages/teacher/ContentHistoryPage'));
 const ExamAttemptPage = lazy(() => import('./pages/student/ExamAttemptPage'));
+const AttemptReviewPage = lazy(() => import('./pages/student/AttemptReviewPage'));
 const WebKnowledgePage = lazy(() => import('./pages/WebKnowledgePage'));
 const CurriculumKbPage = lazy(() => import('./pages/CurriculumKbPage'));
 const ToolLibraryPage = lazy(() => import('./pages/ToolLibraryPage'));
@@ -215,6 +216,12 @@ function App() {
         <Route
           path="/take-exam/:examId"
           element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><ExamAttemptPage /></RoleRoute></AppLayout>}
+        />
+        {/* Xem lại bài đã nộp — chỉ đọc. Tách khỏi /take-exam vì trang đó gọi
+            startAttempt và chạy autosave; mở bài cũ bằng nó là mời gọi ghi đè. */}
+        <Route
+          path="/bai-lam/:attemptId"
+          element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><AttemptReviewPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/admin/dashboard"
