@@ -23,7 +23,7 @@ OperationType = Literal[
 ]
 
 # ─────────────────────────── Provider ──────────────────────────────
-ProviderType = Literal["google", "groq", "local", "mixed", "unknown"]
+ProviderType = Literal["anthropic", "google", "groq", "local", "mixed", "unknown"]
 
 # ─────────────────────────── Retrieval Modes ───────────────────────
 # Exact production values from AdvancedChatResponse.retrieval_mode

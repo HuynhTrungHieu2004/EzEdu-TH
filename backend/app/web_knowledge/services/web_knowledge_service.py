@@ -1,25 +1,25 @@
-"""Khám phá kiến thức Internet có kiểm chứng — dùng Gemini Grounding with
-Google Search (`tools=[{"google_search": {}}]`), đúng cơ chế đã dùng thật ở
-`app/services/learning_chat_service.py:ask_advanced_question`. KHÔNG tự
-scrape HTML trang kết quả Google — mọi truy xuất web đi qua tool có sẵn của
-Gemini, model tự quyết định trang nào để đọc.
+"""Khám phá kiến thức Internet có kiểm chứng bằng Claude Web Search.
 
 Giai đoạn 6 đóng gói lại thành tính năng độc lập (tách khỏi luồng chat):
 domain-scoring nâng cấp (data-driven), redaction PII cơ bản trên excerpt,
-cache theo câu hỏi đã chuẩn hoá (TTL, tránh gọi Gemini lặp lại), quota theo
+cache theo câu hỏi đã chuẩn hoá (TTL, tránh gọi AI lặp lại), quota theo
 ngày (bền qua restart — khác `SlidingWindowLimiter` trong-tiến-trình hiện
 có, vốn không phù hợp cho hạn mức theo NGÀY).
 """
 
 import asyncio
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.services.llm_service import get_gemini_client
+from app.schemas.analytics import UsageEventCreate
+from app.services.ai_quota_service import claude_token_usage
+from app.services.analytics_service import new_attempt_id, new_event_id, new_logical_request_id, record_event
+from app.services.llm_service import claude_web_search
 from app.web_knowledge.constants.collections import WEB_KNOWLEDGE_CACHE, WEB_KNOWLEDGE_QUOTA
 from app.web_knowledge.schemas.source import ExploreResponse
 
@@ -149,29 +149,23 @@ Quy tắc bắt buộc:
 def _extract_citations(response: Any) -> List[Dict[str, Any]]:
     citations: List[Dict[str, Any]] = []
     try:
-        grounding_metadata = getattr(response.candidates[0], "grounding_metadata", None)
-        if grounding_metadata is None:
-            return citations
         seen_urls = set()
-        for chunk in grounding_metadata.grounding_chunks or []:
-            web = getattr(chunk, "web", None)
-            if web is None or not getattr(web, "uri", None):
-                continue
-            uri = web.uri
-            if uri in seen_urls:
+        for item in response.citations:
+            uri = item.get("url")
+            if not uri or uri in seen_urls:
                 continue
             seen_urls.add(uri)
-            excerpt = getattr(chunk, "excerpt", None) or ""
+            excerpt = item.get("cited_text") or item.get("supporting_excerpt") or ""
             citations.append(
                 {
-                    "title": getattr(web, "title", None) or uri,
+                    "title": item.get("title") or uri,
                     "url": uri,
-                    "publisher": getattr(web, "publisher", None),
+                    "publisher": item.get("publisher"),
                     "supporting_excerpt": redact_text(excerpt) if excerpt else None,
                     "relevance_score": get_domain_score(uri) / 100.0,
                 }
             )
-    except Exception:  # noqa: BLE001 - thiếu grounding metadata không được làm hỏng câu trả lời
+    except Exception:  # noqa: BLE001 - thiếu citation không được làm hỏng câu trả lời
         pass
 
     citations.sort(key=lambda c: c["relevance_score"], reverse=True)
@@ -199,20 +193,21 @@ async def explore(db, *, user_id: str, query: str) -> ExploreResponse:
 
     await _check_and_increment_daily_quota(db, user_id)
 
+    used_tokens = await claude_token_usage(database=db)
+    if settings.CLAUDE_TOTAL_TOKEN_BUDGET > 0 and used_tokens >= settings.CLAUDE_TOTAL_TOKEN_BUDGET:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Đã đạt ngân sách token Claude của hệ thống.",
+        )
+
+    prompt = _build_prompt(query)
+    started = time.perf_counter()
+
     try:
-        client = get_gemini_client()
+        response = await asyncio.to_thread(claude_web_search, prompt)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
-
-    model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
-    prompt = _build_prompt(query)
-
-    def _call_ai():
-        return client.models.generate_content(model=model_name, contents=prompt, config={"tools": [{"google_search": {}}]})
-
-    try:
-        response = await asyncio.to_thread(_call_ai)
-    except Exception as exc:  # noqa: BLE001 - lỗi Gemini (quota/mạng) không được làm lộ traceback ra người dùng
+    except Exception as exc:  # noqa: BLE001 - lỗi provider không được làm lộ traceback ra người dùng
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Không thể tra cứu lúc này — dịch vụ AI đang gặp sự cố hoặc hết hạn mức, vui lòng thử lại sau.",
@@ -236,6 +231,27 @@ async def explore(db, *, user_id: str, query: str) -> ExploreResponse:
 
     citations = _extract_citations(response)
     now = datetime.now(timezone.utc)
+
+    logical_request_id = new_logical_request_id()
+    await record_event(UsageEventCreate(
+        event_id=new_event_id(),
+        logical_request_id=logical_request_id,
+        attempt_id=new_attempt_id(),
+        attempt_number=1,
+        is_final=True,
+        event_kind="logical_operation",
+        user_id=user_id,
+        operation_type="web_search",
+        provider="anthropic",
+        model_name=response.model,
+        status="success",
+        latency_ms=int((time.perf_counter() - started) * 1000),
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
+        total_tokens=response.total_tokens,
+        grounding_request_count=len(citations),
+        created_at=now,
+    ), database=db)
 
     await _store_cache(
         db,

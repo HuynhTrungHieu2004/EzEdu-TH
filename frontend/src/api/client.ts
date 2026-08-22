@@ -1,10 +1,5 @@
 import axios from 'axios';
-import type { InternalAxiosRequestConfig } from 'axios';
 import { buildApiUrl, createApiConfigError, isApiBaseUrlConfigured } from '../config/api';
-import { trackRequest } from './serverWaking';
-
-/** Hàm dọn của `trackRequest`, gắn kèm config để interceptor phản hồi gọi lại. */
-type TrackedConfig = InternalAxiosRequestConfig & { __untrack?: () => void };
 
 const client = axios.create({
   baseURL: isApiBaseUrlConfigured ? buildApiUrl('/api/v1') : undefined,
@@ -24,7 +19,6 @@ client.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    (config as TrackedConfig).__untrack = trackRequest();
     return config;
   },
   (error) => {
@@ -35,12 +29,8 @@ client.interceptors.request.use(
 // Interceptor to handle authentication expiration (401 Unauthorized) and
 // system-wide maintenance mode (503 Service Unavailable, error_code MAINTENANCE_MODE)
 client.interceptors.response.use(
-  (response) => {
-    (response.config as TrackedConfig).__untrack?.();
-    return response;
-  },
+  (response) => response,
   (error) => {
-    (error.config as TrackedConfig | undefined)?.__untrack?.();
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('access_token');
       // If we are not on login page, redirect to login page

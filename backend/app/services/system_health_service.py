@@ -160,18 +160,19 @@ async def _check_chromadb():
 
 
 async def _check_provider(name: str):
-    from app.services.llm_service import is_gemini_available, is_groq_available
+    from app.services.llm_service import is_claude_available, is_gemini_available, is_groq_available
 
-    ok = is_gemini_available() if name == "gemini" else is_groq_available()
+    checks = {
+        "claude": is_claude_available,
+        "gemini": is_gemini_available,
+        "groq": is_groq_available,
+    }
+    ok = checks[name]()
     return ("healthy" if ok else "unknown"), ("Provider đã cấu hình." if ok else "Provider chưa cấu hình hoặc chưa thể kiểm tra live."), {"live_ping": False}
 
 
 async def _check_embedding():
-    from app.services.llm_service import is_gemini_available
-
-    if is_gemini_available():
-        return "healthy", "Embedding có thể dùng Gemini hoặc fallback local.", {"provider": "gemini_or_local"}
-    return "degraded", "Embedding sẽ dùng fallback local hash.", {"provider": "local_fallback"}
+    return "healthy", "Embedding đang dùng local hash.", {"provider": "local"}
 
 
 async def _check_web_search():
@@ -209,7 +210,10 @@ async def get_system_health(*, include_history: bool = True, database: Any = Non
         ("mongodb", _check_mongodb),
         ("mongodb_indexes", _check_mongodb_indexes),
         ("chromadb", _check_chromadb),
-        ("gemini", lambda: _check_provider("gemini")),
+        (
+            "claude" if settings.AI_TEXT_PROVIDER == "claude" else "gemini",
+            lambda: _check_provider("claude" if settings.AI_TEXT_PROVIDER == "claude" else "gemini"),
+        ),
         ("groq", lambda: _check_provider("groq")),
         ("embedding_service", _check_embedding),
         ("web_search", _check_web_search),

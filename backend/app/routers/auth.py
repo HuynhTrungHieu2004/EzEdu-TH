@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Optional
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     UserRegister, UserLogin, UserResponse, Token, TokenPayload,
     GoogleLoginRequest, GoogleLoginResponse,
     FacebookLoginRequest, FacebookLoginResponse,
+    AccountEmailRequest, PasswordResetRequest, EmailVerificationRequest, MessageResponse,
 )
 from app.services.activity_log_service import record_activity
 from app.services.system_settings_service import get_setting_value, is_feature_enabled
@@ -32,8 +34,11 @@ from app.services.social_auth_service import (
     create_social_user,
     find_or_link_social_user,
 )
+from app.services.account_token_service import consume_account_token, issue_account_token
+from app.services.email_service import is_email_configured, send_account_email
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Swagger UI Authorize sẽ sử dụng endpoint login-swagger
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login-swagger", auto_error=False)
@@ -135,6 +140,100 @@ async def require_admin(current_user: UserResponse = Depends(get_current_user)) 
 
 def _email_domain(email: str) -> str:
     return email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(payload: AccountEmailRequest):
+    if not is_email_configured():
+        raise HTTPException(status_code=503, detail="Máy chủ chưa cấu hình dịch vụ gửi email.")
+
+    db = get_database()
+    user = await db["users"].find_one({
+        "email": str(payload.email).lower(),
+        "is_active": {"$ne": False},
+        "deleted_at": None,
+    })
+    if user:
+        raw = await issue_account_token(
+            db,
+            user_id=str(user["_id"]),
+            purpose="password_reset",
+            expires_minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES,
+        )
+        link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password?token={raw}"
+        try:
+            await send_account_email(
+                recipient=user["email"],
+                subject="Đặt lại mật khẩu EzEdu AI",
+                body=f"Mở liên kết sau để đặt lại mật khẩu. Liên kết chỉ dùng một lần:\n\n{link}",
+            )
+        except Exception:
+            # Do not reveal account existence through a provider outage.
+            logger.exception("Password reset email delivery failed")
+
+    return MessageResponse(message="Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.")
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(payload: PasswordResetRequest):
+    db = get_database()
+    user_id = await consume_account_token(db, raw_token=payload.token, purpose="password_reset")
+    if not user_id or not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.")
+    now = datetime.now(timezone.utc)
+    result = await db["users"].update_one(
+        {"_id": ObjectId(user_id), "is_active": {"$ne": False}, "deleted_at": None},
+        {"$set": {
+            "hashed_password": get_password_hash(payload.new_password),
+            "force_logout_at": now,
+            "updated_at": now,
+        }},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=400, detail="Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.")
+    return MessageResponse(message="Mật khẩu đã được cập nhật.")
+
+
+@router.post("/verify-email", response_model=MessageResponse)
+async def verify_email(payload: EmailVerificationRequest):
+    db = get_database()
+    user_id = await consume_account_token(db, raw_token=payload.token, purpose="email_verification")
+    if not user_id or not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Liên kết xác thực email không hợp lệ hoặc đã hết hạn.")
+    result = await db["users"].update_one(
+        {"_id": ObjectId(user_id), "deleted_at": None},
+        {"$set": {"email_verified": True, "updated_at": datetime.now(timezone.utc)}},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(status_code=400, detail="Liên kết xác thực email không hợp lệ hoặc đã hết hạn.")
+    return MessageResponse(message="Email đã được xác thực.")
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(current_user: UserResponse = Depends(get_current_user)):
+    if not is_email_configured():
+        raise HTTPException(status_code=503, detail="Máy chủ chưa cấu hình dịch vụ gửi email.")
+
+    db = get_database()
+    user = await db["users"].find_one({"_id": ObjectId(current_user.id), "deleted_at": None})
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản.")
+    if user.get("email_verified") is True:
+        return MessageResponse(message="Email đã được xác thực.")
+
+    raw = await issue_account_token(
+        db,
+        user_id=current_user.id,
+        purpose="email_verification",
+        expires_minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES,
+    )
+    link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/verify-email?token={raw}"
+    await send_account_email(
+        recipient=user["email"],
+        subject="Xác thực email EzEdu AI",
+        body=f"Mở liên kết sau để xác thực email. Liên kết chỉ dùng một lần:\n\n{link}",
+    )
+    return MessageResponse(message="Đã gửi liên kết xác thực email.")
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

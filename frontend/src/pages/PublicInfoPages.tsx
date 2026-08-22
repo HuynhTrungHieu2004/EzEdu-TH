@@ -9,7 +9,6 @@
 import { useEffect, useState } from 'react';
 import PublicHeader from '../components/public/PublicHeader';
 import PublicFooter from '../components/public/PublicFooter';
-import { ChalkUnderline } from '../components/ui';
 import {
   Faq,
   FeaturesByRole,
@@ -78,7 +77,6 @@ function PublicInfoShell({
             <h1 className="ezp-title" style={{ fontSize: 'var(--ez-text-h1)' }}>
               {title}
             </h1>
-            <ChalkUnderline />
             <p className="ezp-lede">{description}</p>
           </div>
         </section>
@@ -132,21 +130,12 @@ export function FaqPage() {
   );
 }
 
-/**
- * Chính sách dữ liệu — liệt kê đúng những gì app lưu trên trình duyệt.
- *
- * Viết tay thay vì lấy từ CMS: nội dung này phải khớp với mã nguồn (bốn khoá
- * localStorage), nên để cạnh mã dễ giữ đồng bộ hơn là để quản trị viên sửa.
- */
 const BROWSER_STORAGE = [
-  { key: 'access_token', purpose: 'Giữ đăng nhập để mỗi lần mở trang không phải nhập lại mật khẩu.' },
-  { key: 'theme-preference', purpose: 'Nhớ bạn chọn giao diện sáng, tối hay theo hệ thống.' },
-  { key: 'ez-student-onboarding-draft', purpose: 'Giữ dở phần khai báo hồ sơ học sinh khi bạn thoát giữa chừng.' },
-  { key: 'ezedu_recent_tools', purpose: 'Đưa công cụ bạn hay dùng lên đầu danh sách.' },
-  { key: 'ezedu_announcement_dismissed', purpose: 'Ghi nhớ bạn đã tắt dải thông báo trên đầu trang. Mục này xoá ngay khi bạn đóng tab.' },
-  { key: 'learning-event-offline-queue', purpose: 'Giữ tạm hoạt động học khi mất mạng, gửi lên máy chủ khi có mạng lại.' },
-  { key: 'learning-session:…', purpose: 'Nối các thao tác trong cùng một buổi học vào một phiên, để thống kê thời lượng học.' },
-  { key: 'ez-data-notice-v1', purpose: 'Ghi nhớ bạn đã đọc thông báo này, để không hiện lại.' },
+  { key: 'access_token', purpose: 'Giữ phiên đăng nhập trên thiết bị này.' },
+  { key: 'theme-preference', purpose: 'Nhớ giao diện sáng, tối hoặc theo hệ thống.' },
+  { key: 'ez-student-onboarding-draft', purpose: 'Giữ tạm hồ sơ học sinh đang khai báo dở.' },
+  { key: 'ezedu_recent_tools', purpose: 'Đưa các công cụ thường dùng lên đầu danh sách.' },
+  { key: 'learning-event-offline-queue', purpose: 'Giữ tạm hoạt động học khi mất mạng để gửi lại sau.' },
 ];
 
 export function DataPolicyPage() {
@@ -154,61 +143,17 @@ export function DataPolicyPage() {
     <PublicInfoShell
       eyebrow="Quyền riêng tư"
       title="Dữ liệu lưu trên trình duyệt"
-      description="Trang này liệt kê chính xác những gì EzEdu AI lưu trên máy bạn, dùng để làm gì và cách xoá."
+      description="Những dữ liệu EzEdu AI lưu trên thiết bị, mục đích sử dụng và cách xóa."
     >
       <section className="ezp-container" style={{ paddingBottom: 'var(--ez-space-10)' }}>
-        <h2 className="ezp-section-title">Không dùng cookie</h2>
-        <p className="ezp-lede">
-          EzEdu AI không đặt cookie nào, không gắn công cụ phân tích lưu lượng, không có mã theo dõi quảng
-          cáo. Những gì lưu trên máy bạn nằm trong <code>localStorage</code> của trình duyệt và chỉ phục vụ
-          việc dùng ứng dụng.
-        </p>
-
-        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>
-          {/* Đếm từ chính danh sách. Viết cứng "Năm mục" đã lệch một lần khi
-              thêm mục mới, và một trang chính sách sai số liệu thì tệ hơn là
-              không có trang nào. */}
-          {BROWSER_STORAGE.length} mục được lưu
-        </h2>
-        <div className="ez-datatable-wrap">
-          <table className="ez-datatable">
-            <thead>
-              <tr>
-                <th scope="col">Tên mục</th>
-                <th scope="col">Dùng để làm gì</th>
-              </tr>
-            </thead>
-            <tbody>
-              {BROWSER_STORAGE.map((item) => (
-                <tr key={item.key}>
-                  <td><code>{item.key}</code></td>
-                  <td>{item.purpose}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Cách xoá</h2>
-        <p className="ezp-lede">
-          Bấm <strong>Đăng xuất</strong> là xoá phần giữ đăng nhập. Muốn xoá sạch, dùng chức năng xoá dữ liệu
-          trang web của trình duyệt: Chrome và Edge ở mục <em>Cài đặt → Quyền riêng tư → Dữ liệu duyệt web</em>,
-          Safari ở <em>Cài đặt → Nâng cao → Dữ liệu trang web</em>.
-        </p>
-
-        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Đăng nhập bằng Google</h2>
-        <p className="ezp-lede">
-          Nếu bạn dùng nút đăng nhập bằng Google, trình duyệt sẽ tải mã của Google Identity Services và Google
-          có thể lưu dữ liệu theo chính sách riêng của họ. Mã này chỉ được tải ở trang đăng nhập và đăng ký.
-          Không dùng nút đó thì không có gì của Google chạy.
-        </p>
-
-        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Dữ liệu học tập</h2>
-        <p className="ezp-lede">
-          Học liệu bạn tải lên, câu hỏi được sinh ra, bài làm và kết quả nằm trên máy chủ chứ không nằm trong
-          trình duyệt. Xoá dữ liệu trình duyệt không xoá những thứ đó; muốn xoá tài khoản và dữ liệu kèm theo,
-          liên hệ quản trị viên.
-        </p>
+        <h2 className="ezp-section-title">Dữ liệu cục bộ</h2>
+        <div className="ez-datatable-wrap"><table className="ez-datatable"><thead><tr><th scope="col">Tên mục</th><th scope="col">Mục đích</th></tr></thead><tbody>
+          {BROWSER_STORAGE.map((item) => <tr key={item.key}><td><code>{item.key}</code></td><td>{item.purpose}</td></tr>)}
+        </tbody></table></div>
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Dữ liệu trên máy chủ</h2>
+        <p className="ezp-lede">Tài khoản, học liệu, câu hỏi, bài làm và kết quả được lưu trong hệ thống để cung cấp chức năng học tập. Xóa dữ liệu trình duyệt không xóa các dữ liệu này; hãy liên hệ quản trị viên khi cần xóa tài khoản.</p>
+        <h2 className="ezp-section-title" style={{ marginTop: 'var(--ez-space-8)' }}>Cách xóa</h2>
+        <p className="ezp-lede">Đăng xuất để xóa phiên đăng nhập. Bạn cũng có thể dùng chức năng xóa dữ liệu trang web trong phần cài đặt quyền riêng tư của trình duyệt.</p>
       </section>
       <FinalCta />
     </PublicInfoShell>

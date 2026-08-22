@@ -11,13 +11,16 @@ from pymongo.errors import DuplicateKeyError
 from app.core.config import settings
 from app.database.mongodb import get_database
 from app.services.llm_service import (
+    claude_generate,
+    claude_web_search,
     generate_content,
     generate_json_with_failover,
     get_gemini_client,
-    get_groq_client,
 )
 from app.services.rag_service import search_user_chunks_advanced
 from app.services.system_settings_service import get_setting_value
+from app.curriculum_kb.services.context_service import resolve_context
+from app.services.language_policy_service import validate_output_language
 from app.schemas.chat import (
     AdvancedChatAskRequest,
     AdvancedChatResponse,
@@ -227,7 +230,9 @@ Chỉ trả về JSON."""
         
         # Thử lần lượt các nhà cung cấp: hạn mức miễn phí của Gemini là 20
         # lượt/ngày, hết là cả trang hỏi đáp chết trong khi Groq vẫn chạy tốt.
-        res_text = (await asyncio.to_thread(generate_json_with_failover, prompt) or "").strip()
+        res_text = (
+            await asyncio.to_thread(generate_json_with_failover, prompt, quality=False) or ""
+        ).strip()
         res_data = json.loads(res_text)
         mode = res_data.get("retrieval_mode", "internal_only")
         if mode in ["internal_only", "web_only", "hybrid", "model_knowledge", "clarification_required"]:
@@ -307,7 +312,11 @@ async def ask_advanced_question(
     _error_code = None
     _retrieval_mode_logged = None
     _evidence_status_logged = None
-    _model_name_logged = settings.GEMINI_MODEL or "gemini-2.5-flash"
+    _model_name_logged = (
+        settings.CLAUDE_FAST_MODEL
+        if settings.AI_TEXT_PROVIDER == "claude"
+        else settings.GEMINI_MODEL or "gemini-2.5-flash"
+    )
     _input_tokens = None
     _output_tokens = None
     _total_tokens = None
@@ -461,7 +470,9 @@ async def ask_advanced_question(
         history_msgs.reverse()
 
         # 7. Query Classification
-        retrieval_mode = await classify_query(
+        curriculum_scoped = payload.subject_id is not None and payload.grade is not None
+        output_language = payload.resolved_output_language
+        retrieval_mode = "internal_only" if curriculum_scoped else await classify_query(
             question=payload.question,
             history_messages=history_msgs,
             scope=payload.scope,
@@ -471,7 +482,81 @@ async def ask_advanced_question(
         # 8. Retrieve internal RAG context if needed
         rag_context = ""
         internal_chunks = []
-        if retrieval_mode in ["internal_only", "hybrid"]:
+        if curriculum_scoped:
+            curriculum_chunks = await resolve_context(
+                db,
+                query=payload.question,
+                subject_id=payload.subject_id,
+                grade=payload.grade,
+                topic_id=payload.topic_id,
+                language="en" if payload.subject_id == "tieng_anh" else None,
+            )
+            if curriculum_chunks:
+                rag_context = "\n\n".join(
+                    f"[Nguồn: DOC_{index}] (Tài liệu: {chunk.title}, CHUNK_ID: {chunk.chunk_id})\nNội dung: {chunk.text}"
+                    for index, chunk in enumerate(curriculum_chunks, 1)
+                )
+                internal_chunks = [
+                    {
+                        "id": chunk.chunk_id,
+                        "text": chunk.text,
+                        "relevance_score": chunk.relevance_score,
+                        "metadata": {
+                            "document_id": chunk.source_id,
+                            "document_title": chunk.title,
+                            "source_id": chunk.source_id,
+                        },
+                    }
+                    for chunk in curriculum_chunks
+                ]
+                retrieval_mode = "internal_only"
+            elif payload.use_web_search:
+                retrieval_mode = "web_only"
+            else:
+                retrieval_mode = "clarification_required"
+                answer = (
+                    "There is not enough verified local evidence to answer this question."
+                    if output_language == "en"
+                    else "Không có đủ bằng chứng nội bộ đã xác minh để trả lời câu hỏi này."
+                )
+                ans_response = {
+                    "answer": answer,
+                    "short_answer": answer,
+                    "explanation": answer,
+                    "key_points": [],
+                    "examples": [],
+                    "internal_citations": [],
+                    "web_citations": [],
+                    "retrieval_mode": retrieval_mode,
+                    "evidence_status": "insufficient_evidence",
+                    "confidence": 0.0,
+                    "external_search_status": "not_triggered",
+                    "conversation_id": conversation_id,
+                    "message_id": str(ObjectId()),
+                    "model_name": "local",
+                    "follow_up_suggestions": [],
+                }
+                await db["conversation_messages"].update_one(
+                    {"request_id": request_id}, {"$set": {"status": "completed"}}
+                )
+                assistant_msg_doc = {
+                    "conversation_id": ObjectId(conversation_id),
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "request_id": request_id,
+                    "status": "completed",
+                    "created_at": datetime.now(timezone.utc),
+                    "content": answer,
+                    **ans_response,
+                }
+                del assistant_msg_doc["message_id"]
+                result = await db["conversation_messages"].insert_one(assistant_msg_doc)
+                ans_response["message_id"] = str(result.inserted_id)
+                _event_status = "success"
+                _retrieval_mode_logged = retrieval_mode
+                _evidence_status_logged = "insufficient_evidence"
+                return ans_response
+        elif retrieval_mode in ["internal_only", "hybrid"]:
             rag_context, internal_chunks = await retrieve_context(user_id, payload.question, resolved_doc_ids)
             
             # Fallback if no relevant chunks found in hybrid
@@ -530,14 +615,11 @@ async def ask_advanced_question(
             history_context += f"{role}: {m['content']}\n"
 
         # 10. Call AI
-        client = get_gemini_client()
-        model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
-        
         # System instructions & delimiters
         system_instruction = f"""Bạn là một trợ lý học tập AI thông minh, hỗ trợ hỏi đáp kiến thức có dẫn nguồn chính xác.
 Quy tắc trả lời:
 1. Bạn phải phân tích kỹ lưỡng câu hỏi của người học.
-2. Trả lời bằng tiếng Việt.
+2. {"Answer entirely in English." if output_language == "en" else "Trả lời hoàn toàn bằng tiếng Việt."}
 3. Nếu thông tin không đủ để trả lời, hãy báo cáo evidence_status là "insufficient_evidence" và trả lời trung thực là không đủ thông tin.
 4. Tránh bịa đặt nguồn gốc hoặc URL.
 5. Định dạng đầu ra bắt buộc phải bao bọc bởi các thẻ như dưới đây:
@@ -577,77 +659,88 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
         # Final combined prompt
         prompt = f"{system_instruction}\n\n{user_prompt}"
         
-        # Setup tools config based on mode
-        tools = []
+        # Setup web search based on mode
+        use_external_search = False
         external_search_status = "disabled"
         if retrieval_mode in ["web_only", "hybrid"] and payload.use_web_search:
-            tools = [{"google_search": {}}]
+            use_external_search = True
             external_search_status = "success"
 
-        def _call_ai():
-            return client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config={
-                    "tools": tools,
-                }
-            )
-
-        # Gemini là đường chính vì chỉ nó có công cụ tìm kiếm, số liệu token và
-        # dữ liệu trích dẫn. Nhưng hạn mức miễn phí chỉ 20 lượt/ngày, và hết
-        # hạn mức thì cả trang hỏi đáp chết trong khi Groq vẫn chạy tốt.
-        try:
-            response = await asyncio.to_thread(_call_ai)
-            response_text = response.text or ""
-        except Exception as exc:  # noqa: BLE001 - đổi nhà cung cấp với mọi lỗi
-            logger.warning("Gemini trả lời thất bại, chuyển sang Groq: %s", exc)
-            response = None
-            response_text = await asyncio.to_thread(generate_content, prompt) or ""
-            # Groq không tra được Internet. Giữ nguyên "success" ở đây là nói với
-            # người học rằng câu trả lời có đối chiếu nguồn ngoài, trong khi thực
-            # tế nó chỉ dựa vào kiến thức sẵn có của mô hình.
-            if external_search_status == "success":
-                external_search_status = "unavailable"
-
-        # Extract token usage metadata (only record when SDK provides it)
-        _usage = getattr(response, "usage_metadata", None) if response is not None else None
-        if _usage is not None:
-            _input_tokens = getattr(_usage, "prompt_token_count", None)
-            _output_tokens = getattr(_usage, "candidates_token_count", None)
-            _total_tokens = getattr(_usage, "total_token_count", None)
-
-
         web_citations = []
-        grounding_metadata = (
-            getattr(response.candidates[0], "grounding_metadata", None)
-            if response is not None and getattr(response, "candidates", None)
-            else None
-        )
-        
-        if grounding_metadata:
-            g_chunks = getattr(grounding_metadata, "grounding_chunks", [])
-            _grounding_count = len(g_chunks)  # number of real web results retrieved
+        if settings.AI_TEXT_PROVIDER == "claude":
+            result = await asyncio.to_thread(
+                claude_web_search if use_external_search else claude_generate,
+                prompt,
+                **({} if use_external_search else {"quality": False}),
+            )
+            response_text = result.text
+            _model_name_logged = result.model
+            _input_tokens = result.input_tokens
+            _output_tokens = result.output_tokens
+            _total_tokens = result.total_tokens
+            _grounding_count = len(result.citations)
             seen_urls = set()
-            
-            for g_chunk in g_chunks:
-                web = getattr(g_chunk, "web", None)
-                if web:
-                    title = getattr(web, "title", "Nguồn Internet")
-                    uri = getattr(web, "uri", None)
+            for citation in result.citations:
+                uri = citation.get("url")
+                if uri and uri not in seen_urls:
+                    seen_urls.add(uri)
+                    web_citations.append(WebCitation(
+                        title=citation.get("title") or uri,
+                        url=uri,
+                        publisher=citation.get("publisher"),
+                        supporting_excerpt=citation.get("cited_text"),
+                        relevance_score=float(get_domain_score(uri)) / 100.0,
+                    ))
+        else:
+            client = get_gemini_client()
+            model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
+
+            def _call_ai():
+                return client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config={"tools": [{"google_search": {}}] if use_external_search else []},
+                )
+
+            try:
+                response = await asyncio.to_thread(_call_ai)
+                response_text = response.text or ""
+            except Exception as exc:  # noqa: BLE001 - rollback provider failover
+                logger.warning("Gemini trả lời thất bại, chuyển sang Groq: %s", exc)
+                response = None
+                response_text = await asyncio.to_thread(generate_content, prompt) or ""
+                if external_search_status == "success":
+                    external_search_status = "unavailable"
+
+            usage = getattr(response, "usage_metadata", None) if response is not None else None
+            if usage is not None:
+                _input_tokens = getattr(usage, "prompt_token_count", None)
+                _output_tokens = getattr(usage, "candidates_token_count", None)
+                _total_tokens = getattr(usage, "total_token_count", None)
+
+            grounding_metadata = (
+                getattr(response.candidates[0], "grounding_metadata", None)
+                if response is not None and getattr(response, "candidates", None)
+                else None
+            )
+            if grounding_metadata:
+                chunks = getattr(grounding_metadata, "grounding_chunks", [])
+                _grounding_count = len(chunks)
+                seen_urls = set()
+                for chunk in chunks:
+                    web = getattr(chunk, "web", None)
+                    uri = getattr(web, "uri", None) if web else None
                     if uri and uri not in seen_urls:
                         seen_urls.add(uri)
-                        
-                        web_citations.append(
-                            WebCitation(
-                                title=title,
-                                url=uri,
-                                publisher=getattr(web, "publisher", None),
-                                supporting_excerpt=getattr(g_chunk, "excerpt", None),
-                                relevance_score=float(get_domain_score(uri)) / 100.0
-                            )
-                        )
-                        
-            # Sort web citations by authority score
+                        web_citations.append(WebCitation(
+                            title=getattr(web, "title", "Nguồn Internet"),
+                            url=uri,
+                            publisher=getattr(web, "publisher", None),
+                            supporting_excerpt=getattr(chunk, "excerpt", None),
+                            relevance_score=float(get_domain_score(uri)) / 100.0,
+                        ))
+
+        if web_citations:
             web_citations.sort(key=lambda x: (x.relevance_score or 0.0), reverse=True)
             web_citations = web_citations[:settings.MAX_WEB_CITATIONS]
             for i, citation in enumerate(web_citations, 1):
@@ -671,6 +764,11 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
 
         full_answer = explanation or response_text
         full_answer = clean_hallucinated_urls(full_answer, web_citations)
+        if curriculum_scoped:
+            validate_output_language(
+                [short_answer, explanation, *key_points, *examples, *follow_up],
+                expected=output_language,
+            )
 
         # 13. Map pre-assigned DOC_x to actual chunks and filter invalid ones
         internal_citations = []
@@ -687,7 +785,7 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
                         chunk_id=chunk["id"],
                         excerpt=chunk["text"],
                         relevance_score=chunk.get("relevance_score", 1.0),
-                        source_id=f"DOC_{idx}"
+                        source_id=chunk["metadata"].get("source_id") or f"DOC_{idx}"
                     )
                 )
                 
@@ -720,7 +818,7 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
             "external_search_status": external_search_status,
             "conversation_id": conversation_id,
             "message_id": str(ObjectId()),
-            "model_name": model_name,
+            "model_name": _model_name_logged,
             "follow_up_suggestions": follow_up
         }
 
@@ -813,7 +911,7 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
             event_kind="logical_operation",
             user_id=user_id,
             operation_type="advanced_chat",
-            provider="google",
+            provider="anthropic" if settings.AI_TEXT_PROVIDER == "claude" else "google",
             model_name=_model_name_logged,
             retrieval_mode=_retrieval_mode_logged,
             evidence_status=_evidence_status_logged,
@@ -825,7 +923,7 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
             total_tokens=_total_tokens,
             grounding_request_count=_grounding_count,
             created_at=datetime.now(timezone.utc),
-        ))
+        ), database=db)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

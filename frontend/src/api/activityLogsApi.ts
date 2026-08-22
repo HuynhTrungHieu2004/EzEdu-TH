@@ -3,10 +3,18 @@ import type {
   ActivityLogListParams,
   UserActivityLogListResponse,
   UserActivityLogStatisticsResponse,
-  UserBehaviorGroupsResponse,
 } from '../types/activityLogs';
 
 export const activityLogsApi = {
+  selfActivity: async (
+    params: Pick<ActivityLogListParams, 'page' | 'page_size'> = {},
+    signal?: AbortSignal,
+  ): Promise<UserActivityLogListResponse> =>
+    (await client.get<UserActivityLogListResponse>('/activity', { params, signal })).data,
+
+  selfStatistics: async (signal?: AbortSignal): Promise<UserActivityLogStatisticsResponse> =>
+    (await client.get<UserActivityLogStatisticsResponse>('/activity/statistics', { signal })).data,
+
   list: async (params: ActivityLogListParams, signal?: AbortSignal): Promise<UserActivityLogListResponse> => {
     const response = await client.get<UserActivityLogListResponse>('/admin/activity-logs', { params, signal });
     return response.data;
@@ -26,15 +34,6 @@ export const activityLogsApi = {
     signal?: AbortSignal,
   ): Promise<UserActivityLogListResponse> => {
     const response = await client.get<UserActivityLogListResponse>(`/admin/users/${userId}/activity`, { params, signal });
-    return response.data;
-  },
-
-  /** Phân nhóm hành vi người dùng bằng K-Means (chỉ quản trị). */
-  behaviorGroups: async (days = 90, signal?: AbortSignal): Promise<UserBehaviorGroupsResponse> => {
-    const response = await client.get<UserBehaviorGroupsResponse>('/admin/behavior-groups', {
-      params: { days },
-      signal,
-    });
     return response.data;
   },
 };

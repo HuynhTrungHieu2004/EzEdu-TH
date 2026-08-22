@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Any, List, Optional, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field, model_validator
 from app.schemas.feedback import FeedbackResponse
+from app.services.language_policy_service import resolve_output_language
 
 
 class ChatAskRequest(BaseModel):
@@ -34,6 +35,27 @@ class AdvancedChatAskRequest(BaseModel):
     use_web_search: bool = True
     response_style: Literal["concise", "normal", "detailed", "beginner"] = "normal"
     request_id: Optional[str] = None
+    subject_id: Optional[str] = Field(None, min_length=1, max_length=100)
+    grade: Optional[int] = Field(None, ge=6, le=12)
+    topic_id: Optional[str] = Field(None, max_length=100)
+    output_language: Optional[Literal["vi", "en"]] = None
+
+    @model_validator(mode="after")
+    def require_subject_and_grade_together(self) -> "AdvancedChatAskRequest":
+        if (self.subject_id is None) != (self.grade is None):
+            raise ValueError("subject_id and grade must be supplied together")
+        return self
+
+    @computed_field
+    @property
+    def resolved_output_language(self) -> Literal["vi", "en"]:
+        if self.subject_id is None or self.grade is None:
+            return self.output_language or "vi"
+        return resolve_output_language(
+            subject_id=self.subject_id,
+            grade=self.grade,
+            explicit=self.output_language,
+        )
 
 
 class WebCitation(BaseModel):
@@ -81,7 +103,7 @@ class AdvancedChatResponse(BaseModel):
 
 
 import re
-from pydantic import field_validator, model_validator
+from pydantic import field_validator
 
 class ConversationResponse(BaseModel):
     id: str

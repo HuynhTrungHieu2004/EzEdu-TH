@@ -1,363 +1,65 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { BookOpen, ClipboardList, FileText, School, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  ClipboardList,
-  Database,
-  FileQuestion,
-  FileText,
-  Library,
-  MessageSquare,
-  Plus,
-  Sparkles,
-  Upload,
-  Users,
-  Video,
-} from 'lucide-react';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  ErrorState,
-  SearchCommand,
-  SkeletonText,
-  StatGrid,
-  StatTile,
-} from '../../components/ui';
-import { ProcessingStatusBadge } from '../../components/domain/ProcessingStatusBadge';
-import { isDocumentReady } from '../../components/domain/documentStatus';
-import CharacterIllustration from '../../components/public/CharacterIllustration';
-import { documentApi } from '../../api/documentApi';
-import type { DocumentResponse } from '../../api/documentApi';
-import { questionApi } from '../../api/questionApi';
-import type { QuestionSetSummary } from '../../api/questionApi';
+import { assignmentsApi } from '../../api/assignmentsApi';
 import { classesApi } from '../../api/classesApi';
-import { useAuth } from '../../hooks/useAuth';
-import { toolsEnabledBy, toolsForRole } from '../../data/toolRegistry';
-import { useFeatureFlags } from '../../hooks/useFeatureFlags';
-import { AnimatedCounter, StaggerGroup } from '../../motion';
-import '../dashboard.css';
+import { coursesApi } from '../../api/coursesApi';
+import { documentApi, type DocumentResponse } from '../../api/documentApi';
+import { questionApi, type QuestionSetSummary } from '../../api/questionApi';
+import { Button, Card, CardBody, PageHeader, StatGrid, StatTile } from '../../components/ui';
+import type { Assignment, Course } from '../../types/courses';
 
-const QUICK_ACTIONS = [
-  { to: '/documents', label: 'Tải học liệu', icon: Upload },
-  { to: '/generate', label: 'Sinh câu hỏi', icon: Sparkles },
-  { to: '/exam-blueprints', label: 'Tạo đề', icon: ClipboardList },
-  { to: '/question-bank', label: 'Ngân hàng câu hỏi', icon: Database },
-  { to: '/chat-advanced', label: 'Hỏi đáp AI', icon: MessageSquare },
-];
-
-type LoadState = 'loading' | 'ready' | 'error';
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-/**
- * Tổng quan của giáo viên.
- *
- * Thay bốn thẻ điều hướng 01–04 bằng nội dung thật: học liệu gần đây kèm trạng
- * thái xử lý, bộ đề gần đây, và một hành động chính duy nhất.
- *
- * Trạng thái pipeline được diễn đạt bằng ngôn ngữ người dùng — không hiện tên
- * bước kỹ thuật, không hiện thuật ngữ embedding hay K-Means.
- */
 export default function TeacherDashboardPage() {
-  const { user } = useAuth();
-  const [state, setState] = useState<LoadState>('loading');
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [questionSets, setQuestionSets] = useState<QuestionSetSummary[]>([]);
-  const [classCount, setClassCount] = useState<number | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [classCount, setClassCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([documentApi.list(), questionApi.listMyHistory({ limit: 5 })])
-      .then(([docs, sets]) => {
-        if (cancelled) return;
-        setDocuments(docs ?? []);
-        setQuestionSets(sets.items ?? []);
-        setState('ready');
-      })
-      .catch(() => {
-        if (!cancelled) setState('error');
-      });
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const results = await Promise.allSettled([
+        documentApi.list(),
+        questionApi.listMyHistory({ limit: 5 }),
+        classesApi.list(),
+        coursesApi.getAllCourses(),
+        assignmentsApi.list(),
+      ]);
+      const [docs, sets, classData, courseData, assignmentData] = results;
+      if (docs.status === 'fulfilled') setDocuments(docs.value);
+      if (sets.status === 'fulfilled') setQuestionSets(sets.value.items);
+      if (classData.status === 'fulfilled') setClassCount(classData.value.items.length);
+      if (courseData.status === 'fulfilled') setCourses(courseData.value);
+      if (assignmentData.status === 'fulfilled') setAssignments(assignmentData.value);
+      if (results.some((result) => result.status === 'rejected')) {
+        setError('Một số dữ liệu chưa thể tải. Bạn có thể bấm Làm mới để thử lại.');
+      }
+    } catch {
+      setError('Không thể tải tổng quan giảng dạy.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Số lớp là thông tin phụ: lỗi ở đây không được làm hỏng cả trang.
   useEffect(() => {
-    let cancelled = false;
-    classesApi
-      .list()
-      .then((res) => {
-        if (!cancelled) setClassCount(res.items?.length ?? 0);
-      })
-      .catch(() => {
-        if (!cancelled) setClassCount(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const firstName = user?.full_name?.trim().split(/\s+/).slice(-1)[0] ?? 'bạn';
-  const readyDocs = documents.filter((doc) => isDocumentReady(doc.status));
-  const isNewcomer = state === 'ready' && documents.length === 0 && questionSets.length === 0;
-  const { isEnabled } = useFeatureFlags();
-  const teacherTools = useMemo(() => toolsEnabledBy(toolsForRole('teacher'), isEnabled), [isEnabled]);
+    queueMicrotask(() => void load());
+  }, [load]);
 
   return (
-    <>
-      <div className="ez-dashboard-banner">
-        <header className="dash-greeting">
-          <h1 className="dash-greeting-title">Xin chào, {firstName}</h1>
-          <p className="dash-greeting-sub">Hôm nay bạn muốn chuẩn bị nội dung gì?</p>
-        </header>
-        <CharacterIllustration variant="teacher" className="ez-dashboard-banner-art" />
-      </div>
-
-      <div style={{ marginBottom: 'var(--ez-space-6)' }}>
-        <SearchCommand
-          placeholder="Tìm công cụ, học liệu, câu hỏi hoặc đề thi..."
-          tools={teacherTools}
-        />
-      </div>
-
-      <div style={{ marginBottom: 'var(--ez-space-8)' }}>
-        <StaggerGroup className="dash-quick-actions" selector=".dash-quick-action">
-          {QUICK_ACTIONS.map(({ to, label, icon: Icon }) => (
-            <Link key={to} to={to} className="dash-quick-action">
-              <Icon size={18} aria-hidden="true" />
-              <span>{label}</span>
-            </Link>
-          ))}
-        </StaggerGroup>
-      </div>
-
-      {state === 'error' && (
-        <ErrorState
-          title="Không tải được dữ liệu"
-          description="Kết nối tới hệ thống đang gặp sự cố. Bạn có thể thử lại."
-          onRetry={() => window.location.reload()}
-        />
-      )}
-
-      {state === 'loading' && (
-        <Card style={{ marginBottom: 'var(--ez-space-8)' }}>
-          <CardBody>
-            <SkeletonText lines={3} />
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Người mới: ba bước đầu tiên, thay cho lưới thẻ trống */}
-      {isNewcomer && (
-        <Card style={{ marginBottom: 'var(--ez-space-8)' }}>
-          <CardHeader>
-            <div>
-              <CardTitle as="h2">Ba bước để có bộ đề đầu tiên</CardTitle>
-            </div>
-          </CardHeader>
-          <CardBody>
-            <ol className="dash-onboard-list">
-              <li className="dash-onboard-item">
-                <span className="dash-onboard-num" aria-hidden="true">
-                  1
-                </span>
-                <div>
-                  <p className="dash-onboard-title">Tải học liệu lên</p>
-                  <p className="dash-onboard-desc">
-                    Tài liệu PDF, DOCX, PPTX hoặc video bài giảng. Video sẽ được chuyển lời thành
-                    văn bản.
-                  </p>
-                  <div className="dash-onboard-action">
-                    <Link to="/documents">
-                      <Button size="sm">Tải học liệu lên</Button>
-                    </Link>
-                  </div>
-                </div>
-              </li>
-              <li className="dash-onboard-item">
-                <span className="dash-onboard-num" aria-hidden="true">
-                  2
-                </span>
-                <div>
-                  <p className="dash-onboard-title">Sinh bộ câu hỏi</p>
-                  <p className="dash-onboard-desc">
-                    Chọn số câu, độ khó và dạng câu hỏi. Hệ thống tạo câu hỏi kèm đáp án và giải
-                    thích.
-                  </p>
-                </div>
-              </li>
-              <li className="dash-onboard-item">
-                <span className="dash-onboard-num" aria-hidden="true">
-                  3
-                </span>
-                <div>
-                  <p className="dash-onboard-title">Rà soát rồi ban hành</p>
-                  <p className="dash-onboard-desc">
-                    Bạn xem lại từng câu, sửa nếu cần, rồi ban hành cho học sinh hoặc xuất ra
-                    DOCX/PDF.
-                  </p>
-                </div>
-              </li>
-            </ol>
-          </CardBody>
-        </Card>
-      )}
-
-      {state === 'ready' && !isNewcomer && (
-        <>
-          <StaggerGroup selector=".ez-stat">
-            <StatGrid style={{ marginBottom: 'var(--ez-space-8)' }}>
-              <StatTile label="Học liệu" value={<AnimatedCounter value={documents.length} />} />
-              <StatTile label="Sẵn sàng dùng" value={<AnimatedCounter value={readyDocs.length} />} />
-              <StatTile label="Bộ đề đã tạo" value={<AnimatedCounter value={questionSets.length} />} />
-              <StatTile
-                label="Lớp học"
-                value={classCount === null ? '—' : <AnimatedCounter value={classCount} />}
-              />
-            </StatGrid>
-          </StaggerGroup>
-
-          <div className="dash-columns">
-            <div>
-              <section className="dash-block">
-                <Card>
-                  <CardHeader>
-                    <div>
-                      <CardTitle as="h2">Học liệu gần đây</CardTitle>
-                    </div>
-                    <Link to="/documents">
-                      <Button variant="ghost" size="sm">
-                        Xem tất cả
-                      </Button>
-                    </Link>
-                  </CardHeader>
-                  <CardBody>
-                    {documents.length === 0 ? (
-                      <EmptyState
-                        compact
-                        icon={<Library size={24} />}
-                        title="Chưa có học liệu nào"
-                        description="Tải tài liệu hoặc video bài giảng lên để bắt đầu."
-                        actions={
-                          <Link to="/documents">
-                            <Button size="sm">Tải học liệu lên</Button>
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <div>
-                        {documents.slice(0, 5).map((doc) => (
-                          <Link key={doc.id} to={`/documents/${doc.id}`} className="dash-row">
-                            <span className="dash-row-icon" aria-hidden="true">
-                              {doc.media_kind === 'video' ? (
-                                <Video size={18} />
-                              ) : (
-                                <FileText size={18} />
-                              )}
-                            </span>
-                            <span className="dash-row-main">
-                              <span className="dash-row-title">{doc.original_filename}</span>
-                              <span className="dash-row-meta">
-                                <span>{formatDate(doc.created_at)}</span>
-                              </span>
-                            </span>
-                            <span className="dash-row-trail">
-                              <ProcessingStatusBadge status={doc.status} />
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </CardBody>
-                </Card>
-              </section>
-            </div>
-
-            <div>
-              <section className="dash-block">
-                <Card>
-                  <CardHeader>
-                    <div>
-                      <CardTitle as="h2">Bộ đề gần đây</CardTitle>
-                    </div>
-                    <Link to="/question-history">
-                      <Button variant="ghost" size="sm">
-                        Xem tất cả
-                      </Button>
-                    </Link>
-                  </CardHeader>
-                  <CardBody>
-                    {questionSets.length === 0 ? (
-                      <EmptyState
-                        compact
-                        icon={<FileQuestion size={24} />}
-                        title="Chưa có bộ đề nào"
-                        description="Tạo bộ câu hỏi đầu tiên từ học liệu đã tải lên."
-                        actions={
-                          <Link to="/generate">
-                            <Button size="sm" leadingIcon={<Plus size={16} aria-hidden="true" />}>
-                              Tạo đề mới
-                            </Button>
-                          </Link>
-                        }
-                      />
-                    ) : (
-                      <div>
-                        {questionSets.slice(0, 5).map((set) => (
-                          <Link key={set.id} to={`/question-sets/${set.id}`} className="dash-row">
-                            <span className="dash-row-icon" aria-hidden="true">
-                              <FileQuestion size={18} />
-                            </span>
-                            <span className="dash-row-main">
-                              <span className="dash-row-title">
-                                {set.document_name || 'Bộ câu hỏi'}
-                              </span>
-                              <span className="dash-row-meta">
-                                <span>{set.question_count} câu</span>
-                                <span>{formatDate(set.created_at)}</span>
-                                {set.published_question_count > 0 && <span>Đã ban hành</span>}
-                              </span>
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </CardBody>
-                </Card>
-              </section>
-
-              <section className="dash-block">
-                <Card variant="muted">
-                  <CardBody>
-                    <p className="dash-onboard-title">Giao đề theo lớp</p>
-                    <p className="dash-onboard-desc">
-                      Tạo lớp và thêm học sinh để ban hành đề cho đúng nhóm người học.
-                    </p>
-                    <div className="dash-onboard-action">
-                      <Link to="/classes">
-                        <Button
-                          variant="outline"
-                          leadingIcon={<Users size={16} aria-hidden="true" />}
-                        >
-                          Quản lý lớp học
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardBody>
-                </Card>
-              </section>
-            </div>
-          </div>
-        </>
-      )}
-    </>
+    <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
+      <PageHeader title="Tổng quan giảng dạy" description="Dữ liệu trực tiếp từ học liệu, lớp, khóa học và bài tập của bạn." actions={<Button variant="outline" onClick={() => void load()}>Làm mới</Button>} />
+      {loading ? <Card style={{ padding: '3rem', textAlign: 'center' }}>Đang tải...</Card> : <>
+        {error && <Card style={{ padding: '1rem', textAlign: 'center', color: '#b91c1c' }}>{error}</Card>}
+        <StatGrid><StatTile label="Học liệu" value={documents.length} icon={<FileText size={20} />} /><StatTile label="Bộ câu hỏi" value={questionSets.length} icon={<ClipboardList size={20} />} /><StatTile label="Lớp phụ trách" value={classCount} icon={<Users size={20} />} /><StatTile label="Khóa học" value={courses.length} icon={<School size={20} />} /><StatTile label="Bài tập" value={assignments.length} icon={<BookOpen size={20} />} /></StatGrid>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+          <Card><CardBody><h3>Học liệu gần đây</h3>{documents.slice(0, 5).map((item) => <p key={item.id}><Link to={`/documents/${item.id}`}>{item.original_filename}</Link><br /><span style={{ color: '#64748b' }}>{item.status}</span></p>)}{documents.length === 0 && <p style={{ color: '#64748b' }}>Chưa có học liệu.</p>}<Link to="/documents">Quản lý học liệu</Link></CardBody></Card>
+          <Card><CardBody><h3>Bộ câu hỏi gần đây</h3>{questionSets.slice(0, 5).map((item) => <p key={item.id}><Link to={`/question-sets/${item.id}`}>{item.document_name}</Link><br /><span style={{ color: '#64748b' }}>{item.question_count} câu</span></p>)}{questionSets.length === 0 && <p style={{ color: '#64748b' }}>Chưa có bộ câu hỏi.</p>}<Link to="/question-bank">Mở ngân hàng câu hỏi</Link></CardBody></Card>
+        </div>
+      </>}
+    </div>
   );
 }

@@ -9,6 +9,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
+from app.core.config import settings
 from app.database.mongodb import get_database
 from app.schemas.auth import UserResponse
 from app.schemas.question import (
@@ -27,6 +28,8 @@ from app.schemas.question import (
 )
 from app.routers.auth import get_current_user
 from app.services.question_generation_service import generate_questions
+from app.curriculum_kb.services.context_service import UngroundedOutputError
+from app.services.language_policy_service import LanguageMismatchError
 from app.services.question_quality_service import analyze_question_set_quality
 from app.services.question_visibility_service import build_visible_question_set_filter
 from app.personalization.services.knowledge_extraction_job import enqueue_knowledge_extraction
@@ -64,7 +67,10 @@ async def _record_question_generation_usage(
     started: float,
     status_value: str,
     error_code: str | None = None,
+    usage: dict | None = None,
 ) -> None:
+    usage = usage or {}
+    is_claude = settings.AI_TEXT_PROVIDER == "claude"
     await record_event(UsageEventCreate(
         event_id=new_event_id(),
         logical_request_id=logical_request_id,
@@ -75,12 +81,15 @@ async def _record_question_generation_usage(
         user_id=user_id,
         operation_type="question_generation",
         feature="question_generation",
-        provider="mixed",
-        model_name="groq+gemini",
-        model="groq+gemini",
+        provider="anthropic" if is_claude else "mixed",
+        model_name=usage.get("model") or (settings.CLAUDE_QUALITY_MODEL if is_claude else "groq+gemini"),
+        model=usage.get("model") or (settings.CLAUDE_QUALITY_MODEL if is_claude else "groq+gemini"),
         status=status_value,
         error_code=error_code,
         latency_ms=int((time.perf_counter() - started) * 1000),
+        input_tokens=usage.get("input_tokens"),
+        output_tokens=usage.get("output_tokens"),
+        total_tokens=usage.get("total_tokens"),
         document_id=document_id,
         created_at=datetime.now(timezone.utc),
     ))
@@ -257,6 +266,10 @@ def _qs_to_response(qs: dict) -> QuestionSetResponse:
         published_question_count=counts.get("published", 0),
         audience_type=qs.get("audience_type") or "all",
         target_class_ids=qs.get("target_class_ids") or [],
+        subject_id=qs.get("subject_id"),
+        grade=qs.get("grade"),
+        topic_id=qs.get("topic_id"),
+        output_language=qs.get("output_language"),
         created_at=qs["created_at"],
         updated_at=qs.get("updated_at", qs["created_at"]),
     )
@@ -427,6 +440,10 @@ async def generate_questions_api(
             difficulty=payload.difficulty,
             question_type=payload.question_type,
             bloom_level=payload.bloom_level,
+            subject_id=payload.subject_id,
+            grade=payload.grade,
+            topic_id=payload.topic_id,
+            output_language=payload.output_language,
         )
     except FileNotFoundError as fnf_err:
         await _record_question_generation_usage(
@@ -452,6 +469,26 @@ async def generate_questions_api(
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(fnf_err)
+        )
+    except (UngroundedOutputError, LanguageMismatchError) as validation_err:
+        await _record_question_generation_usage(
+            user_id=current_user.id,
+            document_id=payload.document_id,
+            logical_request_id=logical_request_id,
+            started=started,
+            status_value="failure",
+            error_code="INVALID_RESPONSE",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": (
+                    "language_mismatch"
+                    if isinstance(validation_err, LanguageMismatchError)
+                    else "insufficient_evidence"
+                ),
+                "message": str(validation_err),
+            },
         )
     except ValueError as val_err:
         await _record_question_generation_usage(
@@ -515,6 +552,7 @@ async def generate_questions_api(
         logical_request_id=logical_request_id,
         started=started,
         status_value="success",
+        usage=question_set.pop("_ai_usage", None),
     )
     safe_metadata = {
         "question_count": len(question_set.get("questions", [])) or payload.question_count,

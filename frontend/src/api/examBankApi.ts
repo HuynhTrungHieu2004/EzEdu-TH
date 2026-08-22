@@ -228,11 +228,55 @@ export interface Attempt {
   version: number;
 }
 
+export interface ExamResultItem {
+  id: string;
+  exam_id: string;
+  exam_code: string;
+  student_id: string;
+  student_name: string | null;
+  student_email: string | null;
+  status: AttemptStatus;
+  score: number;
+  total_score: number;
+  max_score: number;
+  submitted_at: string | null;
+}
+
+export interface ExamResultStatistics {
+  total_attempts: number;
+  graded_attempts: number;
+  average_score: number;
+  pass_rate: number;
+  excellent_rate: number;
+  score_distribution: Record<string, number>;
+}
+
+export interface StudentExamItem {
+  id: string;
+  code: string;
+  question_count: number;
+  total_points: number;
+  duration_minutes: number;
+  published_at: string | null;
+  attempt_id: string | null;
+  attempt_status: AttemptStatus | null;
+  score: number | null;
+}
+
 function newIdempotencyKey(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export const examBankApi = {
+  listStudentExams: async (): Promise<StudentExamItem[]> =>
+    (await client.get<StudentExamItem[]>('/student/exams')).data,
+
+  listExamResults: async (classId?: string): Promise<ExamResultItem[]> =>
+    (await client.get<ExamResultItem[]>('/exam-results', { params: classId ? { class_id: classId } : {} })).data,
+
+  getExamResultStatistics: async (classId?: string): Promise<ExamResultStatistics> =>
+    (await client.get<ExamResultStatistics>('/exam-results/statistics', { params: classId ? { class_id: classId } : {} })).data,
+
   // ── Ngân hàng câu hỏi ──────────────────────────────────────────────
   createQuestion: async (payload: QuestionBankCreatePayload): Promise<QuestionBankItem> => {
     const response = await client.post<QuestionBankItem>('/question-bank/questions', payload);

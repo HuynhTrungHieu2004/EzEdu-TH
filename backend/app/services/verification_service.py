@@ -31,14 +31,19 @@ from app.services.document_mutation_service import (
     recover_interrupted_document_mutations,
 )
 from app.services.llm_service import (
+    claude_generate_json,
     gemini_generate_json,
     generate_json,
+    is_claude_available,
     is_gemini_available,
     is_groq_available,
+    start_claude_usage_capture,
+    stop_claude_usage_capture,
 )
 from app.services.text_chunking_service import split_text_into_chunks
 from app.services.rag_service import add_document_chunks
 from app.services.analytics_service import new_attempt_id, new_event_id, record_event
+from app.curriculum_kb.services.context_service import GroundedChunk, resolve_context
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +399,12 @@ async def verify_batch(
     chunks: list[str],
     start_index: int,
     batch_index: int,
+    *,
+    db=None,
+    subject_id: str | None = None,
+    grade: int | None = None,
+    topic_id: str | None = None,
+    local_evidence: list[GroundedChunk] | None = None,
 ) -> list[dict]:
     """
     Verify a single batch of chunks using dual-AI cross-check.
@@ -402,12 +413,49 @@ async def verify_batch(
     if not chunks:
         return []
 
+    curriculum_scoped = subject_id is not None and grade is not None
+    if (subject_id is None) != (grade is None):
+        raise ValueError("subject_id and grade must be supplied together")
+    if curriculum_scoped and local_evidence is None:
+        local_evidence = await resolve_context(
+            db or get_database(),
+            query=" ".join(chunks)[:1000],
+            subject_id=subject_id,
+            grade=grade,
+            topic_id=topic_id,
+            language="en" if subject_id == "tieng_anh" else None,
+        )
+    if curriculum_scoped and not local_evidence:
+        return []
+
     chunks_text = _format_chunks_for_prompt(chunks, start_index)
     if len(chunks_text) > MAX_CONTEXT_PER_BATCH:
         raise ValueError("Batch verification context exceeds the configured safe limit.")
 
     valid_chunk_indices = list(range(start_index, start_index + len(chunks)))
     prompt = _build_verification_prompt(chunks_text, batch_index, valid_chunk_indices)
+
+    if settings.AI_TEXT_PROVIDER == "claude":
+        if not is_claude_available():
+            raise VerificationProviderError("Chưa cấu hình Claude để kiểm tra nội dung.")
+        raw = await _call_llm_with_retry(
+            "Claude", lambda value: claude_generate_json(value, quality=True), prompt
+        )
+        parsed_issues = _parse_issues_response(raw)
+        normalized = _normalize_primary_issues(
+            parsed_issues, chunks, start_index, "claude"
+        )
+        if parsed_issues and not normalized:
+            raise VerificationProviderError("Claude chỉ trả về vấn đề không hợp lệ.")
+        confirmed = [issue for issue in normalized if issue["confidence"] >= CONFIDENCE_THRESHOLD]
+        if local_evidence:
+            source_reference = "; ".join(
+                f"{chunk.title} [{chunk.chunk_id}]" for chunk in local_evidence[:3]
+            )
+            for issue in confirmed:
+                issue["source_reference"] = source_reference
+                issue["external_verified"] = True
+        return confirmed
 
     # Step 1: Primary detection (prefer Gemini for factual knowledge)
     primary_issues: list[dict] = []
@@ -523,7 +571,13 @@ async def verify_batch(
             continue
 
         # Fact checking and grounding
-        source_ref, ext_verified = await _verify_issue_fact_with_search(issue)
+        if local_evidence:
+            source_ref = "; ".join(
+                f"{chunk.title} [{chunk.chunk_id}]" for chunk in local_evidence[:3]
+            )
+            ext_verified = True
+        else:
+            source_ref, ext_verified = await _verify_issue_fact_with_search(issue)
         issue["source_reference"] = source_ref
         issue["external_verified"] = ext_verified
 
@@ -755,7 +809,11 @@ async def create_verification_session(
         "issues_pending": 0,
         "successful_chunks": 0,
         "failed_chunks": 0,
-        "ai_model": settings.GEMINI_MODEL or "gemini-2.5-flash",
+        "ai_model": (
+            settings.CLAUDE_QUALITY_MODEL
+            if settings.AI_TEXT_PROVIDER == "claude"
+            else settings.GEMINI_MODEL or "gemini-2.5-flash"
+        ),
         "summary": None,
         "severity_stats": {"low": 0, "medium": 0, "high": 0, "critical": 0},
         "content_revision_hash": content_revision_hash,
@@ -931,6 +989,9 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
     successful_chunks = 0
     failed_chunks = 0
     errors_list: list[str] = []
+    usage_capture_token = (
+        start_claude_usage_capture() if settings.AI_TEXT_PROVIDER == "claude" else None
+    )
 
     try:
         await _ensure_verification_target_active(document_id, user_id, session_id)
@@ -1074,6 +1135,11 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
         await db["verification_issues"].delete_many({"session_id": session_id})
         await complete_session(session_id, 0, status="failed", error=f"Lỗi kiểm tra: {str(e)[:300]}")
     finally:
+        claude_usage = (
+            stop_claude_usage_capture(usage_capture_token)
+            if usage_capture_token is not None
+            else {}
+        )
         await record_event(UsageEventCreate(
             event_id=new_event_id(),
             logical_request_id=session_id,
@@ -1084,16 +1150,19 @@ async def run_verification_task(document_id: str, user_id: str, session_id: str)
             user_id=user_id,
             operation_type="document_verification",
             feature="document_verification",
-            provider="mixed",
-            model_name="groq+gemini",
-            model="groq+gemini",
+            provider="anthropic" if settings.AI_TEXT_PROVIDER == "claude" else "mixed",
+            model_name=(settings.CLAUDE_QUALITY_MODEL if settings.AI_TEXT_PROVIDER == "claude" else "groq+gemini"),
+            model=(settings.CLAUDE_QUALITY_MODEL if settings.AI_TEXT_PROVIDER == "claude" else "groq+gemini"),
             status=usage_status,
             error_code=usage_error_code,
             latency_ms=int((asyncio.get_running_loop().time() - started_at) * 1000),
+            input_tokens=claude_usage.get("input_tokens"),
+            output_tokens=claude_usage.get("output_tokens"),
+            total_tokens=claude_usage.get("total_tokens"),
             document_id=document_id,
             request_id=session_id,
             created_at=datetime.now(timezone.utc),
-        ))
+        ), database=db)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

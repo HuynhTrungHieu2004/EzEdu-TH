@@ -13,16 +13,20 @@ export type BadgeVariant =
   | 'error'
   | 'info';
 
+export type BadgeSize = 'sm' | 'md' | 'lg';
+
 export type BadgeProps = ComponentPropsWithoutRef<'span'> & {
   variant?: BadgeVariant;
   count?: boolean;
   icon?: ReactNode;
+  size?: BadgeSize;
 };
 
 export function Badge({
   variant = 'neutral',
   count = false,
   icon,
+  size,
   className,
   children,
   ...rest
@@ -33,6 +37,7 @@ export function Badge({
         'ez-badge',
         `ez-badge-${variant}`,
         count && 'ez-badge-count',
+        size && `ez-badge-${size}`,
         className,
       )}
       {...rest}

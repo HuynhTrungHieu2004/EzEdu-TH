@@ -11,12 +11,11 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  min-height: 100dvh; /* di động: 100vh tính cả phần bị thanh URL che */
   /* Transparent so the app-wide crystal gradient/sparkle background (set on
      <body> in index.css) shows through, instead of being hidden behind a
      flat opaque color like before. */
   background: transparent;
-  font-family: var(--ez-font-sans);
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 /* ── Header ───────────────────────────────────────────────── */
@@ -26,10 +25,10 @@
   justify-content: space-between;
   padding: 0 24px;
   height: 60px;
-  background: color-mix(in srgb, var(--ez-surface) 92%, transparent);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--ez-border);
+  border-bottom: 1px solid rgba(139, 124, 248, 0.10);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -47,11 +46,25 @@
   text-decoration: none;
 }
 
+.pub-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ez-radius-md);
+  background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
 
 .pub-logo-text {
   font-size: 16px;
   font-weight: 700;
-  color: var(--ez-text);
+  color: #1e1b4b;
   letter-spacing: -0.3px;
 }
 
@@ -68,19 +81,19 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: var(--ez-text-secondary);
+  color: #4c4878;
   padding: 6px 14px;
   border-radius: var(--ez-radius-md);
   transition: background 0.15s, color 0.15s;
 }
 
 .pub-nav-link:hover {
-  background: var(--ez-primary-subtle);
-  color: var(--ez-primary-hover);
+  background: rgba(139, 124, 248, 0.08);
+  color: #6c3fd1;
 }
 
 .pub-nav-cta {
-  background: var(--ez-gradient-cta);
+  background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
   border: none;
   cursor: pointer;
   font-size: 14px;
@@ -117,6 +130,7 @@
   opacity: 0.5;
   pointer-events: none;
   z-index: 0;
+  animation: pub-blob-float 16s ease-in-out infinite;
 }
 
 .pub-blob-1 {
@@ -124,7 +138,8 @@
   height: 380px;
   top: -100px;
   left: -140px;
-  background: radial-gradient(circle, rgba(29, 59, 44, 0.22) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(139, 124, 248, 0.30) 0%, transparent 70%);
+  animation-delay: 0s;
 }
 
 .pub-blob-2 {
@@ -132,7 +147,8 @@
   height: 340px;
   bottom: -120px;
   right: -110px;
-  background: radial-gradient(circle, rgba(214, 69, 69, 0.16) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(247, 74, 138, 0.22) 0%, transparent 70%);
+  animation-delay: 2.5s;
 }
 
 .pub-blob-3 {
@@ -140,7 +156,14 @@
   height: 280px;
   top: 40%;
   right: 8%;
-  background: radial-gradient(circle, rgba(29, 59, 44, 0.14) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.20) 0%, transparent 70%);
+  animation-delay: 5s;
+}
+
+@keyframes pub-blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(18px, -14px) scale(1.05); }
+  66% { transform: translate(-12px, 10px) scale(0.96); }
 }
 
 /* ── Cute floating study stickers ─────────────────────────── */
@@ -255,13 +278,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
-  border-top: 1px solid var(--ez-border);
-  background: color-mix(in srgb, var(--ez-surface) 70%, transparent);
+  border-top: 1px solid rgba(139, 124, 248, 0.10);
+  background: rgba(255, 255, 255, 0.70);
 }
 
 .pub-footer-copy {
   font-size: 12px;
-  color: var(--ez-text-secondary);
+  color: #8985a8;
   margin: 0;
 }
 
@@ -270,14 +293,14 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
-  color: var(--ez-text-link);
+  color: #8b7cf8;
   font-weight: 500;
   transition: color 0.15s;
   padding: 0;
 }
 
 .pub-footer-home:hover {
-  color: var(--ez-primary-hover);
+  color: #6c3fd1;
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
@@ -299,19 +322,5 @@
     gap: 8px;
     text-align: center;
     padding: 14px 16px;
-  }
-}
-
-/* Trang công khai là nơi người dùng chạm vào đầu tiên, phần lớn từ điện thoại:
-   các liên kết/nút ở đây tự đặt padding riêng nên chưa đủ 44px như hệ thiết kế. */
-@media (pointer: coarse) {
-  .pub-nav-cta,
-  .pub-nav-link,
-  .pub-footer-home,
-  .pub-footer-link {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
   }
 }

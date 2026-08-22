@@ -153,6 +153,20 @@ class RebuildTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dem["mongo_chunks"], 4)
         self.assertEqual(dem["chroma_vectors"], 0, "chưa nạp thì Chroma phải rỗng")
 
+    async def test_migrate_local_embedding_idempotent_and_keeps_legacy_vector(self):
+        await self._them_doan(2, chieu=768)
+        a, b, c = self._va()
+        with a, b, c:
+            first = await svc.migrate_embeddings_to_local()
+            second = await svc.migrate_embeddings_to_local()
+
+        docs = [doc async for doc in self.db["document_chunks"].find({})]
+        self.assertEqual(first["migrated"], 2)
+        self.assertEqual(second["migrated"], 2)
+        self.assertTrue(all(len(doc["embedding"]) == 768 for doc in docs))
+        self.assertTrue(all(len(doc["local_embedding"]) == svc.EMBEDDING_DIMENSION for doc in docs))
+        self.assertEqual(len(self.chroma.collections[f"document_chunks_local_{svc.EMBEDDING_DIMENSION}d"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

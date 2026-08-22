@@ -1,0 +1,29 @@
+{
+  "curriculum_version": "2018-consolidated-2022",
+  "source_url": "https://datafiles.chinhphu.vn/cpp/files/vbpq/2022/08/13-bgddt.signed.pdf",
+  "subjects": [
+    {"id": "ngu_van", "name": "Ngữ văn", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "toan", "name": "Toán", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "tieng_anh", "name": "Tiếng Anh", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "gdcd", "name": "Giáo dục công dân", "grades": [6, 7, 8, 9], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "lich_su_dia_li", "name": "Lịch sử và Địa lí", "grades": [6, 7, 8, 9], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "khoa_hoc_tu_nhien", "name": "Khoa học tự nhiên", "grades": [6, 7, 8, 9], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "cong_nghe", "name": "Công nghệ", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "tin_hoc", "name": "Tin học", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "giao_duc_the_chat", "name": "Giáo dục thể chất", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "nghe_thuat", "name": "Nghệ thuật", "grades": [6, 7, 8, 9], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "hoat_dong_trai_nghiem_huong_nghiep", "name": "Hoạt động trải nghiệm, hướng nghiệp", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "noi_dung_giao_duc_dia_phuong", "name": "Nội dung giáo dục địa phương", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "lich_su", "name": "Lịch sử", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "dia_li", "name": "Địa lí", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "gdktpl", "name": "Giáo dục kinh tế và pháp luật", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "vat_li", "name": "Vật lí", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "hoa_hoc", "name": "Hóa học", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "sinh_hoc", "name": "Sinh học", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "am_nhac", "name": "Âm nhạc", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "mi_thuat", "name": "Mĩ thuật", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "giao_duc_quoc_phong_an_ninh", "name": "Giáo dục quốc phòng và an ninh", "grades": [10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "ngoai_ngu_2", "name": "Ngoại ngữ 2", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]},
+    {"id": "tieng_dan_toc_thieu_so", "name": "Tiếng dân tộc thiểu số", "grades": [6, 7, 8, 9, 10, 11, 12], "topics": [{"id": "curriculum_outcomes", "name": "Yêu cầu cần đạt"}]}
+  ]
+}

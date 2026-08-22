@@ -11,7 +11,6 @@
  */
 import { useEffect, useState } from 'react';
 import AnnouncementBar from '../../components/public/AnnouncementBar';
-import { DataPipeline } from '../../components/public/DataPipeline';
 import PublicHeader from '../../components/public/PublicHeader';
 import PublicFooter from '../../components/public/PublicFooter';
 import {
@@ -31,8 +30,6 @@ import {
   TrustBlock,
   WhyEzEdu,
 } from '../../components/public/LandingSections';
-import { ScrollReveal } from '../../motion';
-import { RouteErrorBoundary } from '../../components/RouteErrorBoundary';
 import { fetchPublicWebsiteContent } from '../../api/websiteContentApi';
 import type { WebsiteContentBundle } from '../../types/websiteContent';
 import { DEFAULT_WEBSITE_CONTENT, mergeWebsiteContent } from '../../utils/websiteContentDefaults';
@@ -96,27 +93,21 @@ export default function LandingPage() {
       <PublicHeader content={content.header} identity={content.site_identity} />
 
       <main id="main" className="ezp-main" tabIndex={-1}>
-        {/* Nội dung CMS lỗi định dạng không được làm trắng trang chủ */}
-        <RouteErrorBoundary resetKey="landing">
-          <Hero content={content.hero} />
-          {/* Mỗi khối dưới hero xuất hiện khi cuộn tới; reduced motion hiện sẵn */}
-          <ScrollReveal><BuiltForLearning /></ScrollReveal>
-          {uploadEnabled && <ScrollReveal><PrimaryTool /></ScrollReveal>}
-          <ScrollReveal><QuickExamples /></ScrollReveal>
-          <ScrollReveal selector=".ezp-step"><HowItWorks /></ScrollReveal>
-          {/* Ghim theo cuộn: tự quản ScrollTrigger nên không bọc ScrollReveal */}
-          <DataPipeline />
-          <ScrollReveal selector=".ezp-card"><WhyEzEdu /></ScrollReveal>
-          <ScrollReveal><FeaturesByRole /></ScrollReveal>
-          <ScrollReveal selector=".ezp-card"><TeacherToolsShowcase /></ScrollReveal>
-          <ScrollReveal selector=".ezp-card"><StudentToolsShowcase /></ScrollReveal>
-          <ScrollReveal selector=".ezp-stat"><StatsBlock /></ScrollReveal>
-          <ScrollReveal><TestimonialBlock /></ScrollReveal>
-          <ScrollReveal><TrustBlock /></ScrollReveal>
-          <ScrollReveal><IntegrationsTeaser /></ScrollReveal>
-          <ScrollReveal><Faq /></ScrollReveal>
-          <ScrollReveal><FinalCta /></ScrollReveal>
-        </RouteErrorBoundary>
+        <Hero content={content.hero} />
+        <BuiltForLearning />
+        {uploadEnabled && <PrimaryTool />}
+        <QuickExamples />
+        <HowItWorks />
+        <WhyEzEdu />
+        <FeaturesByRole />
+        <TeacherToolsShowcase />
+        <StudentToolsShowcase />
+        <StatsBlock />
+        <TestimonialBlock />
+        <TrustBlock />
+        <IntegrationsTeaser />
+        <Faq />
+        <FinalCta />
       </main>
 
       <PublicFooter content={content.footer} identity={content.site_identity} />

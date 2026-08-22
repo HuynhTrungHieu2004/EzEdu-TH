@@ -11,6 +11,16 @@ from app.core.config import settings
 # USD per 1M tokens. These defaults are estimates only and can be replaced by
 # AI_MODEL_PRICING_JSON without code changes.
 DEFAULT_MODEL_PRICING: dict[str, dict[str, Any]] = {
+    "anthropic:claude-haiku-4-5-20251001": {
+        "input_per_1m": 1.0,
+        "output_per_1m": 5.0,
+        "currency": "USD",
+    },
+    "anthropic:claude-sonnet-5": {
+        "input_per_1m": 3.0,
+        "output_per_1m": 15.0,
+        "currency": "USD",
+    },
     "google:gemini-2.5-flash": {
         "input_per_1m": 0.30,
         "output_per_1m": 2.50,

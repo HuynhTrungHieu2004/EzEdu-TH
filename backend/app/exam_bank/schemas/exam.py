@@ -74,6 +74,18 @@ class ExamGenerateResponse(BaseModel):
     exams: List[ExamResponse]
 
 
+class StudentExamItem(BaseModel):
+    id: str
+    code: str
+    question_count: int
+    total_points: float
+    duration_minutes: int
+    published_at: Optional[datetime] = None
+    attempt_id: Optional[str] = None
+    attempt_status: Optional[Literal["in_progress", "submitted", "graded"]] = None
+    score: Optional[float] = None
+
+
 class ExamPreviewQuestionItem(BaseModel):
     question_id: str
     order: int

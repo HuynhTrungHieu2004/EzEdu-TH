@@ -37,9 +37,9 @@ const styles = {
   button: {
     padding: '6px 14px',
     borderRadius: '20px',
-    border: '1px solid var(--ez-border-strong)',
+    border: '1px solid var(--border-strong)',
     backgroundColor: 'var(--glass-white-strong)',
-    color: 'var(--ez-primary)',
+    color: 'var(--accent)',
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',

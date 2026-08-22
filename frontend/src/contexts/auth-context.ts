@@ -53,18 +53,3 @@ export function homePathForArea(area: AppArea | null): string {
       return '/login';
   }
 }
-
-/**
- * Trang đích ngay sau khi đăng nhập.
- *
- * Khác `homePathForArea`: học sinh được đưa thẳng tới danh sách bài thi, và
- * học sinh chưa khai hồ sơ thì đi qua bước thiết lập trước. Đăng nhập bằng mật
- * khẩu và bằng Google đều gọi hàm này để hai luồng không lệch nhau về sau.
- */
-export function postLoginPath(user: UserResponse): string {
-  if (user.role === 'student') {
-    return user.student_profile_completed ? '/published-questions' : '/student-onboarding';
-  }
-  if (user.role === 'admin') return '/admin/dashboard';
-  return '/dashboard';
-}

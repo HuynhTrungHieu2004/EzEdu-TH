@@ -4,7 +4,12 @@ import logging
 
 from pymongo import ASCENDING, DESCENDING
 
-from app.curriculum_kb.constants.collections import CRAWL_BATCHES, CRAWL_ITEMS, CURRICULUM_SOURCES
+from app.curriculum_kb.constants.collections import (
+    CRAWL_BATCHES,
+    CRAWL_ITEMS,
+    CURRICULUM_DATASET_RUNS,
+    CURRICULUM_SOURCES,
+)
 
 logger = logging.getLogger("app.curriculum_kb.repositories.indexes")
 
@@ -16,6 +21,16 @@ async def ensure_curriculum_kb_indexes(db) -> None:
             [("review_status", ASCENDING), ("ingest_status", ASCENDING), ("subject_id", ASCENDING)], name="source_published_lookup"
         )
         await db[CURRICULUM_SOURCES].create_index([("created_at", DESCENDING)], name="source_created_at")
+        await db[CURRICULUM_SOURCES].create_index(
+            [("dataset_key", ASCENDING), ("source_key", ASCENDING)],
+            name="source_dataset_key",
+            unique=True,
+            sparse=True,
+        )
+        await db[CURRICULUM_DATASET_RUNS].create_index(
+            [("dataset_key", ASCENDING), ("status", ASCENDING), ("started_at", DESCENDING)],
+            name="dataset_run_status",
+        )
         await db[CRAWL_BATCHES].create_index(
             [("owner_id", ASCENDING), ("created_at", DESCENDING)], name="crawl_batch_owner_created"
         )

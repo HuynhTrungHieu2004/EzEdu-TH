@@ -4,11 +4,7 @@ frontend/.env
 .env
 .env.local
 .env.*.local
-# Bản sao lưu cấu hình cũng chứa nguyên bộ khoá thật — dễ lọt lên remote nhất
-# vì tên khác .env nên các mẫu ở trên không bắt.
-.env.bak*
-*.env.bak*
-.env.*.bak*
+*.env
 
 # Virtual environments
 backend/.venv/
@@ -64,5 +60,3 @@ playwright-report/
 # Codex isolated feature worktrees
 .worktrees/
 
-# Thư mục làm việc tạm của quy trình subagent-driven — không phải mã nguồn
-.superpowers/

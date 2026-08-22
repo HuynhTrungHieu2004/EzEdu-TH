@@ -76,7 +76,7 @@ const styles = {
   label: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
   },
   grid: {
     display: 'grid',
@@ -89,18 +89,18 @@ const styles = {
     gap: '8px',
     padding: '8px 12px',
     borderRadius: '8px',
-    border: '1px solid var(--ez-border)',
-    backgroundColor: 'var(--ez-surface)',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--surface)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     fontSize: '12px',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     userSelect: 'none' as const,
   },
   checkboxLabelChecked: {
-    borderColor: 'var(--ez-error)',
-    backgroundColor: 'var(--ez-error-subtle)',
-    color: 'var(--ez-error)',
+    borderColor: 'var(--danger)',
+    backgroundColor: 'var(--danger-bg)',
+    color: 'var(--danger)',
   },
   checkboxLabelDisabled: {
     opacity: 0.5,

@@ -13,6 +13,23 @@ class UserLogin(BaseModel):
     password: str
 
 
+class AccountEmailRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(..., min_length=20, max_length=512)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class EmailVerificationRequest(BaseModel):
+    token: str = Field(..., min_length=20, max_length=512)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {

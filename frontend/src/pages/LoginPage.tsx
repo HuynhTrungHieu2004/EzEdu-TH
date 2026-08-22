@@ -1,172 +1,316 @@
-import { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
-import { Check } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { authApi } from '../api/authApi';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Moon, Sun, Check } from 'lucide-react';
+import { authApi, isDemoLoginConfigured, type SocialLoginResponse, type SocialRole } from '../api/authApi';
 import { getApiErrorDetail } from '../api/errors';
-import { postLoginPath } from '../contexts/auth-context';
 import { useAuth } from '../hooks/useAuth';
-import { Alert, Button, Card, CardBody, FormField, Input } from '../components/ui';
-import { GoogleSignInButton } from '../components/GoogleSignInButton';
-import { FacebookSignInButton } from '../components/FacebookSignInButton';
-import { SocialRoleDialog } from '../components/SocialRoleDialog';
-import { useGoogleSignIn } from '../hooks/useGoogleSignIn';
-import { useFacebookSignIn } from '../hooks/useFacebookSignIn';
-import './auth.css';
+import { useTheme } from '../contexts/ThemeContext';
+import { loginWithFacebook, renderGoogleButton } from '../utils/socialAuth';
 
-const BRAND_POINTS = [
-  'Học liệu của bạn thành ngân hàng câu hỏi có trích dẫn',
-  'Ma trận đề và bộ đề cân đối theo độ khó',
-  'Học sinh ôn tập ngay trong hội thoại, không cần chờ duyệt',
-];
+const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
+const googleClientId = viteEnv.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+const facebookAppId = viteEnv.VITE_FACEBOOK_APP_ID?.trim() ?? '';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const LoginPage = () => {
+const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { refresh } = useAuth();
+  const { preference, setPreference } = useTheme();
   const locationMessage = (location.state as { message?: string } | null)?.message ?? null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [success, setSuccess] = useState<string | null>(locationMessage);
-  const google = useGoogleSignIn('Đăng nhập bằng Google thất bại.');
-  const facebook = useFacebookSignIn('Đăng nhập bằng Facebook thất bại.');
-  // Đang xử lý một nhà cung cấp thì khoá cả hai nút: bấm nút kia giữa
-  // chừng sẽ chạy hai luồng đăng nhập song song, và luồng nào về sau sẽ
-  // ghi đè access_token của luồng về trước.
-  const dangDangNhap = google.dangXuLy || facebook.dangXuLy;
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [pendingSocial, setPendingSocial] = useState<{ provider: 'google' | 'facebook'; token: string; profile: SocialLoginResponse } | null>(null);
 
   useEffect(() => {
     if (locationMessage) {
       window.history.replaceState({}, document.title);
     }
-
-    if (localStorage.getItem('access_token')) {
-      navigate('/dashboard');
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      authApi.getMe().then((user) => {
+        if (user.role === 'student') navigate('/published-questions');
+        else if (user.role === 'admin') navigate('/admin/dashboard');
+        else navigate('/dashboard');
+      }).catch(() => {
+        localStorage.removeItem('access_token');
+      });
     }
   }, [locationMessage, navigate]);
 
-  /** Lỗi nhập liệu hiện ngay cạnh trường thay vì gộp vào một dòng trên đầu form. */
-  function validate(): boolean {
-    const next: { email?: string; password?: string } = {};
-    if (!email.trim()) next.email = 'Nhập email đăng nhập.';
-    else if (!EMAIL_PATTERN.test(email.trim())) next.email = 'Email chưa đúng định dạng.';
-    if (!password) next.password = 'Nhập mật khẩu.';
-    setFieldErrors(next);
-    return Object.keys(next).length === 0;
-  }
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setError(null);
     setSuccess(null);
-    if (!validate()) return;
 
-    setLoading(true);
     try {
       const data = await authApi.login({ email, password });
       localStorage.setItem('access_token', data.access_token);
       const user = await authApi.getMe();
-      // AuthProvider tự tải /auth/me ở lần mount đầu, khi chưa có token nên
-      // status dừng ở 'anonymous'. Không gọi refresh() ở đây thì status không
-      // bao giờ cập nhật, khiến RoleRoute coi người vừa đăng nhập là chưa đăng
-      // nhập và đưa họ quay lại /login — trong khi trang này thấy token vẫn
-      // còn nên lại điều hướng đi, tạo vòng lặp chuyển hướng vô tận.
       await refresh();
-      navigate(postLoginPath(user));
+
+      if (user.role === 'student' && !user.student_profile_completed) navigate('/student-onboarding');
+      else if (user.role === 'student') navigate('/published-questions');
+      else if (user.role === 'admin') navigate('/admin/dashboard');
+      else navigate('/dashboard');
     } catch (err: unknown) {
       const detail = getApiErrorDetail(err);
-      setError(detail ?? 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.');
+      setError(
+        detail ?? 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finishSocialLogin = useCallback(async (result: SocialLoginResponse, provider: 'google' | 'facebook', token: string) => {
+    if (result.needs_role) { setPendingSocial({ provider, token, profile: result }); return; }
+    if (!result.access_token) throw new Error('Máy chủ không trả về phiên đăng nhập.');
+    localStorage.setItem('access_token', result.access_token);
+    const user = await authApi.getMe();
+    await refresh();
+    if (user.role === 'student' && !user.student_profile_completed) navigate('/student-onboarding');
+    else if (user.role === 'student') navigate('/student/dashboard');
+    else if (user.role === 'admin' || user.role === 'super_admin') navigate('/admin/dashboard');
+    else navigate('/dashboard');
+  }, [navigate, refresh]);
+
+  const submitSocialToken = useCallback(async (provider: 'google' | 'facebook', token: string, role?: SocialRole) => {
+    setLoading(true); setError(null);
+    try {
+      const result = provider === 'google' ? await authApi.googleLogin(token, role) : await authApi.facebookLogin(token, role);
+      await finishSocialLogin(result, provider, token);
+    } catch (err) { setError(getApiErrorDetail(err) ?? 'Đăng nhập mạng xã hội thất bại.'); }
+    finally { setLoading(false); }
+  }, [finishSocialLogin]);
+
+  useEffect(() => {
+    const parent = googleButtonRef.current;
+    if (!googleClientId || !parent) return;
+    renderGoogleButton(parent, googleClientId, (credential) => void submitSocialToken('google', credential))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được Google Login.'));
+  }, [submitSocialToken]);
+
+  const handleBypassLogin = async (role: 'teacher' | 'student' | 'admin' = 'teacher') => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authApi.bypassLogin(role);
+      await refresh();
+      if (role === 'student') navigate('/published-questions');
+      else if (role === 'admin') navigate('/admin/dashboard');
+      else navigate('/dashboard');
+    } catch {
+      setError('Vào ứng dụng thất bại.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="ez-auth">
-      <aside className="ez-auth-brand" aria-hidden="true">
-        <h2 className="ez-auth-brand-title">Học liệu vào, đề luyện tập ra</h2>
-        <p className="ez-auth-brand-sub">
-          EzEdu AI đọc tài liệu bạn dạy, phân loại nội dung và dựng bộ đề bám đúng chương trình.
-        </p>
-        <ul className="ez-auth-points">
-          {BRAND_POINTS.map((point) => (
-            <li key={point} className="ez-auth-point">
-              <span className="ez-auth-point-mark">
-                <Check size={15} />
-              </span>
-              <span>{point}</span>
-            </li>
-          ))}
-        </ul>
-      </aside>
+    <div className="ez-auth-container">
+      {/* ── Background Floating Glow Orbs ───────────────────────────── */}
+      <div className="ez-auth-orb ez-auth-orb-1" aria-hidden="true" />
+      <div className="ez-auth-orb ez-auth-orb-2" aria-hidden="true" />
+      <div className="ez-auth-orb ez-auth-orb-3" aria-hidden="true" />
 
-      <Card>
-        <CardBody>
-          <div className="ez-auth-form-head">
-            <h1 className="ez-auth-title">Đăng nhập</h1>
-            <p className="ez-auth-subtitle">Dùng tài khoản EzEdu AI của bạn để tiếp tục.</p>
+      {/* ── Top Theme Toggle Float ──────────────────────────────────── */}
+      <div className="ez-auth-top-actions">
+        <button
+          type="button"
+          className="ez-theme-btn"
+          onClick={() => setPreference(preference === 'dark' ? 'light' : 'dark')}
+          title={preference === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+          aria-label="Đổi giao diện Sáng/Tối"
+        >
+          {preference === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </div>
+
+      {/* ── Glassmorphism Card ──────────────────────────────────────── */}
+      <div className="ez-auth-card">
+        {/* Header */}
+        <div className="ez-auth-header">
+          <div className="ez-auth-logo-badge" translate="no">
+            Ez
           </div>
+          <h1 className="ez-auth-title">Đăng nhập EzEdu AI</h1>
+          <p className="ez-auth-subtitle">Biến học liệu thành đề thi dễ dàng & chuẩn hóa AI</p>
+        </div>
 
-          {success && <Alert tone="success" style={{ marginBottom: 'var(--ez-space-4)' }}>{success}</Alert>}
-          {error && <Alert tone="error" style={{ marginBottom: 'var(--ez-space-4)' }}>{error}</Alert>}
+        {/* Alert Messages */}
+        {success && <div className="alert alert-success">{success}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
 
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="ez-auth-fields">
-              <FormField label="Email đăng nhập" error={fieldErrors.email}>
-                <Input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  placeholder="name@example.com"
-                  disabled={loading}
-                  invalid={Boolean(fieldErrors.email)}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </FormField>
 
-              <FormField label="Mật khẩu" error={fieldErrors.password}>
-                <Input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  invalid={Boolean(fieldErrors.password)}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </FormField>
 
-              <Button type="submit" size="lg" block loading={loading}>
-                Đăng nhập
-              </Button>
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="ez-field-stack">
+          {/* Email Input */}
+          <div className="ez-field-group">
+            <label htmlFor="login-email" className="ez-field-label">
+              <span>Email đăng nhập</span>
+            </label>
+            <div className="ez-input-wrapper">
+              <Mail className="ez-input-icon-left" size={18} />
+              <input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                required
+                autoComplete="email"
+                disabled={loading}
+                className="ez-input-control"
+              />
             </div>
-          </form>
-
-          <div className="ez-auth-divider">hoặc</div>
-
-          <div className="ez-auth-alt">
-            <GoogleSignInButton onCredential={google.onCredential} disabled={dangDangNhap} />
-            {google.error && <Alert tone="error">{google.error}</Alert>}
-            <FacebookSignInButton onCredential={facebook.onCredential} disabled={dangDangNhap} />
-            {facebook.error && <Alert tone="error">{facebook.error}</Alert>}
           </div>
-          {google.dialogProps && <SocialRoleDialog {...google.dialogProps} />}
-          {facebook.dialogProps && <SocialRoleDialog {...facebook.dialogProps} />}
 
-          <p className="ez-auth-footer">
-            Chưa có tài khoản?{' '}
-            <Button variant="link" onClick={() => navigate('/register')}>
-              Đăng ký ngay
-            </Button>
-          </p>
-        </CardBody>
-      </Card>
+          {/* Password Input */}
+          <div className="ez-field-group">
+            <div className="ez-field-label">
+              <label htmlFor="login-password">Mật khẩu</label>
+            </div>
+            <div className="ez-input-wrapper">
+              <Lock className="ez-input-icon-left" size={18} />
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+                disabled={loading}
+                className="ez-input-control"
+              />
+              <button
+                type="button"
+                className="ez-input-icon-right"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ẩn nội dung đã nhập' : 'Hiển thị nội dung đã nhập'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Remember Me */}
+          <div className="ez-auth-options">
+            <label className="ez-checkbox-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="ez-sr-only"
+                style={{ display: 'none' }}
+              />
+              <div className="ez-custom-checkbox">
+                {rememberMe && <Check size={12} strokeWidth={3} />}
+              </div>
+              <span>Ghi nhớ đăng nhập</span>
+            </label>
+          </div>
+
+          {/* Submit Button */}
+          <button type="submit" className="ez-btn-primary-gradient" disabled={loading}>
+            {loading ? (
+              <span>Đang xác thực...</span>
+            ) : (
+              <>
+                <span>Đăng nhập</span>
+                <ArrowRight size={18} />
+              </>
+            )}
+          </button>
+
+          <Link to="/forgot-password" className="ez-auth-link">
+            Quên mật khẩu?
+          </Link>
+        </form>
+
+        {/* Divider */}
+        <div className="ez-divider-wrap">
+          <div className="ez-divider-line" />
+          <span>Hoặc tiếp tục với</span>
+          <div className="ez-divider-line" />
+        </div>
+
+        {pendingSocial && <div className="alert alert-success"><p>{pendingSocial.profile.full_name || pendingSocial.profile.email}, hãy chọn vai trò để hoàn tất đăng ký.</p><div className="ez-social-grid"><button type="button" className="ez-social-btn" onClick={() => void submitSocialToken(pendingSocial.provider, pendingSocial.token, 'student')}>Học sinh</button><button type="button" className="ez-social-btn" onClick={() => void submitSocialToken(pendingSocial.provider, pendingSocial.token, 'lecturer')}>Giáo viên</button></div></div>}
+
+        {/* Social Login Grid */}
+        <div className="ez-social-grid">
+          {googleClientId ? <div ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button type="button" className="ez-social-btn" disabled>Google chưa được cấu hình</button>}
+
+          <button
+            type="button"
+            className="ez-social-btn"
+            disabled={!facebookAppId || loading}
+            onClick={() => void loginWithFacebook(facebookAppId).then((token) => submitSocialToken('facebook', token)).catch((err) => setError(err instanceof Error ? err.message : 'Đăng nhập Facebook thất bại.'))}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+            <span>{facebookAppId ? 'Facebook' : 'Facebook chưa được cấu hình'}</span>
+          </button>
+        </div>
+
+        {isDemoLoginConfigured && <>
+          <div className="ez-divider-wrap" style={{ marginTop: '1.25rem' }}>
+            <div className="ez-divider-line" />
+            <span>Vào nhanh trải nghiệm (Demo)</span>
+            <div className="ez-divider-line" />
+          </div>
+
+          <div className="ez-social-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+          <button
+            type="button"
+            className="ez-social-btn"
+            onClick={() => handleBypassLogin('teacher')}
+            title="Đăng nhập Giảng viên"
+          >
+            <span>🎓 Giảng viên</span>
+          </button>
+
+          <button
+            type="button"
+            className="ez-social-btn"
+            onClick={() => handleBypassLogin('student')}
+            title="Đăng nhập Học sinh"
+          >
+            <span>📚 Học sinh</span>
+          </button>
+
+          <button
+            type="button"
+            className="ez-social-btn"
+            onClick={() => handleBypassLogin('admin')}
+            title="Đăng nhập Quản trị viên Admin"
+            style={{ borderColor: 'var(--ez-primary-alpha-40)', background: 'var(--ez-primary-alpha-10)' }}
+          >
+            <span>⚡ Admin</span>
+          </button>
+          </div>
+        </>}
+
+        {/* Footer Link */}
+        <div className="auth-footer" style={{ marginTop: '1.75rem' }}>
+          Chưa có tài khoản?{' '}
+          <button type="button" onClick={() => navigate('/register')} className="text-link">
+            Đăng ký ngay
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -8,6 +8,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
+from app.core.config import settings
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
 from app.schemas.auth import UserResponse
@@ -30,7 +31,7 @@ from app.services.verification_service import (
     resolve_issues,
     run_verification_task,
 )
-from app.services.llm_service import is_gemini_available, is_groq_available
+from app.services.llm_service import is_claude_available, is_gemini_available, is_groq_available
 from app.services.ai_quota_service import enforce_ai_quota
 from app.services.text_chunking_service import split_text_into_chunks
 
@@ -99,10 +100,15 @@ async def trigger_verification(
             message="Quá trình kiểm tra đang chạy. Vui lòng đợi.",
         )
 
-    if not is_gemini_available() and not is_groq_available():
+    provider_available = (
+        is_claude_available()
+        if settings.AI_TEXT_PROVIDER == "claude"
+        else is_gemini_available() or is_groq_available()
+    )
+    if not provider_available:
         raise HTTPException(
             status_code=503,
-            detail="Chưa cấu hình Gemini hoặc Groq để kiểm tra nội dung.",
+            detail="Chưa cấu hình dịch vụ AI để kiểm tra nội dung.",
         )
 
     # Validate and count a fresh snapshot instead of trusting possibly stale

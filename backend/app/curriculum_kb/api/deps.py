@@ -35,5 +35,15 @@ async def require_teacher_actor(current_user: UserResponse = Depends(get_current
     return current_user
 
 
+async def require_dataset_admin(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+    _require_feature_enabled()
+    if getattr(current_user, "role", "user") not in _ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ quản trị viên được xem báo cáo dataset chương trình.",
+        )
+    return current_user
+
+
 def is_admin_actor(user: UserResponse) -> bool:
     return getattr(user, "role", "user") in _ADMIN_ROLES

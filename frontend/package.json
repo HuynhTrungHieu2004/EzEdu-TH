@@ -9,18 +9,14 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:chat": "npx tsx src/tests/runChatTests.tsx",
+    "test:no-mock-apis": "node src/tests/noMockApiFallbacks.test.mjs",
+    "test:courses-api": "node src/tests/coursesApi.test.mjs",
+    "test:assignments-api": "node src/tests/assignmentsApi.test.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:report": "playwright show-report",
-    "test:foundation": "playwright test e2e/design-foundation.spec.ts e2e/motion-foundation.spec.ts e2e/student-dashboard-chat.spec.ts e2e/exam-attempt.spec.ts e2e/teacher-workspace.spec.ts e2e/admin-workspace.spec.ts e2e/public-experience.spec.ts e2e/system-qa.spec.ts e2e/accessibility.spec.ts",
-    "test:perf": "playwright test --project=perf",
-    "test:live": "playwright test --config=playwright.live.config.ts",
-    "test:ai": "playwright test --config=playwright.ai.config.ts",
-    "test:mobile": "playwright test --config=playwright.mobile-audit.config.ts"
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
-    "@gsap/react": "^2.1.2",
     "axios": "^1.18.0",
-    "gsap": "^3.15.0",
     "lucide-react": "^1.26.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -33,13 +29,13 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^5.4.14"
   }
 }

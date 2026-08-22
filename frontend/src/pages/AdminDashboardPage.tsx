@@ -37,7 +37,6 @@ import {
   StatTile,
   Tabs,
 } from '../components/ui';
-import { AnimatedCounter, StaggerGroup } from '../motion';
 import './AdminDashboardPage.css';
 
 // ─────── Helpers ────────────────────────────────────────────────────────────
@@ -143,7 +142,7 @@ function DonutChart({ value, total, color = 'var(--ez-primary)' }: { value: numb
   const pct = total > 0 ? value / total : 0;
   return (
     <svg role="img" aria-label={`${Math.round(pct * 100)}%`} viewBox="0 0 72 72" width="72" height="72">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--ez-border)" strokeWidth="8" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-border)" strokeWidth="8" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
         stroke={color} strokeWidth="8"
@@ -151,7 +150,7 @@ function DonutChart({ value, total, color = 'var(--ez-primary)' }: { value: numb
         strokeLinecap="round"
         transform={`rotate(-90 ${cx} ${cy})`}
       />
-      <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11" fill="var(--ez-text)">
+      <text x={cx} y={cy + 5} textAnchor="middle" fontSize="11" fill="var(--text-primary)">
         {Math.round(pct * 100)}%
       </text>
     </svg>
@@ -170,9 +169,7 @@ function Panel({
       <SectionHeader title={title} titleAs="h3" actions={actions} />
       {state === 'loading' && <SkeletonText lines={5} />}
       {state === 'error' && <ErrorState title="Lỗi tải dữ liệu" onRetry={onRetry} compact />}
-      {/* Một StaggerGroup ở đây phủ mọi panel — số liệu vào theo thứ tự thay vì
-          hiện đồng loạt, giống dashboard giáo viên/học sinh. */}
-      {state === 'ok' && <StaggerGroup selector=".stat-card">{children}</StaggerGroup>}
+      {state === 'ok' && children}
     </section>
   );
 }
@@ -183,24 +180,13 @@ function StatCard({ label, value, sub }: { label: ReactNode; value: ReactNode; s
   return <StatTile className="stat-card" label={label} value={value} hint={sub} />;
 }
 
-/** Số nguyên trong ô thống kê thì đếm lên; giá trị đã định dạng (%, ms) giữ nguyên. */
-function CountedStatCard({ label, value, sub }: { label: ReactNode; value: number; sub?: string }) {
-  return (
-    <StatTile
-      className="stat-card"
-      label={label}
-      value={<AnimatedCounter value={value} formatter={(current) => current.toLocaleString('vi-VN')} />}
-      hint={sub}
-    />
-  );
-}
-
 // ─────── Backend Connection Panel ────────────────────────────────────────────
 
 const SERVICE_LABELS: Record<string, string> = {
   mongodb: 'MongoDB',
   chromadb: 'ChromaDB',
   mongodb_indexes: 'MongoDB indexes',
+  claude: 'Claude',
   gemini: 'Gemini',
   groq: 'Groq',
   fastapi_backend: 'FastAPI',
@@ -343,11 +329,11 @@ function OverviewTab({ filter }: { filter: DateRangeFilter }) {
         {data && (
           <>
             <div className="stat-grid">
-              <CountedStatCard label="Tổng người dùng" value={data.total_users} />
-              <CountedStatCard label="AI-Active Users" value={data.ai_active_users} sub="Final logical AI ops trong kỳ" />
-              <CountedStatCard label="Hội thoại hoạt động" value={data.total_conversations} />
-              <CountedStatCard label="Tin nhắn người học" value={data.total_messages.user} />
-              <CountedStatCard label="Tin nhắn AI" value={data.total_messages.assistant} />
+              <StatCard label="Tổng người dùng" value={fmt(data.total_users)} />
+              <StatCard label="AI-Active Users" value={fmt(data.ai_active_users)} sub="Final logical AI ops trong kỳ" />
+              <StatCard label="Hội thoại hoạt động" value={fmt(data.total_conversations)} />
+              <StatCard label="Tin nhắn người học" value={fmt(data.total_messages.user)} />
+              <StatCard label="Tin nhắn AI" value={fmt(data.total_messages.assistant)} />
               <StatCard label="Học liệu đã index" value={fmt(data.documents.indexed)} sub={`/ ${fmt(data.documents.total)} tổng`} />
               <StatCard label="Kiểm tra CL thành công" value={fmt(data.verification.success)} />
               <StatCard
@@ -554,11 +540,11 @@ function QualityTab({ filter }: { filter: DateRangeFilter }) {
             <StatCard label="Lỗi tìm kiếm web" value={fmtPct(data.external_search_failure_rate)} sub="Các lần gọi web grounding thất bại" />
           </div>
 
-          {Object.keys(data.negative_reasons ?? {}).length > 0 && (
+          {Object.keys(data.negative_reasons).length > 0 && (
             <div>
               <h4>Lý do phản hồi tiêu cực phổ biến</h4>
               <ul className="legend-list" aria-label="Lý do phản hồi tiêu cực">
-                {Object.entries(data.negative_reasons ?? {}).map(([r, c]) => (
+                {Object.entries(data.negative_reasons).map(([r, c]) => (
                   <li key={r}><span className="legend-dot legend-dot--red" />{r}: <strong>{c}</strong></li>
                 ))}
               </ul>
@@ -625,11 +611,11 @@ function ErrorsLatencyTab({ filter }: { filter: DateRangeFilter }) {
             <StatCard label="P95 Latency" value={fmt(data.latency.p95_ms, ' ms')} />
           </div>
 
-          {Object.keys(data.errors ?? {}).length > 0 && (
+          {Object.keys(data.errors).length > 0 && (
             <div>
               <h4>Phân bổ lỗi</h4>
               <ul className="legend-list" aria-label="Phân bổ mã lỗi">
-                {Object.entries(data.errors ?? {}).map(([code, count]) => (
+                {Object.entries(data.errors).map(([code, count]) => (
                   <li key={code}><span className="legend-dot legend-dot--red" />{code}: <strong>{count}</strong></li>
                 ))}
               </ul>

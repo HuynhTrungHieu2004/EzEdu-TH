@@ -36,7 +36,7 @@ CurriculumQualityStatus = Literal["unreviewed", "flagged", "verified"]
 
 CurriculumIngestStatus = Literal["not_ingested", "pending", "ingested", "failed"]
 
-CurriculumOriginType = Literal["web_knowledge", "web_crawl", "manual"]
+CurriculumOriginType = Literal["web_knowledge", "web_crawl", "manual", "catalog"]
 
 
 class CurriculumSourceCreate(BaseModel):
@@ -76,6 +76,18 @@ class CurriculumSourceResponse(BaseModel):
     updated_by: str
     created_at: datetime
     updated_at: datetime
+    dataset_key: Optional[str] = None
+    manifest_version: Optional[int] = None
+    source_key: Optional[str] = None
+    source_checksum: Optional[str] = None
+    source_language: Optional[Literal["vi", "en"]] = None
+    canonical_url: Optional[str] = None
+    license_id: Optional[str] = None
+    license_url: Optional[str] = None
+    attribution: Optional[str] = None
+    upstream_revision: Optional[str] = None
+    noncommercial_only: bool = False
+    demo_disposal_required: bool = False
 
 
 class CurriculumSourceListResponse(BaseModel):

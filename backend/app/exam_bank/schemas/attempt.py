@@ -82,3 +82,26 @@ class AttemptResponse(BaseModel):
 class AttemptListResponse(BaseModel):
     items: List[AttemptResponse]
     total: int
+
+
+class ExamResultItem(BaseModel):
+    id: str
+    exam_id: str
+    exam_code: str
+    student_id: str
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
+    status: AttemptStatus
+    score: float
+    total_score: float
+    max_score: float
+    submitted_at: Optional[datetime] = None
+
+
+class ExamResultStatistics(BaseModel):
+    total_attempts: int
+    graded_attempts: int
+    average_score: float
+    pass_rate: float
+    excellent_rate: float
+    score_distribution: Dict[str, int]

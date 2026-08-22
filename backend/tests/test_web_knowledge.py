@@ -1,6 +1,5 @@
 import unittest
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from bson import ObjectId
@@ -8,6 +7,7 @@ from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
 
 from app.core.config import settings
+from app.services.llm_service import ClaudeResult
 from app.schemas.auth import UserResponse
 from app.web_knowledge.api.deps import (
     is_admin_actor,
@@ -26,12 +26,15 @@ def _actor(role: str) -> UserResponse:
     )
 
 
-def _fake_gemini_response(text: str, citations=()):
-    chunks = []
-    for uri, title, excerpt in citations:
-        chunks.append(SimpleNamespace(web=SimpleNamespace(uri=uri, title=title, publisher=None), excerpt=excerpt))
-    grounding_metadata = SimpleNamespace(grounding_chunks=chunks) if citations else None
-    return SimpleNamespace(text=text, candidates=[SimpleNamespace(grounding_metadata=grounding_metadata)])
+def _fake_claude_response(text: str, citations=()):
+    return ClaudeResult(
+        text=text,
+        model="claude-sonnet-test",
+        citations=[
+            {"url": uri, "title": title, "cited_text": excerpt}
+            for uri, title, excerpt in citations
+        ],
+    )
 
 
 class DomainScoreAndRedactionTests(unittest.TestCase):
@@ -63,15 +66,14 @@ class ExploreServiceTests(unittest.IsolatedAsyncioTestCase):
         await ensure_web_knowledge_indexes(self.db)
         self.user_id = "student-1"
 
-    async def test_explore_calls_gemini_and_extracts_citations(self):
-        fake_response = _fake_gemini_response(
+    async def test_explore_calls_claude_and_extracts_citations(self):
+        fake_response = _fake_claude_response(
             "[ANSWER] Việt Nam nằm ở Đông Nam Á. [/ANSWER]"
             "[EVIDENCE_STATUS] well_supported [/EVIDENCE_STATUS]"
             "[CONFIDENCE] 0.9 [/CONFIDENCE]",
             citations=[("https://moet.gov.vn/vn", "Bộ GD&ĐT", "Việt Nam thông tin chính thức")],
         )
-        with patch("app.web_knowledge.services.web_knowledge_service.get_gemini_client") as mock_client:
-            mock_client.return_value.models.generate_content.return_value = fake_response
+        with patch("app.web_knowledge.services.web_knowledge_service.claude_web_search", return_value=fake_response) as claude:
             result = await web_knowledge_service.explore(self.db, user_id=self.user_id, query="Việt Nam ở đâu?")
 
         self.assertFalse(result.from_cache)
@@ -80,49 +82,46 @@ class ExploreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result.citations), 1)
         self.assertEqual(result.citations[0].url, "https://moet.gov.vn/vn")
         self.assertEqual(result.citations[0].relevance_score, 1.0)
+        claude.assert_called_once()
 
     async def test_second_identical_query_hits_cache_not_gemini(self):
-        fake_response = _fake_gemini_response(
+        fake_response = _fake_claude_response(
             "[ANSWER] A. [/ANSWER][EVIDENCE_STATUS] well_supported [/EVIDENCE_STATUS][CONFIDENCE] 0.8 [/CONFIDENCE]"
         )
-        with patch("app.web_knowledge.services.web_knowledge_service.get_gemini_client") as mock_client:
-            mock_client.return_value.models.generate_content.return_value = fake_response
+        with patch("app.web_knowledge.services.web_knowledge_service.claude_web_search", return_value=fake_response) as claude:
             first = await web_knowledge_service.explore(self.db, user_id=self.user_id, query="Câu hỏi ABC")
             second = await web_knowledge_service.explore(self.db, user_id=self.user_id, query="  câu hỏi   abc  ")
 
         self.assertFalse(first.from_cache)
         self.assertTrue(second.from_cache)
-        mock_client.return_value.models.generate_content.assert_called_once()
+        claude.assert_called_once()
 
     async def test_daily_quota_blocks_after_limit(self):
-        fake_response = _fake_gemini_response(
+        fake_response = _fake_claude_response(
             "[ANSWER] A. [/ANSWER][EVIDENCE_STATUS] unverified [/EVIDENCE_STATUS][CONFIDENCE] 0.3 [/CONFIDENCE]"
         )
-        with patch("app.web_knowledge.services.web_knowledge_service.get_gemini_client") as mock_client, patch.object(
+        with patch("app.web_knowledge.services.web_knowledge_service.claude_web_search", return_value=fake_response), patch.object(
             settings, "WEB_KNOWLEDGE_DAILY_QUOTA", 2
         ):
-            mock_client.return_value.models.generate_content.return_value = fake_response
             await web_knowledge_service.explore(self.db, user_id=self.user_id, query="câu hỏi 1")
             await web_knowledge_service.explore(self.db, user_id=self.user_id, query="câu hỏi 2")
             with self.assertRaises(HTTPException) as ctx:
                 await web_knowledge_service.explore(self.db, user_id=self.user_id, query="câu hỏi 3")
         self.assertEqual(ctx.exception.status_code, 429)
 
-    async def test_gemini_failure_returns_clean_502_not_raw_exception(self):
-        with patch("app.web_knowledge.services.web_knowledge_service.get_gemini_client") as mock_client:
-            mock_client.return_value.models.generate_content.side_effect = RuntimeError("429 RESOURCE_EXHAUSTED")
+    async def test_claude_failure_returns_clean_502_not_raw_exception(self):
+        with patch("app.web_knowledge.services.web_knowledge_service.claude_web_search", side_effect=RuntimeError("429 rate limit")):
             with self.assertRaises(HTTPException) as ctx:
-                await web_knowledge_service.explore(self.db, user_id=self.user_id, query="câu hỏi lỗi gemini")
+                await web_knowledge_service.explore(self.db, user_id=self.user_id, query="câu hỏi lỗi claude")
         self.assertEqual(ctx.exception.status_code, 502)
 
     async def test_quota_is_per_user(self):
-        fake_response = _fake_gemini_response(
+        fake_response = _fake_claude_response(
             "[ANSWER] A. [/ANSWER][EVIDENCE_STATUS] unverified [/EVIDENCE_STATUS][CONFIDENCE] 0.3 [/CONFIDENCE]"
         )
-        with patch("app.web_knowledge.services.web_knowledge_service.get_gemini_client") as mock_client, patch.object(
+        with patch("app.web_knowledge.services.web_knowledge_service.claude_web_search", return_value=fake_response), patch.object(
             settings, "WEB_KNOWLEDGE_DAILY_QUOTA", 1
         ):
-            mock_client.return_value.models.generate_content.return_value = fake_response
             await web_knowledge_service.explore(self.db, user_id="user-a", query="câu hỏi riêng a")
             # user khác vẫn dùng được dù user-a đã hết quota hôm nay
             result = await web_knowledge_service.explore(self.db, user_id="user-b", query="câu hỏi riêng b")

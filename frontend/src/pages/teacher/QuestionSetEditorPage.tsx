@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertTriangle,
   BarChart3,
   CheckCircle2,
   Download,
@@ -12,12 +11,7 @@ import {
   Rocket,
 } from 'lucide-react';
 import { questionApi } from '../../api/questionApi';
-import type {
-  QuestionItemUpdatePayload,
-  QuestionSetQualityResponse,
-  QuestionSetResponse,
-  SubjectCatalogNode,
-} from '../../api/questionApi';
+import type { QuestionItemUpdatePayload, QuestionSetResponse } from '../../api/questionApi';
 import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../../api/learningEventApi';
 import QuestionCard from '../../components/QuestionCard';
 import { getApiErrorDetail, getBlobErrorDetail, isUnauthorizedError } from '../../api/errors';
@@ -47,15 +41,6 @@ import {
 import '../question-set.css';
 
 type WorkflowStatus = 'draft' | 'review_pending' | 'approved' | 'published';
-
-/** Giải thích cảnh báo chất lượng bằng lời giáo viên hiểu được, không dùng thuật ngữ thống kê. */
-const QUALITY_REASON_TEXT: Record<string, string> = {
-  negative_discrimination:
-    'Học sinh làm tốt cả bài lại sai câu này nhiều hơn học sinh yếu — nhiều khả năng đáp án đang bị sai hoặc câu hỏi gây hiểu nhầm.',
-  too_easy: 'Gần như cả lớp đều trả lời đúng, câu này không giúp phân loại được năng lực học sinh.',
-  cluster_outlier:
-    'Cách học sinh trả lời câu này lệch hẳn so với mọi nhóm câu còn lại trong bộ đề — nên đọc lại nội dung câu hỏi.',
-};
 
 const STATUS_LABELS: Record<WorkflowStatus, string> = {
   draft: 'Bản nháp',
@@ -96,7 +81,6 @@ export default function QuestionSetEditorPage() {
   const { toast } = useToast();
 
   const [questionSet, setQuestionSet] = useState<QuestionSetResponse | null>(null);
-  const [quality, setQuality] = useState<QuestionSetQualityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -119,32 +103,11 @@ export default function QuestionSetEditorPage() {
   const [publishingSet, setPublishingSet] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishAudience, setPublishAudience] = useState<'all' | 'classes'>('all');
-  const [subjectOptions, setSubjectOptions] = useState<SubjectCatalogNode[]>([]);
-  const [publishSubjectId, setPublishSubjectId] = useState('');
-  const [publishChapterId, setPublishChapterId] = useState('');
   const [myClasses, setMyClasses] = useState<ClassSummary[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
 
   const questionSessionRef = useRef<string | null>(null);
   const explanationViewedRef = useRef<Set<string>>(new Set());
-
-  // Phân tích chất lượng chỉ có nghĩa khi đã có học sinh làm bài. Lỗi ở đây
-  // không được chặn màn hình biên tập — đây là thông tin bổ trợ.
-  useEffect(() => {
-    if (!questionSetId) return;
-    let cancelled = false;
-    questionApi
-      .getQuality(questionSetId)
-      .then((data) => {
-        if (!cancelled) setQuality(data);
-      })
-      .catch(() => {
-        if (!cancelled) setQuality(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [questionSetId]);
 
   useEffect(() => {
     if (!questionSet?.id) return;
@@ -292,18 +255,6 @@ export default function QuestionSetEditorPage() {
     setSelectedClassIds((prev) => (prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]));
   }
 
-  useEffect(() => {
-    if (!showPublishModal || subjectOptions.length > 0) return;
-    const controller = new AbortController();
-    // Lỗi ở đây không chặn việc công bố: gắn môn là tuỳ chọn, và chặn giáo viên
-    // ban hành đề chỉ vì không tải được danh sách môn là đánh đổi tồi.
-    questionApi
-      .listSubjectOptions(controller.signal)
-      .then(setSubjectOptions)
-      .catch(() => {});
-    return () => controller.abort();
-  }, [showPublishModal, subjectOptions.length]);
-
   async function confirmPublish() {
     if (!questionSet) return;
     if (publishAudience === 'classes' && selectedClassIds.length === 0) {
@@ -316,10 +267,6 @@ export default function QuestionSetEditorPage() {
       const updated = await questionApi.publishQuestionSet(questionSet.id, {
         audience_type: publishAudience,
         target_class_ids: publishAudience === 'classes' ? selectedClassIds : [],
-        // Chuỗi rỗng thành null: backend phân biệt "không gắn" với "gắn id rỗng",
-        // và gửi chuỗi rỗng lên sẽ trượt validate.
-        subject_id: publishSubjectId || null,
-        chapter_id: publishChapterId || null,
       });
       setQuestionSet(updated);
       setShowPublishModal(false);
@@ -430,46 +377,6 @@ export default function QuestionSetEditorPage() {
           </div>
         </CardBody>
       </Card>
-
-      {quality && quality.status !== 'insufficient_attempts' && quality.flagged.length > 0 && (
-        <Card style={{ marginBottom: 'var(--ez-space-6)' }}>
-          <CardHeader>
-            <div>
-              <CardTitle as="h2">
-                <AlertTriangle size={16} aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />
-                Câu hỏi nên rà soát lại
-              </CardTitle>
-              <p className="qs-quality-sub">
-                Dựa trên {quality.attempt_count} lượt làm bài thật.
-                {quality.clustering
-                  ? ` Phân cụm K-Means thành ${quality.clustering.selected_k} nhóm (silhouette ${quality.clustering.silhouette_score.toFixed(2)}).`
-                  : ''}
-              </p>
-            </div>
-          </CardHeader>
-          <CardBody>
-            <ul className="qs-quality-list">
-              {quality.flagged.map((item) => (
-                <li key={item.question_index} className="qs-quality-item">
-                  <div className="qs-quality-head">
-                    <strong>Câu {item.question_index + 1}</strong>
-                    <span className="qs-quality-metrics">
-                      Tỉ lệ đúng {item.p_value === null ? '—' : `${Math.round(item.p_value * 100)}%`}
-                      {' · '}
-                      Độ phân biệt {item.discrimination === null ? '—' : item.discrimination.toFixed(2)}
-                    </span>
-                  </div>
-                  <ul className="qs-quality-reasons">
-                    {item.reasons.map((reason) => (
-                      <li key={reason}>{QUALITY_REASON_TEXT[reason] ?? reason}</li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </CardBody>
-        </Card>
-      )}
 
       {(questionSet.keywords?.length || bloomTotal > 0) && (
         <div className="ez-grid ez-grid-2" style={{ marginBottom: 'var(--ez-space-6)' }}>
@@ -729,39 +636,6 @@ export default function QuestionSetEditorPage() {
           </DialogFooter>
         }
       >
-        <div className="ez-stack" style={{ marginBottom: 'var(--ez-space-5)' }}>
-          {/* Gắn môn là TUỲ CHỌN. Ép buộc sẽ chặn giáo viên công bố nhanh một bộ
-              luyện tập, và học liệu chưa gắn vẫn tới được học sinh qua nhóm
-              "Chưa phân môn" trong trang Học theo môn. */}
-          <FormField label="Môn học (không bắt buộc)">
-            <Select
-              value={publishSubjectId}
-              onChange={(event) => {
-                setPublishSubjectId(event.target.value);
-                // Đổi môn phải xoá chương: chương của môn cũ không thuộc môn mới
-                // nên backend sẽ từ chối, và giáo viên không hiểu vì sao.
-                setPublishChapterId('');
-              }}
-            >
-              <option value="">— Chưa phân môn —</option>
-              {subjectOptions.map((mon) => (
-                <option key={mon.id} value={mon.id}>{mon.name}</option>
-              ))}
-            </Select>
-          </FormField>
-
-          {publishSubjectId && (
-            <FormField label="Chương (không bắt buộc)">
-              <Select value={publishChapterId} onChange={(event) => setPublishChapterId(event.target.value)}>
-                <option value="">— Cả môn —</option>
-                {(subjectOptions.find((m) => m.id === publishSubjectId)?.chapters ?? []).map((chuong) => (
-                  <option key={chuong.id} value={chuong.id}>{chuong.name}</option>
-                ))}
-              </Select>
-            </FormField>
-          )}
-        </div>
-
         <div className="qs-audience-list">
           <RadioCard
             name="publish-audience"

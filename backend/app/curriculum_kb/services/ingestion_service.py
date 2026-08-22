@@ -69,6 +69,14 @@ async def _delete_source_chunks(client, source_id: str) -> None:
                 pass
 
 
+async def delete_dataset_chunks(dataset_key: str) -> None:
+    client = init_chroma_client()
+    for collection in client.list_collections():
+        name = getattr(collection, "name", str(collection))
+        if name.startswith(_COLLECTION_PREFIX):
+            client.get_collection(name).delete(where={"dataset_key": dataset_key})
+
+
 async def ingest_curriculum_source_job(db, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Handler cho job `ingest_curriculum_source` — gọi từ `app/worker.py`."""
     source_id = payload["source_id"]
@@ -80,6 +88,11 @@ async def ingest_curriculum_source_job(db, payload: Dict[str, Any]) -> Dict[str,
         chunks = split_text_into_chunks(source["content_text"])
         if not chunks:
             raise ValueError("Nội dung quá ngắn, không tách được đoạn nào để nạp.")
+        max_chunks = payload.get("max_chunks")
+        if max_chunks is not None and len(chunks) > max_chunks:
+            raise ValueError(
+                f"Source needs {len(chunks)} chunks but only {max_chunks} remain in the chunk budget."
+            )
 
         client = init_chroma_client()
         await _delete_source_chunks(client, source_id)
@@ -92,10 +105,15 @@ async def ingest_curriculum_source_job(db, payload: Dict[str, Any]) -> Dict[str,
         ids = [f"{source_id}:{i}" for i in range(len(chunks))]
         metadatas = [
             {
+                "chunk_id": ids[i],
                 "source_id": source_id,
                 "subject_id": source["subject_id"],
                 "grade": source.get("grade") or 0,
                 "topic_id": source.get("topic_id") or "",
+                "dataset_key": source.get("dataset_key") or "",
+                "source_key": source.get("source_key") or "",
+                "source_language": source.get("source_language") or "vi",
+                "license_id": source.get("license_id") or "",
                 "chunk_index": i,
                 "created_at": now.isoformat(),
             }
@@ -160,16 +178,21 @@ async def search(
     results = []
     for text, meta, distance in zip(documents, metadatas, distances):
         parent = sources_by_id.get(meta["source_id"])
-        if parent is None:
+        if parent is None or parent.get("review_status") != "published" or parent.get("ingest_status") != "ingested":
             continue
         results.append(
             {
+                "chunk_id": meta.get("chunk_id") or f"{meta['source_id']}:{meta.get('chunk_index', 0)}",
                 "source_id": meta["source_id"],
                 "title": parent["title"],
                 "chunk_text": text,
                 "subject_id": parent["subject_id"],
                 "grade": parent.get("grade"),
                 "topic_id": parent.get("topic_id"),
+                "dataset_key": parent.get("dataset_key"),
+                "source_key": parent.get("source_key"),
+                "source_language": parent.get("source_language", "vi"),
+                "license_id": parent.get("license_id"),
                 "citations": parent.get("citations", []),
                 "relevance_score": max(0.0, 1.0 - float(distance)),
             }

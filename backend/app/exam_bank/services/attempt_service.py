@@ -9,7 +9,16 @@ from pymongo.errors import DuplicateKeyError
 from app.core.concurrency import VersionConflict, compare_and_set, version_conflict_http_error
 from app.services.background_job_service import enqueue
 from app.exam_bank.constants.collections import EXAMS, EXAM_ATTEMPTS, QUESTIONS
-from app.exam_bank.schemas.attempt import AttemptQuestionResult, AttemptResponse, AttemptStartResponse
+from app.exam_bank.schemas.attempt import (
+    AttemptQuestionResult,
+    AttemptResponse,
+    AttemptStartResponse,
+    ExamResultItem,
+    ExamResultStatistics,
+)
+from app.exam_bank.schemas.exam import StudentExamItem
+from app.curriculum_kb.services.context_service import resolve_context
+from app.services.language_policy_service import resolve_output_language
 
 GRADE_ESSAY_JOB_TYPE = "grade_essay_answer"
 
@@ -394,6 +403,108 @@ async def list_attempts_for_exam(db, exam_id: str, *, actor_id: str, is_admin: b
     ]
 
 
+async def list_exam_results(
+    db, *, actor_id: str, is_admin: bool, class_id: str | None = None
+) -> List[ExamResultItem]:
+    student_filter: list[str] | None = None
+    if class_id:
+        if not ObjectId.is_valid(class_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy lớp học.")
+        class_query: dict = {"_id": ObjectId(class_id), "deleted_at": None}
+        if not is_admin:
+            class_query["owner_id"] = actor_id
+        class_doc = await db["classes"].find_one(class_query, {"student_ids": 1})
+        if not class_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy lớp học.")
+        student_filter = list(class_doc.get("student_ids") or [])
+
+    exam_query = {"deleted_at": None}
+    if not is_admin:
+        exam_query["owner_id"] = actor_id
+    exams = {str(doc["_id"]): doc async for doc in db[EXAMS].find(exam_query, {"code": 1})}
+    if not exams:
+        return []
+
+    attempt_query: dict = {
+        "exam_id": {"$in": list(exams)},
+        "status": {"$in": ["submitted", "graded"]},
+    }
+    if student_filter is not None:
+        attempt_query["student_id"] = {"$in": student_filter}
+    docs = await db[EXAM_ATTEMPTS].find(attempt_query).sort("submitted_at", -1).to_list(None)
+    student_ids = [ObjectId(doc["student_id"]) for doc in docs if ObjectId.is_valid(doc.get("student_id", ""))]
+    students = {
+        str(doc["_id"]): doc
+        async for doc in db["users"].find({"_id": {"$in": student_ids}}, {"full_name": 1, "email": 1})
+    }
+    return [
+        ExamResultItem(
+            id=str(doc["_id"]),
+            exam_id=doc["exam_id"],
+            exam_code=str(exams[doc["exam_id"]].get("code") or doc.get("exam_code") or "Đề thi"),
+            student_id=doc["student_id"],
+            student_name=(students.get(doc["student_id"]) or {}).get("full_name"),
+            student_email=(students.get(doc["student_id"]) or {}).get("email"),
+            status=doc["status"],
+            score=round(10 * float(doc.get("total_score", 0)) / float(doc.get("max_score", 0)), 2) if doc.get("max_score", 0) else 0,
+            total_score=float(doc.get("total_score", 0)),
+            max_score=float(doc.get("max_score", 0)),
+            submitted_at=_aware(doc.get("submitted_at")),
+        )
+        for doc in docs
+    ]
+
+
+async def get_exam_result_statistics(
+    db, *, actor_id: str, is_admin: bool, class_id: str | None = None
+) -> ExamResultStatistics:
+    items = await list_exam_results(db, actor_id=actor_id, is_admin=is_admin, class_id=class_id)
+    scores = [item.score for item in items]
+    distribution = {"0-3": 0, "3-5": 0, "5-6.5": 0, "6.5-8": 0, "8-9": 0, "9-10": 0}
+    for score in scores:
+        key = "0-3" if score < 3 else "3-5" if score < 5 else "5-6.5" if score < 6.5 else "6.5-8" if score < 8 else "8-9" if score < 9 else "9-10"
+        distribution[key] += 1
+    total = len(scores)
+    return ExamResultStatistics(
+        total_attempts=total,
+        graded_attempts=sum(item.status == "graded" for item in items),
+        average_score=round(sum(scores) / total, 2) if total else 0,
+        pass_rate=round(100 * sum(score >= 5 for score in scores) / total, 2) if total else 0,
+        excellent_rate=round(100 * sum(score >= 8 for score in scores) / total, 2) if total else 0,
+        score_distribution=distribution,
+    )
+
+
+async def list_student_exams(db, *, student_id: str) -> List[StudentExamItem]:
+    class_ids = [str(doc["_id"]) async for doc in db["classes"].find({"student_ids": student_id, "deleted_at": None}, {"_id": 1})]
+    audience = [{"audience_type": "all"}]
+    if class_ids:
+        audience.append({"audience_type": "classes", "target_class_ids": {"$in": class_ids}})
+    exams = await db[EXAMS].find({
+        "status": "published",
+        "deleted_at": None,
+        "$or": audience,
+    }).sort("published_at", -1).to_list(None)
+    exam_ids = [str(exam["_id"]) for exam in exams]
+    attempts = {}
+    async for attempt in db[EXAM_ATTEMPTS].find({"student_id": student_id, "exam_id": {"$in": exam_ids}}).sort("created_at", -1):
+        attempts.setdefault(attempt["exam_id"], attempt)
+    return [
+        StudentExamItem(
+            id=str(exam["_id"]),
+            code=exam.get("code") or "Đề thi",
+            question_count=len(exam.get("question_ids") or []),
+            total_points=float(exam.get("total_points", 0)),
+            duration_minutes=int(exam.get("duration_minutes", 0)),
+            published_at=_aware(exam.get("published_at")),
+            attempt_id=str(attempts[str(exam["_id"])]["_id"]) if str(exam["_id"]) in attempts else None,
+            attempt_status=attempts.get(str(exam["_id"]), {}).get("status"),
+            score=(round(10 * float(attempts[str(exam["_id"])].get("total_score", 0)) / float(attempts[str(exam["_id"])].get("max_score", 0)), 2) if attempts.get(str(exam["_id"]), {}).get("max_score", 0) else None),
+        )
+        for exam in exams
+    ]
+
+
 async def sweep_expired_attempts(db) -> int:
     """Lớp tự nộp thứ 3: quét các lượt làm bài quá giờ mà học sinh không quay
     lại nữa (đóng tab hẳn) — gọi định kỳ từ `app/worker.py`. Antan toàn khi
@@ -431,11 +542,34 @@ async def grade_essay_answer_job(db, payload: Dict[str, Any]) -> Dict[str, Any]:
     if target is None or target.get("ai_score") is not None:
         return {"skipped": "already_graded_or_missing"}
 
+    evidence_context = []
+    if question.get("subject_id") and question.get("grade") and question.get("source_chunk_ids"):
+        evidence_context = await resolve_context(
+            db,
+            query=f"{question['content']} {question['correct_answer']}",
+            subject_id=question["subject_id"],
+            grade=question["grade"],
+            topic_id=question.get("topic_id"),
+            language="en" if question["subject_id"] == "tieng_anh" else None,
+        )
+        stored_ids = set(question["source_chunk_ids"])
+        evidence_context = [chunk for chunk in evidence_context if chunk.chunk_id in stored_ids]
+    output_language = (
+        resolve_output_language(
+            subject_id=question["subject_id"],
+            grade=question["grade"],
+            explicit=question.get("output_language"),
+        )
+        if question.get("subject_id") and question.get("grade")
+        else None
+    )
     score, confidence, feedback = await grade_short_answer(
         question_content=question["content"],
         reference_answer=question["correct_answer"],
         student_answer=target.get("student_answer") or "",
         max_points=target["points_possible"],
+        evidence_context=evidence_context,
+        output_language=output_language,
     )
     target["ai_score"] = score
     target["ai_confidence"] = confidence

@@ -10,6 +10,7 @@ from fastapi import BackgroundTasks, HTTPException
 from mongomock_motor import AsyncMongoMockClient
 from pydantic import ValidationError
 
+from app.core.config import settings
 from app.routers import documents as documents_router
 from app.routers import questions as questions_router
 from app.routers import verification as verification_router
@@ -87,6 +88,7 @@ class VerificationBackendTests(unittest.IsolatedAsyncioTestCase):
         self.user_id = str(ObjectId())
         self.document_id = str(ObjectId())
         self.db_patches = [
+            patch.object(settings, "AI_TEXT_PROVIDER", "legacy"),
             patch.object(verification_service, "get_database", return_value=self.db),
             patch.object(verification_router, "get_database", return_value=self.db),
             patch.object(documents_router, "get_database", return_value=self.db),
@@ -1204,6 +1206,31 @@ class VerificationBackendTests(unittest.IsolatedAsyncioTestCase):
                 batch_index=0,
             )
         self.assertEqual(issues, [])
+
+    async def test_claude_verification_uses_one_provider_call(self):
+        response = json.dumps({
+            "issues": [{
+                "chunk_index": 0,
+                "issue_type": "ocr_error",
+                "severity": "medium",
+                "original_text": "duợc",
+                "suggested_fix": "được",
+                "reason": "Lỗi OCR.",
+                "confidence": 0.9,
+            }]
+        })
+        with patch.object(settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(verification_service, "is_claude_available", return_value=True), \
+             patch.object(verification_service, "claude_generate_json", return_value=response) as claude, \
+             patch.object(verification_service, "_verify_issue_fact_with_search") as search:
+            issues = await verification_service.verify_batch(
+                ["Văn bản duợc nhận dạng."], start_index=0, batch_index=0
+            )
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0]["ai_provider"], "claude")
+        claude.assert_called_once()
+        search.assert_not_called()
 
 
 if __name__ == "__main__":

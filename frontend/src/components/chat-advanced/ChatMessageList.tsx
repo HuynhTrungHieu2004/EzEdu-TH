@@ -111,11 +111,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
                 </div>
-              ) : msg.status === 'pending' ? (
-                <div style={styles.assistantLoading} role="status" aria-live="polite">
-                  <span className="spinner" style={styles.spinner} />
-                  <span style={styles.loadingText}>Hệ thống đang chuẩn bị câu trả lời...</span>
-                </div>
               ) : (
                 <AssistantMessage
                   message={msg}
@@ -152,9 +147,7 @@ const styles = {
     padding: '24px 20px',
     overflowY: 'auto' as const,
     flex: 1,
-    // Danh sách tin nhắn là vùng cuộn duy nhất của cột chat.
-    minHeight: 0,
-    backgroundColor: 'var(--ez-bg)',
+    backgroundColor: 'var(--bg)',
   },
   empty: {
     display: 'flex',
@@ -167,18 +160,18 @@ const styles = {
   },
   emptyIcon: {
     display: 'inline-flex',
-    color: 'var(--ez-primary)',
+    color: 'var(--accent)',
     marginBottom: '16px',
   },
   emptyText: {
     fontSize: '16px',
     fontWeight: '600',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     margin: '0 0 8px 0',
   },
   emptySub: {
     fontSize: '13px',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     maxWidth: '380px',
     lineHeight: 1.5,
     margin: 0,
@@ -192,12 +185,12 @@ const styles = {
     maxWidth: '80%',
     padding: '14px 16px',
     borderRadius: '16px 16px 4px 16px',
-    backgroundColor: 'var(--ez-primary)',
+    backgroundColor: 'var(--accent)',
     color: '#fff',
-    boxShadow: 'var(--ez-shadow-md)',
+    boxShadow: 'var(--shadow-soft)',
   },
   label: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: '700',
     marginBottom: '6px',
     textTransform: 'uppercase' as const,
@@ -226,7 +219,7 @@ const styles = {
     borderRadius: '4px',
     border: 'none',
     backgroundColor: '#fff',
-    color: 'var(--ez-error)',
+    color: 'var(--danger)',
     fontWeight: '600',
     cursor: 'pointer',
   },
@@ -237,19 +230,19 @@ const styles = {
     gap: '12px',
     padding: '16px 20px',
     borderRadius: '14px',
-    backgroundColor: 'var(--ez-surface-muted)',
-    border: '1px solid var(--ez-border)',
+    backgroundColor: 'var(--surface-muted)',
+    border: '1px solid var(--border)',
   },
   spinner: {
     width: '18px',
     height: '18px',
-    border: '2px solid var(--ez-border)',
-    borderTop: '2px solid var(--ez-primary)',
+    border: '2px solid var(--border)',
+    borderTop: '2px solid var(--accent)',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
   loadingText: {
     fontSize: '13px',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
   },
 };

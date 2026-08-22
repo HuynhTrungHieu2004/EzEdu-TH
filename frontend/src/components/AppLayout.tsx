@@ -1,27 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useGSAP } from '@gsap/react';
-import { gsap } from 'gsap';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
+  Award,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Bot,
+  Calendar,
+  ClipboardList,
+  Database,
   Ellipsis,
+  FileQuestion,
+  LayoutDashboard,
+  Library,
   LogOut,
+  MessageSquare,
   Monitor,
   Moon,
+  School,
+  ScrollText,
+  Settings,
+  Shield,
+  Sparkles,
+  Star,
   Sun,
+  Target,
+  TrendingUp,
+  User,
   UserCog,
+  Users,
+  Video,
 } from 'lucide-react';
-import { questionApi } from '../api/questionApi';
 import { useAuth } from '../hooks/useAuth';
-import { BrandMark } from './BrandMark';
-import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useTheme } from '../contexts/ThemeContext';
-import { MOTION_DURATION, MOTION_EASE, PageEntrance, useMotion } from '../motion';
-import { buildNavigation, type NavGroup, type NavItem } from './navigation';
-import { RouteErrorBoundary } from './RouteErrorBoundary';
+import { notificationsApi } from '../api/notificationsApi';
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Drawer,
   Dropdown,
   DropdownItem,
@@ -35,37 +53,21 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-interface SidebarNavigationGroupProps {
-  group: NavGroup;
-  isOpen: boolean;
-  onToggle: () => void;
-  renderNavLink: (item: NavItem) => ReactNode;
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  /** Số hiển thị ở cuối mục, kèm nhãn đọc được cho trình đọc màn hình. */
+  badge?: { value: number; label: string };
+  onClick?: () => void;
+}
+
+interface NavGroup {
+  label?: string;
+  items: NavItem[];
 }
 
 const ICON = 18;
-
-function SidebarNavigationGroup({ group, isOpen, onToggle, renderNavLink }: SidebarNavigationGroupProps) {
-  const panelId = `nav-group-${group.id}`;
-
-  return (
-    <div className="ez-nav-group">
-      {group.collapsible ? (
-        <button
-          type="button"
-          className="ez-nav-group-label"
-          aria-expanded={isOpen}
-          aria-controls={panelId}
-          onClick={onToggle}
-        >
-          {group.label ?? group.id}
-        </button>
-      ) : group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
-      <div id={panelId} className="ez-nav-group-panel" hidden={!isOpen}>
-        {group.items.map((item) => renderNavLink(item))}
-      </div>
-    </div>
-  );
-}
 
 function roleLabel(role: string | undefined): string {
   switch (role) {
@@ -99,101 +101,223 @@ function initialsOf(name: string): string {
 export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const sidebarRef = useRef<HTMLElement>(null);
   const { status, user, role, area, logout } = useAuth();
-  const { reducedMotion } = useMotion();
-  const { isEnabled } = useFeatureFlags();
   const { preference, setPreference } = useTheme();
-  const [pendingExams, setPendingExams] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
-  /**
-   * Nhóm nào người dùng tự thu gọn. Lựa chọn đó được giữ khi điều hướng — chỉ
-   * nhóm chứa route vừa mở mới bung lại, vì đóng nhóm đang xem thì không thấy
-   * mình đang ở đâu.
-   */
-  const [collapsedNavigation, setCollapsedNavigation] = useState<{
-    activeGroupId: string | null;
-    groupIds: Set<string>;
-  }>({ activeGroupId: null, groupIds: new Set<string>() });
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  const permissions = user?.permissions_override ?? [];
-  const pendingBadgeCount = area === 'student' ? pendingExams : 0;
-
-  // Chỉ gọi API khi là học sinh. Với vai trò khác, giá trị được bỏ qua lúc render
-  // thay vì ghi 0 vào state trong effect.
   useEffect(() => {
     if (area !== 'student') return;
-    let cancelled = false;
-    questionApi
-      .pendingPublishedCount()
-      .then((count) => {
-        if (!cancelled) setPendingExams(count);
+    let active = true;
+    notificationsApi.list()
+      .then((items) => {
+        if (active) setUnreadNotifications(items.filter((item) => !item.is_read).length);
       })
       .catch(() => {
-        // Giữ nguyên giá trị trước đó; badge không phải thông tin thiết yếu.
+        if (active) setUnreadNotifications(0);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { active = false; };
   }, [area]);
 
   function isActive(path: string): boolean {
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   }
 
-  const groups = area
-    ? buildNavigation({
-      area,
-      role,
-      permissions,
-      isFeatureEnabled: isEnabled,
-      badges: pendingBadgeCount > 0
-        ? { pendingExams: { value: pendingBadgeCount, label: `${pendingBadgeCount} bài luyện tập chưa làm` } }
-        : {},
-    })
-    : [];
+  /**
+   * Nhóm mục điều hướng theo khu vực.
+   *
+   * Điểm khác biệt quan trọng so với bản trước: mỗi khu vực chỉ nhận đúng nhóm
+   * của mình. Trước đây `isLecturerRole` bao gồm cả `admin` và `super_admin`,
+   * nên tài khoản quản trị thấy thêm 5 mục của giáo viên — những mục gọi API
+   * theo quyền sở hữu nên gần như luôn rỗng với admin.
+   * Xem docs/ui-redesign/01-audit-report.md §6.2 (lỗi H2).
+   */
+  function buildGroups(): NavGroup[] {
+    if (area === 'student') {
+      return [
+        {
+          label: '🏠 Học tập & Tổng quan',
+          items: [
+            { to: '/student/dashboard', label: 'Tổng quan Dashboard', icon: <LayoutDashboard size={ICON} /> },
+            { to: '/student/courses', label: 'Khóa học của tôi', icon: <BookOpen size={ICON} /> },
+            { to: '/student/online-schedules', label: 'Lịch học Online', icon: <Video size={ICON} /> },
+            { to: '/student/learning-materials', label: 'Học liệu số', icon: <Library size={ICON} /> },
+            { to: '/hoc-theo-mon', label: 'Học theo môn', icon: <BookOpen size={ICON} /> },
+            { to: '/student/practice', label: 'Bài luyện tập', icon: <ClipboardList size={ICON} /> },
+            { to: '/student/exams', label: 'Đề thi chính thức', icon: <FileQuestion size={ICON} /> },
+          ],
+        },
+        {
+          label: '📊 Kết quả & Tiến độ',
+          items: [
+            { to: '/student/results', label: 'Kết quả học tập', icon: <Award size={ICON} /> },
+            { to: '/student/progress', label: 'Tiến độ học tập', icon: <TrendingUp size={ICON} /> },
+            { to: '/student/learning-path', label: 'Lộ trình học cá nhân', icon: <Target size={ICON} /> },
+          ],
+        },
+        {
+          label: '🤖 Trợ lý AI & Thông báo',
+          items: [
+            { to: '/student/ask-ai', label: 'Hỏi AI trợ lý', icon: <Bot size={ICON} /> },
+            {
+              to: '/student/notifications',
+              label: 'Thông báo',
+              icon: <Bell size={ICON} />,
+              badge: unreadNotifications > 0
+                ? { value: unreadNotifications, label: `${unreadNotifications} thông báo mới` }
+                : undefined,
+            },
+            { to: '/student/profile', label: 'Tài khoản cá nhân', icon: <User size={ICON} /> },
+            { to: '#logout', label: 'Đăng xuất', icon: <LogOut size={ICON} />, onClick: () => setShowLogoutConfirm(true) },
+          ],
+        },
+      ];
+    }
+
+    if (area === 'teacher') {
+      return [
+        {
+          label: '📊 Tổng quan',
+          items: [
+            { to: '/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
+          ],
+        },
+        {
+          label: '🤖 AI',
+          items: [
+            { to: '/chat-advanced', label: 'Hỏi đáp AI', icon: <MessageSquare size={ICON} /> },
+            { to: '/tools', label: 'Công cụ AI', icon: <Sparkles size={ICON} /> },
+            { to: '/teacher/ai-generate-exam', label: 'Tạo đề AI', icon: <Sparkles size={ICON} /> },
+            { to: '/teacher/ai-generate-question', label: 'Sinh câu hỏi', icon: <Bot size={ICON} /> },
+            { to: '/teacher/ai-grading', label: 'Chấm điểm AI', icon: <Award size={ICON} /> },
+          ],
+        },
+        {
+          label: '📚 Quản lý giảng dạy',
+          items: [
+            { to: '/teacher/courses', label: 'Khóa học', icon: <BookOpen size={ICON} /> },
+            { to: '/documents', label: 'Học liệu', icon: <Library size={ICON} /> },
+            { to: '/classes', label: 'Lớp học', icon: <School size={ICON} /> },
+            { to: '/teacher/assignments', label: 'Bài tập', icon: <ClipboardList size={ICON} /> },
+            { to: '/question-history', label: 'Đề thi', icon: <FileQuestion size={ICON} /> },
+            { to: '/teacher/questions', label: 'Câu hỏi', icon: <FileQuestion size={ICON} /> },
+            { to: '/question-bank', label: 'Ngân hàng câu hỏi', icon: <Database size={ICON} /> },
+            { to: '/exam-blueprints', label: 'Ma trận đề', icon: <ScrollText size={ICON} /> },
+            { to: '/teacher/content-history', label: 'Lịch sử nội dung', icon: <Activity size={ICON} /> },
+          ],
+        },
+        {
+          label: '📝 Chấm điểm',
+          items: [
+            { to: '/teacher/submissions', label: 'Bài nộp của học sinh', icon: <ClipboardList size={ICON} /> },
+            { to: '/teacher/results', label: 'Kết quả', icon: <Award size={ICON} /> },
+            { to: '/teacher/stats', label: 'Thống kê', icon: <BarChart3 size={ICON} /> },
+          ],
+        },
+        {
+          label: '📅 Lịch',
+          items: [
+            { to: '/teacher/schedules', label: 'Lịch dạy', icon: <Calendar size={ICON} /> },
+            { to: '/teacher/exam-schedules', label: 'Lịch thi', icon: <Calendar size={ICON} /> },
+            { to: '/teacher/notifications', label: 'Thông báo', icon: <Bell size={ICON} /> },
+          ],
+        },
+        {
+          label: '👤 Cá nhân',
+          items: [
+            { to: '/ho-so', label: 'Hồ sơ', icon: <User size={ICON} /> },
+            { to: '/teacher/activity-logs', label: 'Nhật ký hoạt động', icon: <Activity size={ICON} /> },
+            { to: '/teacher/settings', label: 'Cài đặt', icon: <Settings size={ICON} /> },
+            { to: '#logout', label: 'Đăng xuất', icon: <LogOut size={ICON} />, onClick: () => setShowLogoutConfirm(true) },
+          ],
+        },
+      ];
+    }
+
+    if (area === 'admin') {
+      return [
+        {
+          label: 'Dashboard',
+          items: [
+            { to: '/admin/dashboard', label: 'Tổng quan', icon: <LayoutDashboard size={ICON} /> },
+          ],
+        },
+        {
+          label: '🤖 AI',
+          items: [
+            { to: '/admin/ai-generate-exam', label: 'Tạo đề AI', icon: <Sparkles size={ICON} /> },
+            { to: '/admin/ai-generate-question', label: 'Sinh câu hỏi', icon: <Bot size={ICON} /> },
+            { to: '/admin/ai-grading', label: 'Chấm điểm AI', icon: <Award size={ICON} /> },
+            { to: '/admin/ai-chat', label: 'Chat AI', icon: <MessageSquare size={ICON} /> },
+          ],
+        },
+        {
+          label: '📚 Quản lý nội dung',
+          items: [
+            { to: '/admin/documents', label: 'Học liệu', icon: <Library size={ICON} /> },
+            { to: '/admin/exams', label: 'Đề thi', icon: <ClipboardList size={ICON} /> },
+            { to: '/admin/questions', label: 'Câu hỏi', icon: <FileQuestion size={ICON} /> },
+            { to: '/admin/question-bank', label: 'Ngân hàng câu hỏi', icon: <Database size={ICON} /> },
+            { to: '/admin/exam-blueprints', label: 'Ma trận đề', icon: <ScrollText size={ICON} /> },
+            { to: '/admin/mon-hoc', label: 'Danh mục môn', icon: <BookOpen size={ICON} /> },
+          ],
+        },
+        {
+          label: '👥 Quản lý tài khoản',
+          items: [
+            { to: '/admin/users', label: 'Tất cả tài khoản', icon: <Users size={ICON} /> },
+            { to: '/admin/students', label: 'Học sinh', icon: <User size={ICON} /> },
+            { to: '/admin/teachers', label: 'Giáo viên', icon: <UserCog size={ICON} /> },
+            { to: '/admin/users?role=admin', label: 'Admin', icon: <Shield size={ICON} /> },
+          ],
+        },
+        {
+          label: '🎓 Quản lý đào tạo',
+          items: [
+            { to: '/admin/courses', label: 'Khóa học', icon: <BookOpen size={ICON} /> },
+            { to: '/admin/classes', label: 'Lớp học', icon: <School size={ICON} /> },
+            { to: '/admin/teachers', label: 'Giáo viên', icon: <UserCog size={ICON} /> },
+            { to: '/admin/course-enrollments', label: 'Đăng ký khóa học', icon: <Users size={ICON} /> },
+            { to: '/admin/courses', label: 'Bài học', icon: <BookOpen size={ICON} /> },
+            { to: '/admin/exams', label: 'Bài kiểm tra', icon: <FileQuestion size={ICON} /> },
+            { to: '/admin/exam-results', label: 'Kết quả học tập', icon: <Award size={ICON} /> },
+          ],
+        },
+        {
+          label: '📅 Thi cử',
+          items: [
+            { to: '/admin/exam-schedules', label: 'Lịch thi', icon: <Calendar size={ICON} /> },
+            { to: '/admin/exam-results', label: 'Kết quả', icon: <Award size={ICON} /> },
+            { to: '/admin/exam-stats', label: 'Thống kê', icon: <BarChart3 size={ICON} /> },
+            { to: '/admin/reports', label: 'Báo cáo', icon: <ScrollText size={ICON} /> },
+          ],
+        },
+        {
+          label: '👤 Cá nhân',
+          items: [
+            { to: '/admin/notifications', label: 'Thông báo', icon: <Bell size={ICON} /> },
+            { to: '/admin/favorites', label: 'Yêu thích', icon: <Star size={ICON} /> },
+            { to: '/admin/audit-logs', label: 'Lịch sử', icon: <Activity size={ICON} /> },
+            { to: '/admin/settings', label: 'Cài đặt', icon: <Settings size={ICON} /> },
+            { to: '#logout', label: 'Đăng xuất', icon: <LogOut size={ICON} />, onClick: () => setShowLogoutConfirm(true) },
+          ],
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  const groups = buildGroups();
   const allItems = groups.flatMap((g) => g.items);
   const activeItem = allItems.find((item) => isActive(item.to));
-  const activeGroupId = groups.find((group) => group.items.some((item) => isActive(item.to)))?.id ?? null;
-  // Nhóm chứa route đang mở luôn bung, kể cả khi người dùng từng thu gọn nó.
-  const collapsedGroupIds = activeGroupId && collapsedNavigation.groupIds.has(activeGroupId)
-    && collapsedNavigation.activeGroupId !== activeGroupId
-    ? new Set([...collapsedNavigation.groupIds].filter((id) => id !== activeGroupId))
-    : collapsedNavigation.groupIds;
 
   /** Tối đa 4 mục ở thanh dưới cùng trên mobile; phần còn lại vào "Thêm". */
   const tabItems = allItems.slice(0, 4);
   const overflowItems = allItems.slice(4);
-  const overflowActiveItem = overflowItems.find((item) => isActive(item.to));
-  const overflowActive = Boolean(overflowActiveItem);
 
   const displayName = user?.full_name || 'Người dùng';
-
-  useGSAP(() => {
-    const activeIndicator = sidebarRef.current?.querySelector<HTMLElement>('[data-active-indicator]');
-    if (!activeIndicator) return;
-
-    if (reducedMotion) {
-      gsap.set(activeIndicator, { clearProps: 'transform,transformOrigin,opacity,visibility' });
-      return;
-    }
-
-    gsap.fromTo(
-      activeIndicator,
-      { autoAlpha: 0, scaleY: 0.35, transformOrigin: 'left center' },
-      {
-        autoAlpha: 1,
-        scaleY: 1,
-        duration: MOTION_DURATION.base,
-        ease: MOTION_EASE.standard,
-        clearProps: 'transform,transformOrigin,opacity,visibility',
-      },
-    );
-  }, {
-    scope: sidebarRef,
-    dependencies: [location.pathname, reducedMotion],
-    revertOnUpdate: true,
-  });
 
   const userMenu = (
     <>
@@ -231,10 +355,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <DropdownItem
         icon={<LogOut size={16} />}
         danger
-        onClick={() => {
-          logout();
-          navigate('/login', { replace: true });
-        }}
+        onClick={() => setShowLogoutConfirm(true)}
       >
         Đăng xuất
       </DropdownItem>
@@ -242,16 +363,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
   );
 
   function renderNavLink(item: NavItem, onNavigate?: () => void) {
+    if (item.onClick || item.to === '#logout') {
+      return (
+        <button
+          key={item.label}
+          type="button"
+          className="ez-nav-item"
+          style={{
+            width: '100%',
+            textAlign: 'left',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.6rem 0.85rem',
+            borderRadius: '10px',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+          }}
+          onClick={() => {
+            if (onNavigate) onNavigate();
+            if (item.onClick) item.onClick();
+            else setShowLogoutConfirm(true);
+          }}
+        >
+          <span className="ez-nav-icon" aria-hidden="true">
+            {item.icon}
+          </span>
+          <span className="ez-nav-label">{item.label}</span>
+        </button>
+      );
+    }
+
     const active = isActive(item.to);
     return (
       <Link
-        key={item.to}
+        key={`${item.to}:${item.label}`}
         to={item.to}
         className={active ? 'ez-nav-item ez-nav-item-active' : 'ez-nav-item'}
         aria-current={active ? 'page' : undefined}
         onClick={onNavigate}
       >
-        {active ? <span className="ez-nav-active-indicator" data-active-indicator aria-hidden="true" /> : null}
         <span className="ez-nav-icon" aria-hidden="true">
           {item.icon}
         </span>
@@ -269,14 +424,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="ez-shell" data-app-shell data-role-area={area}>
+    <div className="ez-shell">
       <a className="ez-skip-link" href="#main">
         Bỏ qua tới nội dung chính
       </a>
 
-      <aside ref={sidebarRef} className="ez-sidebar">
+      <aside className="ez-sidebar">
         <Link to={area === 'admin' ? '/admin/dashboard' : '/dashboard'} className="ez-brand">
-          <BrandMark size={32} />
+          <span className="ez-brand-mark" aria-hidden="true" translate="no">
+            Ez
+          </span>
           <span className="ez-brand-text">
             <span className="ez-brand-name">EzEdu AI</span>
             {area === 'admin' ? <span className="ez-brand-area">Quản trị</span> : null}
@@ -292,21 +449,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Skeleton height="2.5rem" />
             </div>
           ) : (
-            groups.map((group) => (
-              <SidebarNavigationGroup
-                key={group.id}
-                group={group}
-                isOpen={!group.collapsible || !collapsedGroupIds.has(group.id)}
-                onToggle={() => {
-                  setCollapsedNavigation(() => {
-                    const groupIds = new Set(collapsedGroupIds);
-                    if (groupIds.has(group.id)) groupIds.delete(group.id);
-                    else groupIds.add(group.id);
-                    return { activeGroupId, groupIds };
-                  });
-                }}
-                renderNavLink={renderNavLink}
-              />
+            groups.map((group, index) => (
+              <div key={group.label ?? `group-${index}`} className="ez-nav-group">
+                {group.label ? <span className="ez-nav-group-label">{group.label}</span> : null}
+                {group.items.map((item) => renderNavLink(item))}
+              </div>
             ))
           )}
         </nav>
@@ -316,7 +463,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
             align="start"
             direction="up"
             menuLabel="Tài khoản và cài đặt"
-            className="ez-shell-account-menu"
             trigger={
               <button type="button" className="ez-user-chip">
                 <span className="ez-avatar" aria-hidden="true">
@@ -341,7 +487,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <span className="ez-topbar-title">{activeItem?.label ?? 'EzEdu AI'}</span>
           <Dropdown
             menuLabel="Tài khoản và cài đặt"
-            className="ez-shell-account-menu"
             trigger={
               <Button variant="ghost" size="sm" iconOnly aria-label="Mở menu tài khoản">
                 <span className="ez-avatar ez-avatar-sm" aria-hidden="true">
@@ -355,12 +500,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         <main id="main" className="ez-main" tabIndex={-1}>
-          <PageEntrance key={location.pathname} routeKey={location.pathname}>
-            {/* Lỗi render của một trang không được làm trắng cả khung ứng dụng */}
-            <RouteErrorBoundary resetKey={location.pathname}>
-              {children}
-            </RouteErrorBoundary>
-          </PageEntrance>
+          {children}
         </main>
 
         {tabItems.length > 0 ? (
@@ -369,18 +509,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               const active = isActive(item.to);
               return (
                 <Link
-                  key={item.to}
+                  key={`${item.to}:${item.label}`}
                   to={item.to}
                   className={active ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
                   aria-current={active ? 'page' : undefined}
                 >
-                  {active ? (
-                    <span
-                      className="ez-nav-active-indicator ez-tab-active-indicator"
-                      data-active-indicator
-                      aria-hidden="true"
-                    />
-                  ) : null}
                   <span className="ez-tab-icon" aria-hidden="true">
                     {item.icon}
                   </span>
@@ -397,24 +530,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {overflowItems.length > 0 ? (
               <button
                 type="button"
-                className={overflowActive ? 'ez-tab-item ez-tab-item-active' : 'ez-tab-item'}
+                className="ez-tab-item"
                 onClick={() => setMoreOpen(true)}
                 aria-expanded={moreOpen}
               >
-                {overflowActive ? (
-                  <span
-                    className="ez-nav-active-indicator ez-tab-active-indicator"
-                    data-active-indicator
-                    aria-hidden="true"
-                  />
-                ) : null}
                 <span className="ez-tab-icon" aria-hidden="true">
                   <Ellipsis size={ICON} />
                 </span>
                 <span className="ez-tab-label">Thêm</span>
-                {overflowActiveItem ? (
-                  <span className="ez-sr-only">Đang xem {overflowActiveItem.label}</span>
-                ) : null}
               </button>
             ) : null}
           </nav>
@@ -426,12 +549,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
         onClose={() => setMoreOpen(false)}
         side="bottom"
         title="Thêm"
-        className="ez-more-drawer"
       >
         <div className="ez-nav-group">
           {overflowItems.map((item) => renderNavLink(item, () => setMoreOpen(false)))}
         </div>
       </Drawer>
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          logout();
+          navigate('/login', { replace: true });
+        }}
+        title="Xác nhận đăng xuất"
+        description="Bạn có chắc chắn muốn đăng xuất khỏi hệ thống EzEdu AI không?"
+        confirmLabel="Đăng xuất"
+        confirmVariant="danger"
+      />
     </div>
   );
 }
