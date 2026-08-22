@@ -1,5 +1,6 @@
 from typing import Optional
 
+from app.core.config import settings
 from app.personalization.repositories.mongo import PersonalizationMongoRepository
 from app.personalization.schemas.learner_state import (
     LearnerKnowledgeStateResponse,
@@ -52,7 +53,7 @@ def _profile_response(profile: Optional[dict]) -> Optional[LearnerProfileRespons
         total_learning_events=int(profile.get("total_learning_events") or 0),
         cold_start_status=profile.get("cold_start_status", "new"),
         updated_at=profile["updated_at"],
-        model_version=profile["model_version"],
+        model_version=profile.get("model_version") or settings.LEARNER_MODEL_VERSION,
     )
 
 
