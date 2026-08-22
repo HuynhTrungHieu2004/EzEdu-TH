@@ -24,6 +24,14 @@ services:
         value: "true"
       - key: ENABLE_CURRICULUM_KB
         value: "true"
+      - key: PERSONALIZATION_ENABLED
+        value: "true"
+      - key: LEARNER_MODEL_ENABLED
+        value: "true"
+      - key: RECOMMENDATION_ENABLED
+        value: "true"
+      - key: AI_RECOMMENDATION_EXPLANATION_ENABLED
+        value: "true"
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DB_NAME
