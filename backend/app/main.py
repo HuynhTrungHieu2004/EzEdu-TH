@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
-from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, admin_audit_logs, admin_content, admin_ai, admin_notifications, admin_reports, website_content, system_settings, classes, teacher_history
+from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, my_activity, admin_audit_logs, admin_content, admin_ai, admin_notifications, notifications, admin_reports, website_content, system_settings, assignments, classes, courses, schedules, favorites, teacher_history
 from app.personalization.api import router as personalization_router, onboarding_router as personalization_onboarding_router
 from app.exam_bank.api import router as exam_bank_router
 from app.web_knowledge.api import router as web_knowledge_router
@@ -52,6 +52,34 @@ async def lifespan(app: FastAPI):
         await ensure_background_job_indexes(_db)
     except Exception as e:
         logger.error(f"Lỗi khi tạo index cho hạ tầng dùng chung (idempotency/background_jobs): {e}")
+
+    try:
+        from app.services.course_service import ensure_course_indexes
+
+        await ensure_course_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho khóa học: {e}")
+
+    try:
+        from app.services.assignment_service import ensure_assignment_indexes
+
+        await ensure_assignment_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho bài tập: {e}")
+
+    try:
+        from app.services.schedule_service import ensure_schedule_indexes
+
+        await ensure_schedule_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho lịch học: {e}")
+
+    try:
+        from app.services.favorite_service import ensure_favorite_indexes
+
+        await ensure_favorite_indexes(get_database())
+    except Exception as e:
+        logger.error(f"Lỗi khi tạo index cho yêu thích: {e}")
 
     # Index cho ngân hàng câu hỏi & ma trận đề (giai đoạn 3).
     try:
@@ -281,6 +309,12 @@ app.include_router(
     dependencies=[Depends(require_feature_enabled("enable_personalization"))],
 )
 app.include_router(classes.router, prefix=f"{settings.API_V1_STR}/classes", tags=["Classes"])
+app.include_router(courses.router, prefix=settings.API_V1_STR)
+app.include_router(assignments.router, prefix=settings.API_V1_STR)
+app.include_router(schedules.router, prefix=settings.API_V1_STR)
+app.include_router(favorites.router, prefix=settings.API_V1_STR)
+app.include_router(notifications.router, prefix=settings.API_V1_STR)
+app.include_router(my_activity.router, prefix=settings.API_V1_STR)
 app.include_router(exam_bank_router, prefix=settings.API_V1_STR)
 app.include_router(web_knowledge_router, prefix=settings.API_V1_STR)
 app.include_router(curriculum_kb_router, prefix=settings.API_V1_STR)
@@ -304,7 +338,7 @@ def health_check():
 async def readiness_check():
     from app.database.mongodb import ping_database, is_indexes_ready
     from app.services.rag_service import ping_chroma
-    from app.services.llm_service import is_gemini_available, is_groq_available
+    from app.services.llm_service import is_claude_available, is_gemini_available, is_groq_available
 
     mongo_ok = await ping_database()
     chroma_ok = ping_chroma()
@@ -318,7 +352,8 @@ async def readiness_check():
     except Exception:  # noqa: BLE001 - đếm hỏng không được làm hỏng health check
         dem_vector = {"mongo_chunks": 0, "chroma_vectors": 0}
     indexes_ok = is_indexes_ready()
-    gemini_ok = is_gemini_available()
+    text_provider_name = "claude" if settings.AI_TEXT_PROVIDER == "claude" else "gemini"
+    text_provider_ok = is_claude_available() if text_provider_name == "claude" else is_gemini_available()
     groq_ok = is_groq_available()
 
     services_status = {
@@ -331,7 +366,7 @@ async def readiness_check():
             else "unavailable"
         ),
         "mongodb_indexes": "healthy" if indexes_ok else "degraded",
-        "gemini": "healthy" if gemini_ok else "unavailable",
+        text_provider_name: "healthy" if text_provider_ok else "unavailable",
         "groq": "healthy" if groq_ok else "unavailable"
     }
 
@@ -340,7 +375,7 @@ async def readiness_check():
         status_code = 503
     elif (
         not indexes_ok
-        or not gemini_ok
+        or not text_provider_ok
         or not groq_ok
         or services_status["chromadb"] == "degraded"
     ):

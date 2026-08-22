@@ -9,7 +9,6 @@ import {
 } from '../../constants/advancedChat';
 import { renderAnswerWithCitations, formatConfidence } from '../../utils/chatCitations';
 import { AnswerFeedbackControls } from './feedback/AnswerFeedbackControls';
-import { StudyExamCard } from './StudyExamCard';
 
 interface AssistantMessageProps {
   message: LocalChatMessage;
@@ -45,32 +44,32 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   const getRetrievalStyle = (mode?: string | null) => {
     switch (mode) {
       case 'internal_only':
-        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
+        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
       case 'web_only':
-        return { backgroundColor: 'var(--ez-blue-50)', color: 'var(--ez-blue-600)', border: '1px solid var(--ez-blue-100)' };
+        return { backgroundColor: 'var(--ice-50)', color: 'var(--ice-500)', border: '1px solid var(--ice-200)' };
       case 'hybrid':
-        return { backgroundColor: 'var(--ez-indigo-100)', color: 'var(--ez-indigo-600)', border: '1px solid var(--ez-indigo-200)' };
+        return { backgroundColor: 'var(--crystal-100)', color: 'var(--crystal-600)', border: '1px solid var(--crystal-200)' };
       case 'model_knowledge':
-        return { backgroundColor: 'var(--ez-amber-50)', color: 'var(--ez-amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
+        return { backgroundColor: 'var(--amber-50)', color: 'var(--amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
       case 'clarification_required':
-        return { backgroundColor: 'var(--ez-error-subtle)', color: 'var(--ez-error)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+        return { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)' };
       default:
-        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
+        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
     }
   };
 
   const getEvidenceStyle = (status?: string | null) => {
     switch (status) {
       case 'well_supported':
-        return { backgroundColor: 'var(--ez-teal-50)', color: 'var(--ez-teal-500)', border: '1px solid rgba(16, 185, 129, 0.2)' };
+        return { backgroundColor: 'var(--mint-50)', color: 'var(--mint-500)', border: '1px solid rgba(16, 185, 129, 0.2)' };
       case 'partially_supported':
-        return { backgroundColor: 'var(--ez-amber-50)', color: 'var(--ez-amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
+        return { backgroundColor: 'var(--amber-50)', color: 'var(--amber-500)', border: '1px solid rgba(245, 158, 11, 0.2)' };
       case 'insufficient_evidence':
       case 'conflicting_sources':
       case 'unverified':
-        return { backgroundColor: 'var(--ez-error-subtle)', color: 'var(--ez-error)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+        return { backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)' };
       default:
-        return { backgroundColor: 'var(--ez-surface-muted)', color: 'var(--ez-text-secondary)' };
+        return { backgroundColor: 'var(--surface-muted)', color: 'var(--text)' };
     }
   };
 
@@ -148,15 +147,6 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
         )}
       </div>
 
-      {message.message_kind === 'study_exam_config' && message.study_exam_config && (
-        <StudyExamCard
-          config={message.study_exam_config}
-          conversationId={message.conversation_id}
-          messageId={message.message_id}
-          initialRequest={message.study_exam_request}
-        />
-      )}
-
       <div style={styles.footerRow}>
         <div style={styles.footerMeta}>
           {model_name && <span style={styles.metaItem}>Mô hình: <code>{model_name}</code></span>}
@@ -208,10 +198,10 @@ const styles = {
     width: '100%',
     padding: '18px 20px',
     borderRadius: '16px 16px 16px 4px',
-    border: '1px solid var(--ez-border)',
-    backgroundColor: 'var(--ez-surface)',
-    color: 'var(--ez-text)',
-    boxShadow: 'var(--ez-shadow-md)',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--surface-strong)',
+    color: 'var(--text-h)',
+    boxShadow: 'var(--shadow-soft)',
   },
   badgeHeader: {
     display: 'flex',
@@ -220,7 +210,7 @@ const styles = {
     marginBottom: '12px',
   },
   badge: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: '700',
     padding: '4px 10px',
     borderRadius: '6px',
@@ -229,13 +219,13 @@ const styles = {
     gap: '5px',
   },
   searchBadge: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: '600',
-    backgroundColor: 'var(--ez-surface-muted)',
-    color: 'var(--ez-text-secondary)',
+    backgroundColor: 'var(--surface-muted)',
+    color: 'var(--text)',
     padding: '4px 10px',
     borderRadius: '6px',
-    border: '1px solid var(--ez-border)',
+    border: '1px solid var(--border)',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '5px',
@@ -248,15 +238,15 @@ const styles = {
     padding: '10px 12px',
     borderRadius: '8px',
     color: 'var(--warning-text)',
-    backgroundColor: 'var(--ez-warning-subtle)',
-    border: '1px solid var(--ez-border-strong)',
+    backgroundColor: 'var(--warning-bg)',
+    border: '1px solid var(--border-strong)',
     marginBottom: '12px',
     lineHeight: 1.5,
   },
   tabs: {
     display: 'flex',
     gap: '4px',
-    borderBottom: '1px solid var(--ez-border)',
+    borderBottom: '1px solid var(--border)',
     marginBottom: '14px',
   },
   tabBtn: {
@@ -265,29 +255,29 @@ const styles = {
     fontWeight: '600',
     border: 'none',
     backgroundColor: 'transparent',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     cursor: 'pointer',
     borderBottom: '2px solid transparent',
     transition: 'all 0.2s',
   },
   tabBtnActive: {
-    color: 'var(--ez-primary)',
-    borderBottom: '2px solid var(--ez-primary)',
+    color: 'var(--accent)',
+    borderBottom: '2px solid var(--accent)',
   },
   contentText: {
     fontSize: '14px',
     lineHeight: 1.65,
   },
   shortAnswerBlock: {
-    backgroundColor: 'var(--ez-surface-muted)',
+    backgroundColor: 'var(--surface-muted)',
     padding: '12px',
     borderRadius: '8px',
-    borderLeft: '4px solid var(--ez-primary)',
+    borderLeft: '4px solid var(--accent)',
   },
   footerRow: {
     marginTop: '16px',
     paddingTop: '12px',
-    borderTop: '1px dashed var(--ez-border)',
+    borderTop: '1px dashed var(--border)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -300,8 +290,8 @@ const styles = {
     flexWrap: 'wrap' as const,
     alignItems: 'center',
     gap: '12px',
-    fontSize: '12px',
-    color: 'var(--ez-text-muted)',
+    fontSize: '11px',
+    color: 'var(--muted)',
     flex: 1,
   },
   feedbackContainer: {
@@ -319,12 +309,12 @@ const styles = {
   suggestionsContainer: {
     marginTop: '16px',
     paddingTop: '14px',
-    borderTop: '1px dashed var(--ez-border)',
+    borderTop: '1px dashed var(--border)',
   },
   suggestionsTitle: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     marginBottom: '8px',
     display: 'flex',
     alignItems: 'center',
@@ -338,9 +328,9 @@ const styles = {
   suggestionChip: {
     padding: '6px 12px',
     borderRadius: '20px',
-    border: '1px solid var(--ez-border-strong)',
-    backgroundColor: 'var(--ez-bg)',
-    color: 'var(--ez-primary)',
+    border: '1px solid var(--border-strong)',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--accent)',
     fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',

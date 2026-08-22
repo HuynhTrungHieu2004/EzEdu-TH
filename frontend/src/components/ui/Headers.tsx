@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { ChalkUnderline } from './ChalkUnderline';
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -11,6 +10,7 @@ export type PageHeaderProps = {
   title: string;
   eyebrow?: string;
   description?: string;
+  subtitle?: string;
   actions?: ReactNode;
   backTo?: string;
   backLabel?: string;
@@ -23,6 +23,7 @@ export function PageHeader({
   title,
   eyebrow,
   description,
+  subtitle,
   actions,
   backTo,
   backLabel,
@@ -30,6 +31,7 @@ export function PageHeader({
   loading = false,
   className,
 }: PageHeaderProps) {
+  const desc = description ?? subtitle;
   return (
     <>
       {backTo ? (
@@ -46,16 +48,13 @@ export function PageHeader({
           {loading ? (
             <div className="ez-skeleton ez-skeleton-title" />
           ) : (
-            <>
-              <TitleTag className="ez-page-title">{title}</TitleTag>
-              <ChalkUnderline />
-            </>
+            <TitleTag className="ez-page-title">{title}</TitleTag>
           )}
 
           {loading ? (
             <div className="ez-skeleton ez-skeleton-text" />
-          ) : description ? (
-            <p className="ez-page-desc">{description}</p>
+          ) : desc ? (
+            <p className="ez-page-desc">{desc}</p>
           ) : null}
         </div>
 

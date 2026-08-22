@@ -50,7 +50,7 @@ SYSTEM_SETTING_DEFINITIONS: dict[str, SettingDefinition] = {
     "default_question_count": SettingDefinition("default_question_count", 10, "int", "question_generation", "Số câu hỏi mặc định ở giao diện.", is_public=True, minimum=1, maximum=50),
     "allowed_question_types": SettingDefinition("allowed_question_types", ["multiple_choice", "true_false", "short_answer"], "list", "question_generation", "Loại câu hỏi được phép sinh.", is_public=True, item_choices=("multiple_choice", "true_false", "short_answer")),
     "default_provider": SettingDefinition("default_provider", "groq", "string", "ai", "Nhà cung cấp AI mặc định.", choices=("groq", "gemini", "mixed")),
-    "default_model": SettingDefinition("default_model", getattr(env_settings, "GROQ_MODEL", "llama-3.3-70b-versatile"), "string", "ai", "Model AI mặc định."),
+    "default_model": SettingDefinition("default_model", getattr(env_settings, "CLAUDE_FAST_MODEL", "claude-haiku-4-5-20251001"), "string", "ai", "Model AI mặc định."),
     "fallback_provider": SettingDefinition("fallback_provider", "gemini", "string", "ai", "Nhà cung cấp AI fallback.", choices=("groq", "gemini", "mixed")),
     "timeout_seconds": SettingDefinition("timeout_seconds", int(getattr(env_settings, "AI_TIMEOUT_SECONDS", 25)), "int", "ai", "Timeout cho một số luồng gọi AI.", minimum=1, maximum=300),
     "retry_count": SettingDefinition("retry_count", int(getattr(env_settings, "MAX_RETRIES", 2)), "int", "ai", "Số lần retry cho một số luồng AI.", minimum=0, maximum=10),
@@ -80,7 +80,7 @@ FEATURE_FLAG_DEFINITIONS: dict[str, FeatureFlagDefinition] = {
     # Mặc định TẮT: app Facebook đang ở chế độ Development, chỉ tài khoản có vai
     # trò trong app mới đăng nhập được. Bật khi chưa sẵn sàng chỉ tạo ra một nút
     # mà đa số người bấm vào sẽ bị Facebook từ chối.
-    "enable_facebook_login": FeatureFlagDefinition("enable_facebook_login", False, "Bật/tắt đăng nhập bằng tài khoản Facebook."),
+    "enable_facebook_login": FeatureFlagDefinition("enable_facebook_login", True, "Bật/tắt đăng nhập bằng tài khoản Facebook."),
 }
 
 SENSITIVE_KEY_PATTERN = re.compile(r"(api[_-]?key|password|secret|jwt|token|mongo|database|cloudinary)", re.IGNORECASE)

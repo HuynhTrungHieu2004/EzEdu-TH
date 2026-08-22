@@ -34,7 +34,13 @@ class KnowledgeExtractionValidationError(ValueError):
     """Raised when the AI output violates the strict personalization contract."""
 
 
-def build_knowledge_extraction_prompt(chunks: list[dict], items: list[dict]) -> str:
+def build_knowledge_extraction_prompt(
+    chunks: list[dict],
+    items: list[dict],
+    *,
+    subject_id: str | None = None,
+    topic_id: str | None = None,
+) -> str:
     chunk_payload = [
         {
             "chunk_id": chunk["canonical_chunk_id"],
@@ -94,6 +100,7 @@ Quy tắc:
 - Không tạo chu trình prerequisite.
 - Mỗi item chỉ gắn một số ít knowledge components cần thiết.
 - Nếu không chắc chắn, giảm confidence thay vì đoán.
+- Khi scope taxonomy được cung cấp, trường subject/topic phải dùng đúng ID này: subject={subject_id or "không giới hạn"}, topic={topic_id or "không giới hạn"}.
 
 CHUNKS:
 {json.dumps(chunk_payload, ensure_ascii=False)}
@@ -268,6 +275,18 @@ async def process_document_knowledge_graph(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
 
+    subject_id = document.get("subject_id")
+    topic_id = document.get("topic_id")
+    if subject_id:
+        subject_node = await repo.db["curriculum_taxonomy"].find_one({"_id": subject_id})
+        topic_node = (
+            await repo.db["curriculum_taxonomy"].find_one({"_id": topic_id})
+            if topic_id
+            else None
+        )
+        if subject_node is None or (topic_id and topic_node is None):
+            raise KnowledgeExtractionValidationError("Document references unknown curriculum taxonomy IDs.")
+
     raw_chunks = await repo.list_document_chunks(document_id, user_id)
     chunks, valid_chunk_ids = _canonicalize_chunks(raw_chunks, document_id)
     if not chunks:
@@ -287,15 +306,27 @@ async def process_document_knowledge_graph(
     available_items = {item["item_id"]: item for item in [*existing_items, *question_items, *chunk_items]}
 
     if ai_response is None:
-        prompt = build_knowledge_extraction_prompt(chunks, list(available_items.values()))
+        prompt = build_knowledge_extraction_prompt(
+            chunks,
+            list(available_items.values()),
+            subject_id=subject_id,
+            topic_id=topic_id,
+        )
         if ai_json_generator is None:
             from app.services.llm_service import generate_json_with_failover
 
-            ai_json_generator = generate_json_with_failover
+            ai_json_generator = lambda value: generate_json_with_failover(value, quality=False)
         ai_response = ai_json_generator(prompt)
 
     parsed = _parse_ai_response(ai_response)
     _validate_ai_graph(parsed, valid_chunk_ids)
+    if subject_id and any(
+        candidate.subject != subject_id or (topic_id and candidate.topic != topic_id)
+        for candidate in parsed.knowledge_components
+    ):
+        raise KnowledgeExtractionValidationError(
+            "AI response references subject/topic IDs outside the document taxonomy scope."
+        )
 
     warnings: list[str] = []
     groups, merge_warnings = _merge_candidates(

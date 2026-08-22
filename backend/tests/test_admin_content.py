@@ -6,6 +6,7 @@ from bson import ObjectId
 from fastapi import HTTPException
 from mongomock_motor import AsyncMongoMockClient
 
+from app.core.config import settings
 from app.core.rbac import Permission, require_permission
 from app.schemas.auth import UserResponse
 
@@ -211,7 +212,8 @@ class AdminContentTests(unittest.IsolatedAsyncioTestCase):
             "difficulty": "medium",
             "question_type": "multiple_choice",
         }])
-        with patch("app.services.question_generation_service.is_groq_available", return_value=True), \
+        with patch.object(settings, "AI_TEXT_PROVIDER", "legacy"), \
+             patch("app.services.question_generation_service.is_groq_available", return_value=True), \
              patch("app.services.question_generation_service.is_gemini_available", return_value=False), \
              patch("app.services.question_generation_service.generate_json", return_value=new_question_payload):
             result = await regenerate_admin_question(
@@ -228,7 +230,8 @@ class AdminContentTests(unittest.IsolatedAsyncioTestCase):
     async def test_regenerate_single_question_fails_clearly_without_ai_provider(self):
         from app.routers.admin_content import AdminReasonRequest, regenerate_admin_question
 
-        with patch("app.services.question_generation_service.is_groq_available", return_value=False), \
+        with patch.object(settings, "AI_TEXT_PROVIDER", "legacy"), \
+             patch("app.services.question_generation_service.is_groq_available", return_value=False), \
              patch("app.services.question_generation_service.is_gemini_available", return_value=False):
             with self.assertRaises(HTTPException) as ctx:
                 await regenerate_admin_question(

@@ -153,7 +153,7 @@ def build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
     if not texts:
         return "local", []
 
-    if settings.GEMINI_API_KEY:
+    if settings.AI_TEXT_PROVIDER == "legacy" and settings.GEMINI_API_KEY:
         try:
             return "gemini", [_normalize_vector(embedding) for embedding in get_embeddings(texts)]
         except Exception as exc:
@@ -163,7 +163,7 @@ def build_embeddings(texts: list[str]) -> tuple[str, list[list[float]]]:
 
 
 def build_query_embedding(text: str) -> tuple[str, list[float]]:
-    if settings.GEMINI_API_KEY:
+    if settings.AI_TEXT_PROVIDER == "legacy" and settings.GEMINI_API_KEY:
         try:
             return "gemini", _normalize_vector(get_embedding(text))
         except Exception as exc:
@@ -405,30 +405,34 @@ async def rebuild_chroma_from_mongo() -> dict:
     bo_qua = 0
 
     cursor = db["document_chunks"].find(
-        {}, {"document_id": 1, "user_id": 1, "chunk_index": 1, "content": 1, "embedding": 1, "text_preview": 1}
+        {}, {"document_id": 1, "user_id": 1, "chunk_index": 1, "content": 1, "embedding": 1, "local_embedding": 1, "text_preview": 1}
     )
     async for doc in cursor:
         vector = doc.get("embedding")
-        if not vector:
+        local_vector = doc.get("local_embedding")
+        if not vector and not local_vector:
             # Đoạn cũ lưu trước khi hệ thống bắt đầu giữ vector. Bỏ qua thay vì
             # nhúng lại: nhúng lại ở đây biến hàm "dựng lại miễn phí" thành hàm
             # đốt hạn mức, đúng thứ ghi chú phía trên nói phải tránh.
             bo_qua += 1
             continue
 
-        nhom = theo_kich_thuoc.setdefault(
-            len(vector), {"ids": [], "documents": [], "embeddings": [], "metadatas": []}
-        )
-        nhom["ids"].append(f"{doc['document_id']}:{doc.get('chunk_index', 0)}")
-        nhom["documents"].append(doc.get("content") or "")
-        nhom["embeddings"].append(vector)
-        nhom["metadatas"].append({
-            "document_id": doc["document_id"],
-            "user_id": doc.get("user_id", ""),
-            "chunk_index": doc.get("chunk_index", 0),
-            "text_preview": doc.get("text_preview") or (doc.get("content") or "")[:TEXT_PREVIEW_LENGTH],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+        for candidate in (vector, local_vector if local_vector != vector else None):
+            if not candidate:
+                continue
+            nhom = theo_kich_thuoc.setdefault(
+                len(candidate), {"ids": [], "documents": [], "embeddings": [], "metadatas": []}
+            )
+            nhom["ids"].append(f"{doc['document_id']}:{doc.get('chunk_index', 0)}")
+            nhom["documents"].append(doc.get("content") or "")
+            nhom["embeddings"].append(candidate)
+            nhom["metadatas"].append({
+                "document_id": doc["document_id"],
+                "user_id": doc.get("user_id", ""),
+                "chunk_index": doc.get("chunk_index", 0),
+                "text_preview": doc.get("text_preview") or (doc.get("content") or "")[:TEXT_PREVIEW_LENGTH],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
 
     da_nap = 0
     for kich_thuoc, nhom in theo_kich_thuoc.items():
@@ -451,6 +455,40 @@ async def rebuild_chroma_from_mongo() -> dict:
     return {"restored": da_nap, "skipped": bo_qua}
 
 
+async def migrate_embeddings_to_local() -> dict:
+    """Create local vectors without deleting legacy Gemini vectors."""
+    db = get_database()
+    collection = _get_collection("local", EMBEDDING_DIMENSION)
+    ids: list[str] = []
+    documents: list[str] = []
+    embeddings: list[list[float]] = []
+    metadatas: list[dict] = []
+
+    cursor = db["document_chunks"].find(
+        {}, {"document_id": 1, "user_id": 1, "chunk_index": 1, "content": 1, "text_preview": 1}
+    )
+    async for doc in cursor:
+        content = doc.get("content") or ""
+        vector = _local_hash_embedding(content)
+        await db["document_chunks"].update_one(
+            {"_id": doc["_id"]}, {"$set": {"local_embedding": vector}}
+        )
+        ids.append(f"{doc['document_id']}:{doc.get('chunk_index', 0)}")
+        documents.append(content)
+        embeddings.append(vector)
+        metadatas.append({
+            "document_id": doc["document_id"],
+            "user_id": doc.get("user_id", ""),
+            "chunk_index": doc.get("chunk_index", 0),
+            "text_preview": doc.get("text_preview") or content[:TEXT_PREVIEW_LENGTH],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    if ids:
+        collection.upsert(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
+    return {"migrated": len(ids)}
+
+
 async def rebuild_chroma_if_empty() -> dict:
     """Chỉ nạp lại khi Chroma thiếu so với Mongo. Gọi lúc khởi động.
 
@@ -463,4 +501,3 @@ async def rebuild_chroma_if_empty() -> dict:
         return {"restored": 0, "skipped": 0, **dem}
     ket_qua = await rebuild_chroma_from_mongo()
     return {**ket_qua, **dem}
-

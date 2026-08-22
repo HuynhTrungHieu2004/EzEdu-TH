@@ -8,12 +8,12 @@
 
 /* ── Landing-page scoped tokens ── */
 .lp-root {
-  --lp-bg: #f5f0ff;
+  --lp-bg: #f7f5ff;
   --lp-bg-alt: #f0f4ff;
-  --lp-bg-hero: #ece0ff;
-  --lp-accent: #762bfa;
-  --lp-accent-2: #762bfa;
-  --lp-accent-hover: #4504b7;
+  --lp-bg-hero: #edeaff;
+  --lp-accent: #5b4ef8;
+  --lp-accent-2: #7c3aed;
+  --lp-accent-hover: #4338ca;
   --lp-accent-light: rgba(91, 78, 248, 0.10);
   --lp-accent-border: rgba(91, 78, 248, 0.22);
   --lp-green: #10b981;
@@ -72,13 +72,13 @@
 .lp-logo { display:flex; align-items:center; gap:10px; text-decoration:none; flex-shrink:0; }
 .lp-logo-icon {
   width:36px; height:36px; border-radius: var(--ez-radius-md);
-  background: linear-gradient(135deg,#762bfa 0%,#762bfa 50%,#4504b7 100%);
+  background: linear-gradient(135deg,#5b4ef8 0%,#7c3aed 50%,#4338ca 100%);
   display:grid; place-items:center; color:#fff; font-weight:900; font-size:13px;
   letter-spacing:-0.03em; box-shadow:0 4px 14px rgba(91,78,248,.35); flex-shrink:0;
 }
 .lp-logo-text {
   font-size:17px; font-weight:800;
-  background: linear-gradient(135deg,#762bfa,#762bfa);
+  background: linear-gradient(135deg,#5b4ef8,#7c3aed);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
   letter-spacing:-0.02em;
 }
@@ -128,17 +128,13 @@
 /* ═══ HERO ═══ */
 .lp-hero {
   min-height: 100vh;
-  /* Trên di động, 100vh tính cả phần bị thanh URL che: hero cao hơn màn hình
-     nên nút chính bị đẩy khuất. `svh` là chiều cao nhỏ nhất (thanh URL đang
-     hiện) — hero luôn vừa khung ngay khi mới mở. */
-  min-height: 100svh;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center; padding:140px 24px 100px;
   background:
     radial-gradient(ellipse 80% 60% at 20% 30%, rgba(91,78,248,.10),transparent),
     radial-gradient(ellipse 60% 50% at 80% 70%, rgba(124,58,237,.08),transparent),
     radial-gradient(ellipse 40% 40% at 50% 10%, rgba(16,185,129,.05),transparent),
-    linear-gradient(180deg,#ece0ff 0%,#ece0ff 40%,#f5f0ff 100%);
+    linear-gradient(180deg,#edeaff 0%,#f0eeff 40%,#f7f5ff 100%);
   position:relative; overflow:hidden;
 }
 .lp-hero::before {
@@ -168,7 +164,7 @@
 }
 .lp-hero-deco-4 {
   bottom:30%; right:5%; width:72px; height:72px;
-  background:linear-gradient(135deg,#762bfa,#762bfa); border-radius:50%;
+  background:linear-gradient(135deg,#5b4ef8,#7c3aed); border-radius:50%;
   display:flex; align-items:center; justify-content:center; color:white; font-size:28px;
   box-shadow:0 8px 30px rgba(91,78,248,.35); animation-delay:2s;
 }
@@ -198,7 +194,7 @@
   letter-spacing:-0.03em; color:var(--lp-ink); margin-bottom:20px;
 }
 .lp-hero-title-highlight {
-  background:linear-gradient(135deg,#762bfa 0%,#762bfa 50%,#4504b7 100%);
+  background:linear-gradient(135deg,#5b4ef8 0%,#7c3aed 50%,#4338ca 100%);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
 .lp-hero-desc {
@@ -362,7 +358,7 @@
 
 /* ═══ TECH VALUES ═══ */
 .lp-tech-wrap { max-width:860px; margin:0 auto; }
-.lp-tech-header { background:linear-gradient(135deg,#762bfa 0%,#762bfa 100%); border-radius:var(--lp-radius-xl) var(--lp-radius-xl) 0 0; padding:40px 48px; color:white; }
+.lp-tech-header { background:linear-gradient(135deg,#5b4ef8 0%,#7c3aed 100%); border-radius:var(--lp-radius-xl) var(--lp-radius-xl) 0 0; padding:40px 48px; color:white; }
 .lp-tech-header-label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; opacity:.75; margin-bottom:12px; }
 .lp-tech-header-title { font-size:clamp(20px,3vw,28px); font-weight:800; color:white; line-height:1.3; }
 .lp-tech-body { background:white; border:1px solid var(--lp-border); border-top:none; border-radius:0 0 var(--lp-radius-xl) var(--lp-radius-xl); overflow:hidden; box-shadow:var(--lp-shadow-lg); }
@@ -374,14 +370,14 @@
 .lp-tech-item-title { font-size:15px; font-weight:800; color:var(--lp-ink); margin-bottom:4px; }
 .lp-tech-item-desc { font-size:13px; color:var(--lp-text); line-height:1.6; }
 /* ═══ CTA BOTTOM ═══ */
-.lp-cta-bottom { padding:100px 24px; background:linear-gradient(135deg,#762bfa 0%,#762bfa 60%,#4504b7 100%); text-align:center; position:relative; overflow:hidden; }
+.lp-cta-bottom { padding:100px 24px; background:linear-gradient(135deg,#5b4ef8 0%,#7c3aed 60%,#4338ca 100%); text-align:center; position:relative; overflow:hidden; }
 .lp-cta-bottom::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle 1px at center,rgba(255,255,255,.15) 0%,transparent 100%); background-size:36px 36px; pointer-events:none; }
 .lp-cta-bottom-inner { position:relative; z-index:1; }
 .lp-cta-bottom-title { font-size:clamp(30px,5vw,52px); font-weight:900; color:white; margin-bottom:16px; letter-spacing:-0.025em; }
 .lp-cta-bottom-desc { font-size:17px; color:rgba(255,255,255,.80); margin-bottom:40px; max-width:480px; margin-left:auto; margin-right:auto; line-height:1.6; }
 .lp-cta-actions { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap; }
 .lp-btn-cta-white { padding:15px 32px; border-radius:var(--lp-radius-pill); background:white; border:none; color:var(--lp-accent); font-size:16px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:all .25s; box-shadow:0 8px 30px rgba(0,0,0,.20); }
-.lp-btn-cta-white:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,.30); background:#ece0ff; }
+.lp-btn-cta-white:hover { transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,.30); background:#f0eeff; }
 .lp-btn-cta-outline { padding:15px 32px; border-radius:var(--lp-radius-pill); background:transparent; border:2px solid rgba(255,255,255,.50); color:white; font-size:16px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:all .25s; }
 .lp-btn-cta-outline:hover { border-color:white; background:rgba(255,255,255,.12); }
 
@@ -408,7 +404,7 @@
 .lp-footer-brand-giant { text-align:center; overflow:hidden; line-height:0.85; margin-top:24px; pointer-events:none; user-select:none; }
 .lp-footer-brand-giant-text {
   font-size:clamp(120px,18vw,280px); font-weight:900; letter-spacing:-0.04em;
-  background:linear-gradient(180deg,#762bfa 0%,rgba(91,78,248,.25) 60%,rgba(91,78,248,0) 100%);
+  background:linear-gradient(180deg,#5b4ef8 0%,rgba(91,78,248,.25) 60%,rgba(91,78,248,0) 100%);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
   display:block; transform:translateY(18%);
 }

@@ -21,9 +21,7 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({
 
   return (
     <div style={styles.container}>
-      {/* data-citation-header: khi panel nằm trong drawer, tiêu đề của drawer đã
-          nói đúng nội dung này nên CSS ẩn dòng tiêu đề nội bộ đi. */}
-      <div style={styles.header} data-citation-header>
+      <div style={styles.header}>
         <span style={styles.title}><Pin size={16} aria-hidden="true" /><span>Nguồn trích dẫn</span></span>
         {onClose && (
           <button type="button" onClick={onClose} style={styles.closeBtn}>
@@ -157,7 +155,7 @@ const styles = {
     width: '320px',
     height: '100%',
     backgroundColor: 'var(--conv-sidebar-bg)',
-    borderLeft: '1px solid var(--ez-border)',
+    borderLeft: '1px solid var(--border)',
     overflowY: 'auto' as const,
   },
   header: {
@@ -165,12 +163,12 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    borderBottom: '1px solid var(--ez-border)',
+    borderBottom: '1px solid var(--border)',
   },
   title: {
     fontSize: '14px',
     fontWeight: '700',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
@@ -180,7 +178,7 @@ const styles = {
     padding: '4px 8px',
     borderRadius: '4px',
     border: 'none',
-    backgroundColor: 'var(--ez-surface-muted)',
+    backgroundColor: 'var(--surface-muted)',
     fontSize: '12px',
     cursor: 'pointer',
   },
@@ -194,7 +192,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     textAlign: 'center' as const,
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     marginTop: '60px',
     fontSize: '13px',
   },
@@ -211,7 +209,7 @@ const styles = {
     margin: '0 0 10px 0',
     fontSize: '13px',
     fontWeight: '700',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
@@ -224,14 +222,14 @@ const styles = {
   card: {
     padding: '12px',
     borderRadius: '10px',
-    backgroundColor: 'var(--ez-surface)',
-    border: '1px solid var(--ez-border)',
-    boxShadow: 'var(--ez-shadow-md)',
+    backgroundColor: 'var(--surface-strong)',
+    border: '1px solid var(--border)',
+    boxShadow: 'var(--shadow-soft)',
     transition: 'all 0.3s ease',
   },
   cardFocused: {
-    borderColor: 'var(--ez-primary)',
-    boxShadow: 'var(--ez-shadow-md)',
+    borderColor: 'var(--accent)',
+    boxShadow: 'var(--shadow-glow)',
     transform: 'scale(1.02)',
   },
   cardHeader: {
@@ -244,36 +242,36 @@ const styles = {
     border: 'none',
     backgroundColor: 'transparent',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '11px',
     padding: '2px 4px',
     borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     transition: 'transform 0.2s, color 0.2s',
     outline: 'none',
   },
   sourceTag: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: '800',
-    color: 'var(--ez-primary)',
-    backgroundColor: 'var(--ez-primary-subtle)',
+    color: 'var(--accent)',
+    backgroundColor: 'var(--accent-bg)',
     padding: '2px 6px',
     borderRadius: '4px',
   },
   sourceTagWeb: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: '800',
-    color: 'var(--ez-secondary)',
-    backgroundColor: 'var(--ez-secondary-subtle)',
+    color: 'var(--accent-2)',
+    backgroundColor: 'var(--accent-2-bg)',
     padding: '2px 6px',
     borderRadius: '4px',
   },
   docTitle: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
@@ -282,7 +280,7 @@ const styles = {
   webLink: {
     fontSize: '12px',
     fontWeight: '700',
-    color: 'var(--ez-secondary)',
+    color: 'var(--accent-2)',
     textDecoration: 'none',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -292,13 +290,13 @@ const styles = {
   excerpt: {
     fontSize: '12px',
     lineHeight: 1.5,
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     margin: '0 0 8px 0',
   },
   cardFooter: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '12px',
-    color: 'var(--ez-text-muted)',
+    fontSize: '10px',
+    color: 'var(--muted)',
   },
 };

@@ -80,10 +80,8 @@ export default function AdminNotificationsPage() {
     page,
     page_size: 30,
     search: search || undefined,
-    // Chuỗi rỗng ("Tất cả") phải bỏ hẳn khỏi query — backend khai báo Literal
-    // nên nhận "" là 422 và cả danh sách không tải được.
-    status: (status || undefined) as NotificationStatus | undefined,
-    type: (type || undefined) as NotificationType | undefined,
+    status: status as NotificationStatus | '',
+    type: type as NotificationType | '',
     created_from: dateStart(from),
     created_to: dateEnd(to),
   }), [from, page, search, status, to, type]);

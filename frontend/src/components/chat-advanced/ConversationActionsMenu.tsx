@@ -89,7 +89,7 @@ const styles = {
   triggerBtn: {
     border: 'none',
     backgroundColor: 'transparent',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     cursor: 'pointer',
     padding: '4px 6px',
     borderRadius: '4px',
@@ -101,7 +101,7 @@ const styles = {
     transition: 'background-color 0.2s',
     ':hover': {
       backgroundColor: 'rgba(0,0,0,0.05)',
-      color: 'var(--ez-text-secondary)',
+      color: 'var(--text)',
     },
   },
   dropdown: {
@@ -111,7 +111,7 @@ const styles = {
     zIndex: 100,
     minWidth: '150px',
     backgroundColor: 'var(--modal-bg)',
-    border: '1px solid var(--ez-border-strong)',
+    border: '1px solid var(--border-strong)',
     borderRadius: '8px',
     boxShadow: 'var(--modal-shadow)',
     padding: '4px 0',
@@ -122,7 +122,7 @@ const styles = {
     width: '100%',
     border: 'none',
     backgroundColor: 'transparent',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     padding: '8px 12px',
     fontSize: '12px',
     textAlign: 'left' as const,
@@ -133,11 +133,11 @@ const styles = {
     gap: '8px',
   },
   deleteItem: {
-    color: 'var(--ez-error)',
+    color: 'var(--danger)',
   },
   divider: {
     height: '1px',
-    backgroundColor: 'var(--ez-border)',
+    backgroundColor: 'var(--border)',
     margin: '4px 0',
   },
 };

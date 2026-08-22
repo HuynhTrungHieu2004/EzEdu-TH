@@ -11,7 +11,6 @@ import type {
   AdminUserListResponse,
   AdminUserStatisticsResponse,
   AdminUserStatus,
-  AdminUserSummary,
 } from '../types/adminUsers';
 import { hasPermission, permissionsForRole } from '../utils/adminPermissions';
 import { fmtDateTime, fmtNumber, dateStart, dateEnd, ROLE_LABELS, USER_STATUS_LABELS } from '../utils/adminUtils';
@@ -66,8 +65,7 @@ function isObjectId(value: string) {
 
 interface ConfirmState {
   kind: ActionKind;
-  /** Đủ dùng cho hộp thoại: các số đếm chỉ nằm ở cột riêng, không nằm trong hộp thoại. */
-  user: AdminUserSummary;
+  user: AdminUserDetail;
   nextRole?: AdminRole;
   quotaText?: string;
 }
@@ -182,7 +180,7 @@ function EditUserModal({
   onCancel,
   onSubmit,
 }: {
-  user: AdminUserSummary;
+  user: AdminUserDetail;
   busy: boolean;
   onCancel: () => void;
   onSubmit: (payload: { full_name: string; email: string; email_verified: boolean }) => void;
@@ -235,21 +233,31 @@ function CreateUserModal({
   busy: boolean;
   roleOptions: AdminRole[];
   onCancel: () => void;
-  onSubmit: (payload: AdminUserCreatePayload) => void;
+  onSubmit: (payload: AdminUserCreatePayload & { phone_number?: string; class_name?: string; grade?: string; subject?: string; specialization?: string }) => void;
 }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [role, setRole] = useState<AdminRole>(roleOptions.includes('user') ? 'user' : roleOptions[0]);
   const [password, setPassword] = useState('');
   const [verified, setVerified] = useState(false);
+  const [className, setClassName] = useState('10A1');
+  const [grade, setGrade] = useState('Khối 10');
+  const [subject, setSubject] = useState('Toán học');
+  const [specialization, setSpecialization] = useState('');
 
   const handleSubmit = () => {
     onSubmit({
       full_name: fullName.trim(),
       email: email.trim(),
+      phone_number: phone.trim(),
       role,
       temporary_password: password.trim(),
       email_verified: verified,
+      class_name: role === 'student' ? className : undefined,
+      grade: role === 'student' ? grade : undefined,
+      subject: role === 'lecturer' || role === 'user' ? subject : undefined,
+      specialization: role === 'lecturer' || role === 'user' ? specialization.trim() : undefined,
     });
   };
 
@@ -257,7 +265,7 @@ function CreateUserModal({
     <Dialog
       open
       onClose={onCancel}
-      title="Tạo người dùng"
+      title="Thêm tài khoản người dùng"
       closeOnOverlayClick={!busy}
       footer={
         <>
@@ -268,22 +276,65 @@ function CreateUserModal({
             loading={busy}
             onClick={handleSubmit}
           >
-            Tạo
+            Tạo tài khoản
           </Button>
         </>
       }
     >
       <FormField label="Họ tên" required>
-        <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+        <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="VD: Nguyễn Văn A" />
       </FormField>
       <FormField label="Email" required>
-        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="user@ezedu.vn" />
       </FormField>
-      <FormField label="Vai trò">
+      <FormField label="Số điện thoại">
+        <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="0912345678" />
+      </FormField>
+      <FormField label="Vai trò / Role" required>
         <Select value={role} onChange={(event) => setRole(event.target.value as AdminRole)}>
           {roleOptions.map((option) => <option key={option} value={option}>{ROLE_LABELS[option]}</option>)}
         </Select>
       </FormField>
+
+      {/* Student dynamic fields */}
+      {role === 'student' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <FormField label="Lớp học">
+            <Select value={className} onChange={(e) => setClassName(e.target.value)}>
+              <option value="10A1">Lớp 10A1</option>
+              <option value="10A2">Lớp 10A2</option>
+              <option value="11B1">Lớp 11B1</option>
+              <option value="12C1">Lớp 12C1</option>
+            </Select>
+          </FormField>
+          <FormField label="Khối">
+            <Select value={grade} onChange={(e) => setGrade(e.target.value)}>
+              <option value="Khối 10">Khối 10</option>
+              <option value="Khối 11">Khối 11</option>
+              <option value="Khối 12">Khối 12</option>
+            </Select>
+          </FormField>
+        </div>
+      )}
+
+      {/* Teacher / Lecturer dynamic fields */}
+      {(role === 'lecturer' || role === 'user') && (
+        <>
+          <FormField label="Bộ môn giảng dạy">
+            <Select value={subject} onChange={(e) => setSubject(e.target.value)}>
+              <option value="Toán học">Toán học</option>
+              <option value="Ngữ văn">Ngữ văn</option>
+              <option value="Tiếng Anh">Tiếng Anh</option>
+              <option value="Vật lý">Vật lý</option>
+              <option value="Hóa học">Hóa học</option>
+            </Select>
+          </FormField>
+          <FormField label="Trình độ / Chuyên môn">
+            <Input value={specialization} onChange={(e) => setSpecialization(e.target.value)} placeholder="VD: Thạc sĩ Sư phạm Toán" />
+          </FormField>
+        </>
+      )}
+
       <FormField label="Mật khẩu tạm" required hint="Ít nhất 6 ký tự">
         <Input
           type="password"
@@ -313,7 +364,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
-  const [editUser, setEditUser] = useState<AdminUserSummary | null>(null);
+  const [editUser, setEditUser] = useState<AdminUserDetail | null>(null);
   const [createUser, setCreateUser] = useState(false);
   const [reason, setReason] = useState('');
   const [passwordResult, setPasswordResult] = useState<string | null>(null);
@@ -408,17 +459,17 @@ export default function AdminUsersPage() {
     setAppliedFilters(filters);
   };
 
-  const canTouch = useCallback((user: AdminUserSummary) => {
+  const canTouch = useCallback((user: AdminUserDetail) => {
     if (!currentUser) return false;
     if (user.role === 'super_admin' && currentUser.role !== 'super_admin') return false;
     return true;
   }, [currentUser]);
 
-  const dangerousSelf = useCallback((user: AdminUserSummary, kind: ActionKind) => {
+  const dangerousSelf = useCallback((user: AdminUserDetail, kind: ActionKind) => {
     return user.id === currentUser?.id && ['lock', 'delete'].includes(kind);
   }, [currentUser?.id]);
 
-  const openConfirm = useCallback((kind: ActionKind, user: AdminUserSummary) => {
+  const openConfirm = useCallback((kind: ActionKind, user: AdminUserDetail) => {
     setReason('');
     setNotice(null);
     setPasswordResult(null);
@@ -527,37 +578,34 @@ export default function AdminUsersPage() {
       key: 'actions',
       label: 'Hành động',
       render: (item: RowItem) => {
-        // Dòng danh sách đã đủ để quyết định nút nào hiện; chờ `rowDetails` thì
-        // với backend thật cả cột "Hành động" trống cho tới khi request từng
-        // dòng về (stub trả tức thì nên trước đây không thấy).
-        const detail = rowDetails[item.id] ?? item;
+        const detail = rowDetails[item.id];
         return (
           <div className="ez-datatable-cell-actions">
             <Button variant="outline" size="sm" onClick={() => navigate(`/admin/users/${item.id}`)}>Xem</Button>
-            {can('users.update') && canTouch(detail) && (
+            {detail && can('users.update') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => setEditUser(detail)}>Sửa</Button>
             )}
-            {can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
+            {detail && can('users.lock') && canTouch(detail) && !dangerousSelf(detail, detail.status === 'locked' ? 'unlock' : 'lock') && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm(detail.status === 'locked' ? 'unlock' : 'lock', detail)}>
                 {detail.status === 'locked' ? 'Mở khóa' : 'Khóa'}
               </Button>
             )}
-            {can('users.change_role') && canTouch(detail) && (
+            {detail && can('users.change_role') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('role', detail)}>Role</Button>
             )}
-            {can('users.manage_quota') && canTouch(detail) && (
+            {detail && can('users.manage_quota') && canTouch(detail) && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('quota', detail)}>Quota</Button>
             )}
-            {can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
+            {detail && can('users.reset_password') && canTouch(detail) && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('resetPassword', detail)}>Reset MK</Button>
             )}
-            {can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
+            {detail && can('users.update') && canTouch(detail) && detail.status !== 'deleted' && (
               <Button variant="outline" size="sm" onClick={() => openConfirm('forceLogout', detail)}>Logout</Button>
             )}
-            {can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
+            {detail && can('users.delete') && canTouch(detail) && detail.status !== 'deleted' && !dangerousSelf(detail, 'delete') && (
               <Button variant="danger" size="sm" onClick={() => openConfirm('delete', detail)}>Xóa</Button>
             )}
-            {can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
+            {detail && can('users.restore') && canTouch(detail) && detail.status === 'deleted' && (
               <Button variant="secondary" size="sm" onClick={() => openConfirm('restore', detail)}>Khôi phục</Button>
             )}
           </div>

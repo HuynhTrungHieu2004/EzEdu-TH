@@ -191,11 +191,6 @@
   gap: var(--ez-space-2);
 }
 
-.dash-row-disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 /* Điểm số dạng số lớn, dùng chữ số cùng bề rộng để không nhảy */
 .dash-score {
   font-size: var(--ez-text-body);
@@ -323,3 +318,145 @@
   flex-wrap: wrap;
   gap: var(--ez-space-2);
 }
+
+/* ───────────────────────────────────────────────────────────────────────
+   LMS STUDENT DASHBOARD — STAT CARDS
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Grid 5 cột thống kê */
+.lms-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--ez-space-4);
+}
+
+@media (max-width: 1280px) {
+  .lms-stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .lms-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .lms-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* Card thống kê đơn lẻ */
+.lms-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-2);
+  padding: var(--ez-space-5);
+  border-radius: var(--ez-radius-xl);
+  background-color: var(--ez-surface);
+  border: 1px solid var(--ez-border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: lms-fade-in 0.4s ease forwards;
+}
+
+.lms-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.lms-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ez-radius-lg);
+  margin-bottom: var(--ez-space-1);
+}
+
+.lms-stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--ez-text);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.lms-stat-label {
+  font-size: var(--ez-text-body-sm);
+  font-weight: var(--ez-weight-semibold);
+  color: var(--ez-text);
+}
+
+.lms-stat-sub {
+  font-size: var(--ez-text-caption);
+  color: var(--ez-text-muted);
+}
+
+/* ── 2-column layout ── */
+.lms-two-col {
+  display: grid;
+  gap: var(--ez-space-5);
+}
+
+@media (min-width: 900px) {
+  .lms-two-col {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* ── Fade-in animation ── */
+@keyframes lms-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger cho các stat card */
+.lms-stat-card:nth-child(1) { animation-delay: 0.05s; }
+.lms-stat-card:nth-child(2) { animation-delay: 0.10s; }
+.lms-stat-card:nth-child(3) { animation-delay: 0.15s; }
+.lms-stat-card:nth-child(4) { animation-delay: 0.20s; }
+.lms-stat-card:nth-child(5) { animation-delay: 0.25s; }
+
+/* ── Timeline — Hoạt động gần đây ── */
+.lms-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.lms-timeline-item {
+  display: flex;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 18px;
+}
+
+/* Đường dọc nối các item */
+.lms-timeline-item:not(.lms-timeline-item--last)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 38px;
+  bottom: 0;
+  width: 2px;
+  background: var(--ez-border);
+}
+
+.lms-timeline-dot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--ez-radius-full);
+  background: var(--ez-surface);
+  border: 2px solid var(--ez-border);
+  z-index: 1;
+}
+
+.lms-timeline-content {
+  flex: 1;
+  min-width: 0;
+  padding-top: 7px;
+}
+
+

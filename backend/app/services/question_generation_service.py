@@ -1,9 +1,12 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 from bson import ObjectId
+from app.core.config import settings
 from app.database.mongodb import get_database
 from app.services.llm_service import (
+    claude_generate_json,
     generate_json,
     gemini_generate_json,
     generate_json_with_file,
@@ -12,9 +15,17 @@ from app.services.llm_service import (
     evaluate_questions_groq,
     evaluate_questions_gemini,
     classify_bloom_levels,
+    is_claude_available,
+    transcribe_video,
 )
 from app.services.tfidf_service import extract_keywords
 from app.services.question_diversity_service import select_diverse_questions
+from app.curriculum_kb.services.context_service import GroundedChunk, resolve_context, validate_evidence
+from app.services.language_policy_service import (
+    LanguageMismatchError,
+    resolve_output_language,
+    validate_output_language,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +53,16 @@ def build_bloom_instruction(bloom_level: str | None) -> str:
         return ""
     return f"\n7. YÊU CẦU VỀ MỨC VẬN DỤNG BLOOM:\n{BLOOM_INSTRUCTIONS[bloom_level]}\n"
 
-def build_question_prompt(context: str, question_count: int, difficulty: str, question_type: str, bloom_level: str | None = None, keywords: list[dict] | None = None) -> str:
+def build_question_prompt(
+    context: str,
+    question_count: int,
+    difficulty: str,
+    question_type: str,
+    bloom_level: str | None = None,
+    keywords: list[dict] | None = None,
+    output_language: str = "vi",
+    require_grounding: bool = False,
+) -> str:
     """Builds a structured prompt demanding JSON response matching the question type and difficulty constraints."""
     bloom_instruction = build_bloom_instruction(bloom_level)
     
@@ -51,6 +71,21 @@ def build_question_prompt(context: str, question_count: int, difficulty: str, qu
     if keywords:
         kw_list = ", ".join([kw["keyword"] for kw in keywords[:10]])
         keyword_instruction = f"""\n8. TỪ KHÓA TRỌNG TÂM (trích xuất bởi thuật toán TF-IDF):\n   Các từ khóa quan trọng nhất của tài liệu: [{kw_list}]\n   Hãy ưu tiên sinh câu hỏi xoay quanh các từ khóa trọng tâm này để đảm bảo câu hỏi sát với nội dung cốt lõi nhất của tài liệu.\n"""
+    language_instruction = (
+        "Toàn bộ câu hỏi, lựa chọn, đáp án và giải thích phải viết bằng tiếng Anh."
+        if output_language == "en"
+        else "Toàn bộ câu hỏi, lựa chọn, đáp án và giải thích phải viết bằng tiếng Việt."
+    )
+    grounding_instruction = ""
+    grounding_schema = ""
+    if require_grounding:
+        grounding_instruction = """
+9. Mỗi câu hỏi PHẢI khai báo `source_chunk_ids` chỉ gồm CHUNK_ID có trong context và `grounding_excerpt` phải là đoạn trích nguyên văn nằm trong một chunk đã khai báo. Không có bằng chứng thì không sinh câu hỏi đó.
+"""
+        grounding_schema = f''',
+    "language": "{output_language}",
+    "source_chunk_ids": ["CHUNK_ID từ context"],
+    "grounding_excerpt": "Đoạn trích nguyên văn từ chunk đã dẫn"'''
     
     return f"""
 Bạn là một chuyên gia khảo thí và đánh giá năng lực học sinh/sinh viên. 
@@ -77,6 +112,8 @@ Yêu cầu bắt buộc:
    - Ví dụ SAI: "Tài liệu khẳng định rằng quá trình quang hợp được giải thích 'từ A đến Z'. Diễn giải ý nghĩa cụm từ này."
    - Ví dụ ĐÚNG: "Pha sáng của quá trình quang hợp diễn ra ở đâu trong lục lạp?"
 {bloom_instruction}{keyword_instruction}
+YÊU CẦU NGÔN NGỮ: {language_instruction}
+{grounding_instruction}
 Định dạng JSON Schema của kết quả trả về như sau:
 [
   {{
@@ -90,7 +127,8 @@ Yêu cầu bắt buộc:
     "correct_answer": "A/True/False/ShortAnswerText",
     "explanation": "Giải thích tại sao đáp án này đúng dựa trên tài liệu...",
     "difficulty": "{difficulty}",
-    "question_type": "{question_type}"
+    "question_type": "{question_type}",
+    "bloom_level": "remember | understand | apply | analyze"{grounding_schema}
   }}
 ]
 
@@ -191,13 +229,32 @@ def parse_raw_questions(raw_json: str) -> list[dict]:
     return []
 
 
+def _valid_question_candidate(question: dict) -> bool:
+    if not isinstance(question, dict) or not str(question.get("question") or "").strip():
+        return False
+    answer = str(question.get("correct_answer") or "").strip()
+    question_type = question.get("question_type")
+    if not answer or question_type not in {"multiple_choice", "true_false", "short_answer"}:
+        return False
+    if question_type == "multiple_choice":
+        options = question.get("options")
+        return isinstance(options, dict) and answer in options
+    if question_type == "true_false":
+        return answer.lower() in {"true", "false"}
+    return True
+
+
 async def generate_questions(
     document_id: str,
     user_id: str,
     question_count: int,
     difficulty: str,
     question_type: str,
-    bloom_level: str | None = None
+    bloom_level: str | None = None,
+    subject_id: str | None = None,
+    grade: int | None = None,
+    topic_id: str | None = None,
+    output_language: str | None = None,
 ) -> dict:
     """
     Dual-Gen & Dual-Val Question Generation pipeline:
@@ -207,6 +264,14 @@ async def generate_questions(
     4. Top N questions with highest average score are selected.
     """
     db = get_database()
+    if (subject_id is None) != (grade is None):
+        raise ValueError("subject_id and grade must be supplied together")
+    curriculum_scoped = subject_id is not None and grade is not None
+    resolved_language = (
+        resolve_output_language(subject_id=subject_id, grade=grade, explicit=output_language)
+        if curriculum_scoped
+        else output_language or "vi"
+    )
     
     document = await db["documents"].find_one({"_id": ObjectId(document_id)})
     if not document:
@@ -220,16 +285,51 @@ async def generate_questions(
 
     context = ""
     chunks_list = []
+    supplied_evidence: list[GroundedChunk] = []
+    use_claude = settings.AI_TEXT_PROVIDER == "claude"
+    claude_usage = None
     if document.get("media_kind") == "document" or has_transcript:
         cursor = db["document_chunks"].find({"document_id": document_id}).sort("chunk_index", 1)
-        chunks_list = [doc["content"] async for doc in cursor]
+        chunk_docs = [doc async for doc in cursor]
+        chunks_list = [doc["content"] for doc in chunk_docs]
         if not chunks_list:
             content_doc = await db["document_contents"].find_one({"document_id": document_id})
             if content_doc:
                 chunks_list = [content_doc["extracted_text"]]
+                chunk_docs = [{"chunk_index": 0, "content": chunks_list[0]}]
             else:
                 raise ValueError("Nội dung học liệu chưa được trích xuất hoặc lập chỉ mục.")
-        context = "\n\n".join(chunks_list)
+        if curriculum_scoped:
+            supplied_evidence = await resolve_context(
+                db,
+                query=f"{document.get('original_filename', '')} {chunks_list[0][:500]}",
+                subject_id=subject_id,
+                grade=grade,
+                topic_id=topic_id,
+                language="en" if subject_id == "tieng_anh" else None,
+            )
+            supplied_evidence.extend(
+                GroundedChunk(
+                    chunk_id=f"{document_id}:{doc.get('chunk_index', index)}",
+                    source_id=document_id,
+                    title=document.get("original_filename", "Tài liệu"),
+                    text=doc["content"],
+                    subject_id=subject_id,
+                    grade=grade,
+                    topic_id=topic_id,
+                    source_language=resolved_language,
+                    relevance_score=1.0,
+                )
+                for index, doc in enumerate(chunk_docs)
+            )
+            context = "\n\n".join(
+                f"[CHUNK_ID: {chunk.chunk_id}]\n{chunk.text}" for chunk in supplied_evidence
+            )
+        else:
+            context = "\n\n".join(chunks_list)
+        if use_claude:
+            # Keep room for the question schema/instructions inside the quality prompt cap.
+            context = context[:max(4_000, settings.CLAUDE_QUALITY_MAX_PROMPT_CHARACTERS - 7_000)]
 
     # ── Step 0: TF-IDF Keyword Extraction ──
     keywords = []
@@ -243,10 +343,30 @@ async def generate_questions(
 
     # Prepare prompt
     if document.get("media_kind") == "document" or has_transcript:
-        prompt = build_question_prompt(context, question_count, difficulty, question_type, bloom_level, keywords=keywords)
+        prompt = build_question_prompt(
+            context,
+            question_count,
+            difficulty,
+            question_type,
+            bloom_level,
+            keywords=keywords,
+            output_language=resolved_language,
+            require_grounding=curriculum_scoped,
+        )
         
-        # Groq generation
-        if is_groq_available():
+        if use_claude:
+            if not is_claude_available():
+                raise ValueError("Chưa cấu hình ANTHROPIC_API_KEY để sinh câu hỏi.")
+            raw_claude = await asyncio.to_thread(claude_generate_json, prompt, quality=True)
+            claude_usage = {
+                "model": getattr(raw_claude, "model", settings.CLAUDE_QUALITY_MODEL),
+                "input_tokens": getattr(raw_claude, "input_tokens", 0),
+                "output_tokens": getattr(raw_claude, "output_tokens", 0),
+                "total_tokens": getattr(raw_claude, "total_tokens", 0),
+            }
+            groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
+            logger.info("Claude generated %s valid question candidates", len(groq_questions))
+        elif is_groq_available():
             logger.info("🤖 Groq is generating questions...")
             try:
                 raw_groq = generate_json(prompt)
@@ -256,7 +376,7 @@ async def generate_questions(
                 logger.error(f"  ❌ Groq generation failed: {e}")
 
         # Gemini generation
-        if is_gemini_available():
+        if not use_claude and is_gemini_available():
             logger.info("🤖 Gemini is generating questions...")
             try:
                 raw_gemini = gemini_generate_json(prompt)
@@ -282,8 +402,20 @@ async def generate_questions(
             logger.info(f"Downloading video from {document['cloudinary_url']}...")
             await download_file(document["cloudinary_url"], str(temp_file_path))
             
-            prompt = build_video_question_prompt(question_count, difficulty, question_type, bloom_level)
-            if is_groq_available():
+            if use_claude:
+                transcript = await asyncio.to_thread(transcribe_video, str(temp_file_path))
+                transcript = transcript[:max(4_000, settings.CLAUDE_QUALITY_MAX_PROMPT_CHARACTERS - 7_000)]
+                prompt = build_question_prompt(transcript, question_count, difficulty, question_type, bloom_level)
+                raw_claude = await asyncio.to_thread(claude_generate_json, prompt, quality=True)
+                claude_usage = {
+                    "model": getattr(raw_claude, "model", settings.CLAUDE_QUALITY_MODEL),
+                    "input_tokens": getattr(raw_claude, "input_tokens", 0),
+                    "output_tokens": getattr(raw_claude, "output_tokens", 0),
+                    "total_tokens": getattr(raw_claude, "total_tokens", 0),
+                }
+                groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
+            elif is_groq_available():
+                prompt = build_video_question_prompt(question_count, difficulty, question_type, bloom_level)
                 logger.info("🤖 Groq is generating questions from video...")
                 raw_groq = generate_json_with_file(prompt, str(temp_file_path))
                 groq_questions = parse_raw_questions(raw_groq)
@@ -316,13 +448,13 @@ async def generate_questions(
         "invalid_count": 0,
         "fixed_count": 0,
         "replaced_count": 0,
-        "validator": "groq+gemini",
+        "validator": "claude+rules" if use_claude else "groq+gemini",
     }
 
     final_questions = []
 
     # Check if both APIs are available for cross-validation
-    if is_gemini_available() and is_groq_available():
+    if not use_claude and is_gemini_available() and is_groq_available():
         logger.info(f"🔍 Starting dual AI evaluation on {len(questions_pool)} candidate questions...")
         validation_stats["cross_validated"] = True
         
@@ -384,7 +516,7 @@ async def generate_questions(
         # Fallback to no cross-validation if only one API is present
         final_questions = questions_pool
         validation_stats["valid_count"] = len(final_questions)
-        logger.info("ℹ️ Groq or Gemini not fully configured - skipping cross-validation")
+        logger.info("Skipping legacy dual-provider cross-validation")
 
     # ── Select the requested count — K-Means khử trùng lặp ngữ nghĩa ──
     # Bước khử trùng ở trên chỉ so khớp chuỗi chính xác, không bắt được các
@@ -404,7 +536,7 @@ async def generate_questions(
 
     # ── Step 3: Bloom's Taxonomy Auto-Classification ──
     bloom_distribution = {}
-    if selected_questions:
+    if selected_questions and not use_claude:
         logger.info("🎓 Running Bloom's Taxonomy auto-classification...")
         try:
             bloom_results = classify_bloom_levels(selected_questions)
@@ -428,6 +560,15 @@ async def generate_questions(
                 q.setdefault("tags", [])
                 q.setdefault("status", "draft")
             bloom_distribution = {"understand": len(selected_questions)}
+    elif selected_questions:
+        for q in selected_questions:
+            level = q.get("bloom_level")
+            if level not in ("remember", "understand", "apply", "analyze"):
+                level = bloom_level or "understand"
+            q["bloom_level"] = level
+            q.setdefault("tags", [])
+            q.setdefault("status", "draft")
+            bloom_distribution[level] = bloom_distribution.get(level, 0) + 1
 
     for q in selected_questions:
         q.setdefault("tags", [])
@@ -446,6 +587,26 @@ async def generate_questions(
         else:
             q["hallucination_risk"] = "high"
 
+        if curriculum_scoped:
+            if q.get("language") != resolved_language:
+                raise LanguageMismatchError(
+                    f"Expected question language {resolved_language}, got {q.get('language') or 'missing'}"
+                )
+            validate_evidence(
+                q.get("source_chunk_ids") or [],
+                supplied_evidence,
+                supporting_excerpt=q.get("grounding_excerpt"),
+            )
+            validate_output_language(
+                [
+                    q.get("question", ""),
+                    *((q.get("options") or {}).values()),
+                    q.get("correct_answer", ""),
+                    q.get("explanation", ""),
+                ],
+                expected=resolved_language,
+            )
+
     # 4. Save to MongoDB
     now = datetime.now(timezone.utc)
     question_set = {
@@ -455,6 +616,10 @@ async def generate_questions(
         "question_count": len(selected_questions),
         "difficulty": difficulty,
         "question_type": question_type,
+        "subject_id": subject_id,
+        "grade": grade,
+        "topic_id": topic_id,
+        "output_language": resolved_language if curriculum_scoped else output_language,
         "questions": selected_questions,
         "validation_stats": validation_stats,
         "keywords": keywords,
@@ -472,6 +637,8 @@ async def generate_questions(
     
     result = await db["question_sets"].insert_one(question_set)
     question_set["_id"] = str(result.inserted_id)
+    if claude_usage:
+        question_set["_ai_usage"] = claude_usage
 
     return question_set
 
@@ -505,18 +672,26 @@ async def regenerate_single_question(
         else:
             raise ValueError("Nội dung học liệu chưa được trích xuất hoặc lập chỉ mục.")
     context = "\n\n".join(chunks_list)
+    use_claude = settings.AI_TEXT_PROVIDER == "claude"
+    if use_claude:
+        context = context[:max(4_000, settings.CLAUDE_QUALITY_MAX_PROMPT_CHARACTERS - 7_000)]
 
     keywords = extract_keywords(chunks_list, top_n=15) if chunks_list else []
     prompt = build_question_prompt(context, 1, difficulty, question_type, bloom_level, keywords=keywords)
 
     avoid_set = {text.strip().lower() for text in (avoid_question_texts or []) if text}
     candidates: list[dict] = []
-    if is_groq_available():
+    if use_claude:
+        candidates = [
+            q for q in parse_raw_questions(await asyncio.to_thread(claude_generate_json, prompt, quality=True))
+            if _valid_question_candidate(q)
+        ]
+    elif is_groq_available():
         try:
             candidates = parse_raw_questions(generate_json(prompt))
         except Exception as e:
             logger.error(f"Groq single-question regeneration failed: {e}")
-    if not candidates and is_gemini_available():
+    if not candidates and not use_claude and is_gemini_available():
         try:
             candidates = parse_raw_questions(gemini_generate_json(prompt))
         except Exception as e:

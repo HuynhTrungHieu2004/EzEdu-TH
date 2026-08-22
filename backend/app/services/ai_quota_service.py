@@ -236,6 +236,19 @@ async def usage_snapshot(user_id: str, *, now: Optional[datetime] = None, databa
     }
 
 
+async def claude_token_usage(*, database: Any = None) -> int:
+    db = database if database is not None else get_database()
+    rows = await db["ai_usage_events"].aggregate([
+        {"$match": {
+            "provider": "anthropic",
+            "is_final": True,
+            "event_kind": "logical_operation",
+        }},
+        {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$total_tokens", 0]}}}},
+    ]).to_list(1)
+    return int(rows[0]["total"]) if rows else 0
+
+
 def _failure(key: str, used: int, limit: int) -> QuotaCheckResult:
     return QuotaCheckResult(
         allowed=False,
@@ -257,6 +270,10 @@ async def check_ai_quota(
     database: Any = None,
 ) -> QuotaCheckResult:
     db = database if database is not None else get_database()
+    if settings.AI_TEXT_PROVIDER == "claude" and settings.CLAUDE_TOTAL_TOKEN_BUDGET > 0:
+        used = await claude_token_usage(database=db)
+        if used >= settings.CLAUDE_TOTAL_TOKEN_BUDGET:
+            return _failure("claude_total_tokens", used, settings.CLAUDE_TOTAL_TOKEN_BUDGET)
     if quota_override is None or role is None:
         user_doc = await db["users"].find_one({"_id": ObjectId(user_id)}) if ObjectId.is_valid(user_id) else None
         if user_doc:

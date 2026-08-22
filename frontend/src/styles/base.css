@@ -20,13 +20,12 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  min-height: 100dvh;
   font-family: var(--ez-font-sans);
   font-size: var(--ez-text-body);
   line-height: var(--ez-leading-body);
   font-weight: var(--ez-weight-regular);
   color: var(--ez-text);
-  background: var(--ez-bg);
+  background-color: var(--ez-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Chặn cuộn ngang toàn trang. Nội dung rộng phải tự cuộn trong khối riêng
@@ -39,7 +38,6 @@ body {
    ─────────────────────────────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  font-family: var(--ez-font-heading);
   color: var(--ez-text);
   font-weight: var(--ez-weight-bold);
   line-height: var(--ez-leading-heading);
@@ -264,43 +262,15 @@ th {
   }
 }
 
-html[data-motion='reduced'] {
-  scroll-behavior: auto !important;
-  /* Các component mới dùng duration semantic, vì vậy zero hoá token sẽ làm
-     trạng thái xuất hiện tức thì mà không cần từng component tự đoán mode. */
-  --ez-duration-fast: 0ms;
-  --ez-duration-base: 0ms;
-  --ez-duration-slow: 0ms;
-  --ez-motion-fast: 0ms;
-  --ez-motion-base: 0ms;
-  --ez-motion-slow: 0ms;
-}
-
-html[data-motion='reduced'] *,
-html[data-motion='reduced'] *::before,
-html[data-motion='reduced'] *::after {
-  scroll-behavior: auto !important;
-  /* Transition chỉ làm mượt thay đổi trạng thái; bỏ duration không làm mất
-     trạng thái cuối, đồng thời phủ được các consumer legacy chưa dùng token. */
-  transition-duration: 0s !important;
-  transition-delay: 0s !important;
-}
-
-/* Chỉ tắt animation trang trí/entrance đã biết. Không dùng blanket
-   `animation: none` để spinner, progress indeterminate và skeleton shimmer
-   vẫn truyền đạt đúng trạng thái đang xử lý/đang tải. */
-html[data-motion='reduced'] :where(
-  .page,
-  .sidebar-brand-icon,
-  .ez-toast,
-  .ez-overlay,
-  .ez-dialog,
-  .ez-drawer,
-  .ez-dropdown-menu,
-  .ez-tooltip,
-  .ez-chalk-underline path
-) {
-  animation: none !important;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ───────────────────────────────────────────────────────────────────────

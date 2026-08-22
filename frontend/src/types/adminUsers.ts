@@ -22,6 +22,21 @@ export interface AdminUserSummary {
   last_login_at: string | null;
   deleted_at: string | null;
   current_quota: Record<string, unknown> | null;
+  phone_number?: string;
+  student_code?: string;
+  teacher_code?: string;
+  class_name?: string;
+  grade?: string;
+  subject?: string;
+  specialization?: string;
+  date_of_birth?: string;
+}
+
+export interface UserActivityLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  details?: string;
 }
 
 export interface AdminUserDetail extends AdminUserSummary {
@@ -30,6 +45,18 @@ export interface AdminUserDetail extends AdminUserSummary {
   conversation_count: number;
   ai_request_count: number;
   token_usage: TokenUsage;
+  enrolled_courses?: string[];
+  exercises_done?: number;
+  exams_done?: number;
+  gpa?: number;
+  learning_progress_pct?: number;
+  class_count?: number;
+  assigned_classes?: string[];
+  materials_created?: number;
+  questions_created?: number;
+  exams_created?: number;
+  submissions_graded?: number;
+  activity_history?: UserActivityLog[];
 }
 
 export interface AdminUserListParams {

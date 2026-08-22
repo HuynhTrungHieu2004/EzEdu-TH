@@ -1,17 +1,205 @@
 import json
+import re
 import subprocess
 import tempfile
+import time
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 
+import httpx
 from groq import Groq
 from google import genai
 from app.core.config import settings
 
 import logging
 logger = logging.getLogger(__name__)
+_claude_usage_capture: ContextVar[list | None] = ContextVar(
+    "claude_usage_capture", default=None
+)
+
+
+@dataclass(frozen=True)
+class ClaudeResult:
+    text: str
+    model: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    citations: list[dict] = field(default_factory=list)
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
+class ClaudeText(str):
+    """String-compatible response carrying usage for existing callers."""
+
+    def __new__(cls, result: ClaudeResult):
+        value = super().__new__(cls, result.text)
+        value.model = result.model
+        value.input_tokens = result.input_tokens
+        value.output_tokens = result.output_tokens
+        value.total_tokens = result.total_tokens
+        return value
+
+
+def start_claude_usage_capture():
+    return _claude_usage_capture.set([])
+
+
+def stop_claude_usage_capture(token) -> dict[str, int | str]:
+    results = _claude_usage_capture.get() or []
+    _claude_usage_capture.reset(token)
+    return {
+        "model": results[-1].model if results else "",
+        "input_tokens": sum(result.input_tokens for result in results),
+        "output_tokens": sum(result.output_tokens for result in results),
+        "total_tokens": sum(result.total_tokens for result in results),
+    }
+
+
+def is_claude_available() -> bool:
+    api_key = (settings.ANTHROPIC_API_KEY or "").strip().lower()
+    return bool(api_key and not api_key.startswith("your_") and not api_key.startswith("your-"))
+
+
+def limit_prompt(prompt: str, max_characters: int) -> str:
+    if max_characters <= 0:
+        return ""
+    if len(prompt) <= max_characters:
+        return prompt
+    if max_characters <= 5:
+        return prompt[-max_characters:]
+    marker = "\n...\n"
+    remaining = max(0, max_characters - len(marker))
+    head = (remaining * 3) // 5
+    tail = remaining - head
+    return prompt[:head] + marker + (prompt[-tail:] if tail else "")
+
+
+def claude_generate(
+    prompt: str,
+    *,
+    quality: bool,
+    system: str | None = None,
+    tools: list[dict] | None = None,
+) -> ClaudeResult:
+    """Call Claude Messages API with the two approved model classes."""
+    if not is_claude_available():
+        raise ValueError("ANTHROPIC_API_KEY is not configured in the application environment (.env file).")
+
+    model = settings.CLAUDE_QUALITY_MODEL if quality else settings.CLAUDE_FAST_MODEL
+    max_prompt_characters = (
+        settings.CLAUDE_QUALITY_MAX_PROMPT_CHARACTERS
+        if quality else settings.CLAUDE_FAST_MAX_PROMPT_CHARACTERS
+    )
+    max_tokens = (
+        settings.CLAUDE_QUALITY_MAX_OUTPUT_TOKENS
+        if quality else settings.CLAUDE_FAST_MAX_OUTPUT_TOKENS
+    )
+    payload: dict = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": limit_prompt(prompt, max_prompt_characters)}],
+    }
+    if system:
+        payload["system"] = system
+    if tools:
+        payload["tools"] = tools
+
+    headers = {
+        "x-api-key": settings.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    response = None
+    for attempt in range(settings.MAX_RETRIES + 1):
+        try:
+            response = httpx.post(
+                f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages",
+                headers=headers,
+                json=payload,
+                timeout=settings.AI_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            break
+        except httpx.HTTPStatusError as exc:
+            retryable = exc.response.status_code == 429 or exc.response.status_code >= 500
+            if not retryable or attempt >= settings.MAX_RETRIES:
+                raise
+            delay = float(exc.response.headers.get("retry-after", 2 ** attempt))
+            time.sleep(min(max(delay, 0.0), 60.0))
+        except httpx.RequestError:
+            if attempt >= settings.MAX_RETRIES:
+                raise
+            time.sleep(2 ** attempt)
+
+    data = response.json()
+    blocks = data.get("content") or []
+    text = "\n".join(block.get("text", "") for block in blocks if block.get("type") == "text").strip()
+    citations = [citation for block in blocks for citation in (block.get("citations") or [])]
+    usage = data.get("usage") or {}
+    result = ClaudeResult(
+        text=text,
+        model=data.get("model") or model,
+        input_tokens=int(usage.get("input_tokens") or 0),
+        output_tokens=int(usage.get("output_tokens") or 0),
+        citations=citations,
+    )
+    capture = _claude_usage_capture.get()
+    if capture is not None:
+        capture.append(result)
+    return result
+
+
+def claude_generate_content(prompt: str, *, quality: bool = False) -> str:
+    return ClaudeText(claude_generate(prompt, quality=quality))
+
+
+def claude_generate_json(prompt: str, *, quality: bool = True) -> str:
+    result = claude_generate(
+        prompt,
+        quality=quality,
+        system="Chỉ trả về JSON hợp lệ, không thêm markdown hoặc nội dung ngoài JSON.",
+    )
+    try:
+        parsed = json.loads(result.text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Claude không trả về JSON hợp lệ.") from exc
+    if not isinstance(parsed, (dict, list)):
+        raise ValueError("Claude JSON phải là object hoặc array.")
+    return ClaudeText(result)
+
+
+def claude_web_search(prompt: str) -> ClaudeResult:
+    result = claude_generate(
+        prompt,
+        quality=True,
+        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": settings.MAX_WEB_CITATIONS}],
+    )
+    if result.citations:
+        return result
+    # ponytail: Nghimmo omits structured citations; remove when its gateway preserves them.
+    urls = list(dict.fromkeys(
+        match.rstrip(".,;:!?)]}'\"")
+        for match in re.findall(r"https?://[^\s<>\"]+", result.text)
+    ))
+    return ClaudeResult(
+        text=result.text,
+        model=result.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        citations=[{
+            "url": url,
+            "title": urlparse(url).netloc,
+            "cited_text": "",
+        } for url in urls],
+    )
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Groq Client (Primary — Question Generation, Chat, Transcription)
+# Groq Client (Whisper transcription + legacy text rollback)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _groq_client = None
@@ -28,7 +216,9 @@ def get_groq_client():
 
 
 def generate_content(prompt: str) -> str:
-    """Generates standard text content using Groq API"""
+    """Generate text with Claude, or Groq while the rollback switch is active."""
+    if settings.AI_TEXT_PROVIDER == "claude":
+        return claude_generate_content(prompt, quality=False)
     client = get_groq_client()
     model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
     response = client.chat.completions.create(
@@ -54,7 +244,7 @@ def generate_json(prompt: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Gemini Client (Secondary — Evaluation & Embeddings)
+# Gemini Client (legacy rollback only)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _gemini_client = None
@@ -96,7 +286,7 @@ def is_groq_available() -> bool:
     return bool(api_key and not api_key.startswith("your_") and not api_key.startswith("your-"))
 
 
-def generate_json_with_failover(prompt: str) -> str:
+def generate_json_with_failover(prompt: str, *, quality: bool = True) -> str:
     """Sinh JSON, thử lần lượt các nhà cung cấp đang cấu hình.
 
     Chọn nhà cung cấp một lần rồi thôi có nghĩa là hạn mức của một bên quyết
@@ -107,6 +297,9 @@ def generate_json_with_failover(prompt: str) -> str:
     Thứ tự giữ nguyên như cũ (Gemini trước) để không đổi hành vi ở đường
     thuận lợi; chỉ khi Gemini hỏng mới chuyển sang Groq.
     """
+    if settings.AI_TEXT_PROVIDER == "claude":
+        return claude_generate_json(prompt, quality=quality)
+
     lastest_error: Exception | None = None
 
     for ten, kha_dung, ham in (
@@ -238,7 +431,9 @@ def classify_bloom_levels(questions: list[dict]) -> list[dict]:
     prompt = BLOOM_CLASSIFICATION_PROMPT.format(questions_json=questions_json)
     
     try:
-        if is_gemini_available():
+        if settings.AI_TEXT_PROVIDER == "claude":
+            raw = claude_generate_json(prompt, quality=False)
+        elif is_gemini_available():
             raw = gemini_generate_json(prompt)
         elif is_groq_available():
             raw = generate_json(prompt)
@@ -297,7 +492,9 @@ Trả về JSON:
 Chỉ trả JSON, không thêm gì khác."""
     
     try:
-        if is_gemini_available():
+        if settings.AI_TEXT_PROVIDER == "claude":
+            raw = claude_generate_json(prompt, quality=False)
+        elif is_gemini_available():
             raw = gemini_generate_json(prompt)
         elif is_groq_available():
             raw = generate_json(prompt)

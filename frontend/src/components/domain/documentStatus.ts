@@ -5,5 +5,5 @@
  * điều kiện để Fast Refresh của Vite hoạt động đúng.
  */
 export function isDocumentReady(status: string): boolean {
-  return status === 'indexed';
+  return status === 'indexed' || status === 'ready' || status === 'processed';
 }

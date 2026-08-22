@@ -8,6 +8,7 @@ from typing import Any, Optional
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from app.core.config import settings
 from app.core.rbac import Permission, require_permission
 from app.database.mongodb import get_database
 from app.schemas.admin_ai import (
@@ -193,6 +194,20 @@ async def _provider_quota_warnings(db) -> list[AIUsageWarning]:
                 type="provider_quota_near_limit",
                 message=f"Provider {provider_key} đã dùng {round(ratio * 100)}% ngưỡng request/ngày đã cấu hình.",
                 value=used, threshold=ceiling,
+            ))
+
+    if settings.CLAUDE_TOTAL_TOKEN_BUDGET > 0:
+        from app.services.ai_quota_service import claude_token_usage
+
+        used_tokens = await claude_token_usage(database=db)
+        ratio = used_tokens / settings.CLAUDE_TOTAL_TOKEN_BUDGET
+        if ratio >= 0.8:
+            warnings.append(AIUsageWarning(
+                type="provider_quota_near_limit",
+                severity="critical" if ratio >= 1 else "warning",
+                message=f"Claude đã dùng {round(ratio * 100)}% ngân sách token nội bộ.",
+                value=used_tokens,
+                threshold=settings.CLAUDE_TOTAL_TOKEN_BUDGET,
             ))
     return warnings
 

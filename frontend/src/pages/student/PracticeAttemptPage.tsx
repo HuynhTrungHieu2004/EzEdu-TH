@@ -16,12 +16,7 @@ import {
   PageHeader,
   Skeleton,
 } from '../../components/ui';
-import { AnimatedCounter, Confetti } from '../../motion';
 import '../question-set.css';
-import '../exam-attempt.css';
-
-/** Từ mốc này coi là thành tích đáng ăn mừng (spec §7.4). */
-const CELEBRATE_PERCENT = 80;
 
 /**
  * Làm bài — dành riêng cho học sinh.
@@ -271,25 +266,8 @@ export default function PracticeAttemptPage() {
             Nộp bài và lưu điểm
           </Button>
           {attemptResult && (
-            <div
-              className="ez-result-summary qs-result-box"
-              style={{ marginTop: 'var(--ez-space-4)' }}
-              data-practice-result
-            >
-              <div className="ez-result-summary-grid">
-                <div className="ez-result-score">
-                  <span className="ez-result-score-value">
-                    <AnimatedCounter
-                      value={Math.round(attemptResult.percent)}
-                      formatter={(value) => `${value}%`}
-                    />
-                  </span>
-                  <span className="ez-result-score-meta">
-                    {attemptResult.score}/{attemptResult.max_score} câu đúng
-                  </span>
-                </div>
-              </div>
-              <Confetti active={Math.round(attemptResult.percent) >= CELEBRATE_PERCENT} />
+            <div className="qs-result-box" style={{ marginTop: 'var(--ez-space-4)' }}>
+              Kết quả gần nhất: <strong>{attemptResult.score}/{attemptResult.max_score}</strong> câu đúng ({attemptResult.percent}%)
             </div>
           )}
         </CardBody>

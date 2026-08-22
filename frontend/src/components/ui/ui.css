@@ -254,28 +254,6 @@
               box-shadow var(--ez-duration-fast) var(--ez-ease-standard);
 }
 
-/* Safari bỏ qua `padding` và `min-height` của `<select>` khi `appearance` còn là
-   `auto`: ô lọc trên iPhone chỉ cao 27px dù CSS đặt 44px (Chrome ra đúng 46px).
-   Tắt appearance rồi tự vẽ mũi tên. Đặt trên chính `select` để phủ cả 12 ô thô
-   của các trang chưa dùng component `Select`.
-
-   CHỈ `select`. Trước đây khối này viết nối vào danh sách `.ez-input,
-   .ez-textarea,` phía trên — dấu phẩy kéo luôn hai lớp đó vào, làm mọi ô nhập
-   văn bản trong ứng dụng mất sạch viền, nền, bo góc và mọc thêm mũi tên xổ
-   xuống. Đừng gộp lại. */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235c5c5c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 34px;
-}
-
-[data-theme='dark'] select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a99cc4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-}
-
 .ez-input::placeholder,
 .ez-textarea::placeholder {
   color: var(--ez-text-muted);
@@ -1588,9 +1566,7 @@ select {
 }
 
 .ez-datatable th {
-  /* Chữ mờ trên nền muted chỉ đạt 4.34:1 — tiêu đề cột dùng bậc secondary để
-     đủ AA (áp dụng cho mọi bảng: admin, học liệu, ngân hàng câu hỏi). */
-  color: var(--ez-text-secondary);
+  color: var(--ez-text-muted);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-bold);
   text-transform: uppercase;
@@ -1600,12 +1576,6 @@ select {
 
 .ez-datatable td {
   color: var(--ez-text);
-}
-
-.ez-datatable-status {
-  text-align: center;
-  padding: var(--ez-space-6) var(--ez-space-4);
-  color: var(--ez-text-muted);
 }
 
 .ez-datatable td small {
@@ -1736,14 +1706,6 @@ select {
   }
 }
 
-/* Số kết quả đang hiện sau khi lọc — dùng chung cho mọi trang danh sách */
-.ez-filter-summary {
-  margin: var(--ez-space-4) 0 var(--ez-space-3);
-  color: var(--ez-text-muted);
-  font-size: var(--ez-text-body-sm);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ───────────────────────────────────────────────────────────────────────
    Utility: muted text
    ─────────────────────────────────────────────────────────────────────── */
@@ -1830,234 +1792,4 @@ select {
   .ez-pretty-row {
     grid-template-columns: 1fr;
   }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   ChalkUnderline — gạch chân tay vẽ dưới tiêu đề trang
-   ═══════════════════════════════════════════════════════════════════════ */
-.ez-chalk-underline {
-  display: block;
-  width: 96px;
-  height: 8px;
-  margin-top: var(--ez-space-2);
-  stroke: var(--ez-accent);
-  opacity: 0.85;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .ez-chalk-underline path {
-    stroke-dasharray: 200;
-    stroke-dashoffset: 200;
-    animation: ez-chalk-draw 700ms var(--ez-ease-out) 150ms forwards;
-  }
-
-  @keyframes ez-chalk-draw {
-    to {
-      stroke-dashoffset: 0;
-    }
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   RedCheckmark — dấu tích bút đỏ tay vẽ
-   ═══════════════════════════════════════════════════════════════════════ */
-.ez-red-checkmark {
-  stroke: var(--ez-accent);
-  flex: none;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   GradeStamp — badge tròn kiểu con dấu chấm điểm
-   ═══════════════════════════════════════════════════════════════════════ */
-.ez-grade-stamp {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--ez-radius-full);
-  border: 2.5px solid var(--ez-accent);
-  color: var(--ez-accent-text);
-  transform: rotate(-6deg);
-  font-family: var(--ez-font-heading);
-  line-height: 1.1;
-}
-
-.ez-grade-stamp-sm {
-  width: 48px;
-  height: 48px;
-}
-.ez-grade-stamp-sm .ez-grade-stamp-value { font-size: var(--ez-text-body-sm); font-weight: var(--ez-weight-bold); }
-
-.ez-grade-stamp-md {
-  width: 64px;
-  height: 64px;
-}
-.ez-grade-stamp-md .ez-grade-stamp-value { font-size: var(--ez-text-h4); font-weight: var(--ez-weight-bold); }
-
-.ez-grade-stamp-lg {
-  width: 88px;
-  height: 88px;
-}
-.ez-grade-stamp-lg .ez-grade-stamp-value { font-size: var(--ez-text-h2); font-weight: var(--ez-weight-bold); }
-
-.ez-grade-stamp-label {
-  font-size: var(--ez-text-caption);
-  font-weight: var(--ez-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--ez-tracking-caps);
-}
-
-/* ── Nhóm hành vi người dùng (K-Means, trang nhật ký hoạt động) ── */
-.ez-muted-note {
-  margin: var(--ez-space-1) 0 0;
-  color: var(--ez-text-secondary);
-  font-size: var(--ez-text-body-sm);
-  line-height: var(--ez-leading-snug);
-}
-
-.ez-behavior-groups {
-  display: grid;
-  gap: var(--ez-space-3);
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.ez-behavior-group {
-  padding: var(--ez-space-3);
-  border: 1px solid var(--ez-border);
-  border-radius: var(--ez-radius-md);
-  background-color: var(--ez-surface-muted);
-}
-
-.ez-behavior-group-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ez-space-2);
-  margin-bottom: var(--ez-space-2);
-}
-
-.ez-behavior-hint {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background-color: var(--ez-accent-subtle);
-  color: var(--ez-accent-text);
-  font-size: var(--ez-text-caption);
-  font-weight: var(--ez-weight-semibold);
-}
-
-.ez-behavior-metrics {
-  display: grid;
-  gap: var(--ez-space-1);
-  margin: 0;
-}
-
-.ez-behavior-metrics > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ez-space-3);
-}
-
-.ez-behavior-metrics dt {
-  color: var(--ez-text-secondary);
-  font-size: var(--ez-text-body-sm);
-}
-
-.ez-behavior-metrics dd {
-  margin: 0;
-  color: var(--ez-text);
-  font-size: var(--ez-text-body-sm);
-  font-weight: var(--ez-weight-semibold);
-  font-variant-numeric: tabular-nums;
-}
-
-.ez-behavior-anomalies {
-  margin-top: var(--ez-space-4);
-  padding: var(--ez-space-3);
-  border: 1px solid var(--ez-warning-border);
-  border-radius: var(--ez-radius-md);
-  background-color: var(--ez-warning-subtle);
-}
-
-.ez-behavior-anomalies ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ez-space-2);
-  margin: var(--ez-space-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ez-behavior-anomalies li {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--ez-space-2);
-  padding: 4px 10px;
-  border: 1px solid var(--ez-border-subtle);
-  border-radius: 999px;
-  background-color: var(--ez-surface);
-  font-size: var(--ez-text-body-sm);
-}
-
-.ez-behavior-role,
-.ez-behavior-metric-inline {
-  color: var(--ez-text-muted);
-  font-size: var(--ez-text-caption);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Thiết bị cảm ứng
-   ═══════════════════════════════════════════════════════════════════════════
-   Hai ràng buộc của phần cứng, không phải lựa chọn thiết kế, nên đặt tập trung
-   ở đây thay vì sửa từng trang:
-
-   1. iOS Safari TỰ PHÓNG TO cả trang khi người dùng chạm vào ô nhập có cỡ chữ
-      dưới 16px — và không thu lại. Trang đo được có ô 15px, 14px, 13px, 11.1px
-      rải rác ở 8 file CSS khác nhau; `!important` ở đây là để chặn mọi rule cũ
-      lẫn rule viết sau vô tình rơi lại xuống dưới 16px.
-   2. Ngón tay cần vùng chạm ~44px (Apple HIG, WCAG 2.5.5). Nút mặc định của hệ
-      là 40px, nút nhỏ 32px — bấm được nhưng hay trượt, nhất là khi hai nút nằm
-      sát nhau trong bảng.
-
-   Dùng `pointer: coarse` chứ không dùng bề rộng: máy tính bảng có bút/chuột
-   không cần nới, còn điện thoại xoay ngang vẫn cần. */
-@media (pointer: coarse) {
-  input:not([type='checkbox']):not([type='radio']):not([type='range']),
-  select,
-  textarea {
-    font-size: max(16px, 1rem) !important;
-    /* Ô nhập cũng là vùng chạm: `select` tự tạo của vài trang chỉ cao 27px. */
-    min-height: 44px;
-  }
-
-  .ez-btn,
-  .ez-btn-sm {
-    min-height: 44px;
-  }
-
-  .ez-btn-icon,
-  .ez-btn-icon.ez-btn-sm {
-    width: 44px;
-    min-width: 44px;
-  }
-
-  /* Ô chọn và checkbox trong bảng: nới vùng bấm mà không đổi kích thước hình vẽ */
-  .ez-checkbox,
-  .ez-radio {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .ez-chip {
-    min-height: 40px;
-  }
-}
-
-/* Ô nhập chiếm hết chỗ trống trong hàng ngang cùng nút bấm. Đặt thành lớp vì
-   `FormField` chỉ nhận `className`, không nhận `style`. */
-.ez-flex-1 {
-  flex: 1;
-  min-width: 0;
 }

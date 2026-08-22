@@ -28,24 +28,16 @@ export { Chip, ChipGroup } from './ChipGroup';
 /* Hiển thị */
 export { Card, CardBody, CardDescription, CardFooter, CardHeader, CardTitle } from './Card';
 export { Badge } from './Badge';
-export type { BadgeProps, BadgeVariant } from './Badge';
+export type { BadgeProps, BadgeVariant, BadgeSize } from './Badge';
 export { Alert } from './Alert';
 export type { AlertProps, AlertTone } from './Alert';
 export { PageHeader, SectionHeader } from './Headers';
 export { StatGrid, StatTile } from './StatTile';
-export { ChalkUnderline } from './ChalkUnderline';
-export type { ChalkUnderlineProps } from './ChalkUnderline';
-export { RedCheckmark } from './RedCheckmark';
-export type { RedCheckmarkProps } from './RedCheckmark';
-export { GradeStamp } from './GradeStamp';
-export type { GradeStampProps } from './GradeStamp';
 export { ToolCard } from './ToolCard';
 export type { ToolCardProps } from './ToolCard';
 export { SearchCommand } from './SearchCommand';
 export type { SearchCommandProps } from './SearchCommand';
 export { ProgressBar, ProgressSteps } from './Progress';
-export { TimerRing } from './TimerRing';
-export type { TimerRingProps } from './TimerRing';
 export type { ProgressStep } from './Progress';
 
 /* Lớp nổi */

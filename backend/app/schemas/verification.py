@@ -29,7 +29,7 @@ class VerificationIssue(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     source_reference: Optional[str] = Field(None, max_length=2_048)
     external_verified: bool = False
-    ai_provider: Literal["gemini", "groq", "both", "unknown"] = "unknown"
+    ai_provider: Literal["claude", "gemini", "groq", "both", "unknown"] = "unknown"
 
 
 class VerificationSessionResponse(BaseModel):

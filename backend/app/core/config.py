@@ -42,6 +42,19 @@ class Settings(BaseSettings):
     # xem ở App Dashboard, mục Settings → Advanced → Upgrade API Version.
     FACEBOOK_GRAPH_VERSION: str = "v21.0"
 
+    # Account email delivery. Password-reset and verification endpoints stay
+    # unavailable until these values are configured; tokens are never returned
+    # by the API as a fallback.
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_STARTTLS: bool = True
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+    EMAIL_VERIFICATION_EXPIRE_MINUTES: int = 1440
+
     # JWT configurations
     JWT_SECRET_KEY: str = "change_this_to_a_long_random_secret_key"
     JWT_ALGORITHM: str = "HS256"
@@ -66,13 +79,25 @@ class Settings(BaseSettings):
     CHROMA_SSL: bool = False
     CHROMA_AUTH_TOKEN: str = ""
 
-    # Gemini configurations (for cross-validation)
+    # Legacy Gemini configuration, retained for the rollback switch.
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
-    # Groq configurations (for free primary LLM & transcription)
+    # Groq remains the transcription provider; text use is legacy-only.
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
+    # Claude handles text/JSON/web workloads. Groq remains available for Whisper.
+    AI_TEXT_PROVIDER: Literal["claude", "legacy"] = "claude"
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_BASE_URL: str = "https://api.anthropic.com"
+    CLAUDE_FAST_MODEL: str = "claude-haiku-4-5-20251001"
+    CLAUDE_QUALITY_MODEL: str = "claude-sonnet-5"
+    CLAUDE_FAST_MAX_PROMPT_CHARACTERS: int = 10_000
+    CLAUDE_QUALITY_MAX_PROMPT_CHARACTERS: int = 30_000
+    CLAUDE_FAST_MAX_OUTPUT_TOKENS: int = 1_000
+    CLAUDE_QUALITY_MAX_OUTPUT_TOKENS: int = 3_000
+    CLAUDE_TOTAL_TOKEN_BUDGET: int = 10_000_000
 
     # Advanced Chat Configurations
     RAG_DISTANCE_THRESHOLD: float = 0.75

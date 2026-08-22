@@ -101,6 +101,7 @@ pyproject_hooks==1.2.0
 googleapis-common-protos==1.75.0
 protobuf==6.33.6
 python-dateutil==2.9.0.post0
+langdetect==1.0.9
 referencing==0.37.0
 requests-oauthlib==2.0.0
 rpds-py==2026.5.1

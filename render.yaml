@@ -1,10 +1,3 @@
-# Cấu hình triển khai backend lên Render (https://render.com).
-# Frontend đi Netlify — xem netlify.toml và docs/trien-khai/netlify.md.
-#
-# Render đọc file này khi bạn dùng Blueprint (New → Blueprint → chọn repo).
-# Các biến `sync: false` phải tự điền trong bảng điều khiển: đó là khoá bí mật,
-# không được đặt trong repo.
-
 services:
   - type: web
     name: ezedu-backend
@@ -12,38 +5,41 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
-    region: singapore # gần Việt Nam nhất trong các vùng Render
+    region: singapore
     healthCheckPath: /health/ready
     envVars:
       - key: APP_ENV
         value: production
-      # Worker chấm tự luận chạy chung container: gói free không có dịch vụ
-      # background riêng. Trả phí thì đặt 0 ở đây và tạo thêm một worker service.
       - key: RUN_WORKER
         value: "1"
-      # Điền sau khi có tên miền Netlify. Dạng JSON, ví dụ:
-      # ["https://ezedu.netlify.app"]
       - key: BACKEND_CORS_ORIGINS
         sync: false
-      # Hai phân hệ này mặc định TẮT trong code; máy phát triển bật bằng .env.
-      # Thiếu ở đây thì ngân hàng câu hỏi, ma trận đề và đề thi có giờ đều trả
-      # 403 trên bản chạy thật — giao diện vẫn mở được nên rất khó đoán.
+      - key: FRONTEND_BASE_URL
+        value: https://ezedu.netlify.app
       - key: ENABLE_EXAM_BLUEPRINT
         value: "true"
       - key: ENABLE_TIMED_EXAM
         value: "true"
+      - key: ENABLE_CURRICULUM_KB
+        value: "true"
       - key: MONGODB_URI
         sync: false
-      # Phải khớp tên CSDL bạn dùng trên Atlas. Máy phát triển đang dùng
-      # `chuyende02`; đổi ở đây thì phải đổi cả lệnh mongorestore khi di trú.
       - key: MONGODB_DB_NAME
         value: chuyende02
       - key: JWT_SECRET_KEY
-        generateValue: true # Render tự sinh chuỗi ngẫu nhiên đủ dài
-      - key: GEMINI_API_KEY
+        generateValue: true
+      - key: AI_TEXT_PROVIDER
+        value: claude
+      - key: ANTHROPIC_API_KEY
         sync: false
-      - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+      - key: ANTHROPIC_BASE_URL
+        sync: false
+      - key: CLAUDE_FAST_MODEL
+        sync: false
+      - key: CLAUDE_QUALITY_MODEL
+        sync: false
+      - key: CLAUDE_TOTAL_TOKEN_BUDGET
+        value: "10000000"
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
@@ -56,17 +52,9 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
-      # Đăng nhập Facebook. Khác Google: backend BUỘC phải có App Secret, vì
-      # access token của Facebook là chuỗi đục, muốn biết nó là gì thì phải
-      # hỏi ngược Graph API bằng chính danh nghĩa của app.
       - key: FACEBOOK_APP_ID
         sync: false
       - key: FACEBOOK_APP_SECRET
         sync: false
-      # ChromaDB ghi vào ổ đĩa của container. Gói free KHÔNG có ổ đĩa bền:
-      # mỗi lần deploy hoặc thức dậy sau khi ngủ là mất vector, phải lập chỉ mục
-      # lại học liệu thì hỏi đáp có trích dẫn mới chạy. Muốn giữ: gói trả phí
-      # thêm Persistent Disk gắn vào /app/chroma_db, hoặc đổi sang Chroma Cloud
-      # bằng CHROMA_MODE=http + CHROMA_HOST/CHROMA_PORT/CHROMA_AUTH_TOKEN.
       - key: CHROMA_PERSIST_DIR
         value: /app/chroma_db

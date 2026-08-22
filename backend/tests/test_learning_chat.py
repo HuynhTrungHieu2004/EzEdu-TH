@@ -7,6 +7,7 @@ from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 from fastapi import HTTPException
 
+from app.core.config import settings
 from app.database.mongodb import get_database
 from app.routers import chat as chat_router
 from app.services import learning_chat_service, rag_service
@@ -21,6 +22,7 @@ class LearningChatTests(unittest.IsolatedAsyncioTestCase):
         
         # Patch database
         self.db_patches = [
+            patch.object(settings, "AI_TEXT_PROVIDER", "legacy"),
             patch("app.database.mongodb.get_database", return_value=self.db),
             patch("app.routers.chat.get_database", return_value=self.db),
             patch("app.services.learning_chat_service.get_database", return_value=self.db),

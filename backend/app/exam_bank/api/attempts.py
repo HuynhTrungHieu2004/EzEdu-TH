@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from app.schemas.auth import UserResponse
 
 from app.database.mongodb import get_database
@@ -10,11 +10,38 @@ from app.exam_bank.schemas.attempt import (
     AttemptResponse,
     AttemptStartResponse,
     AttemptSubmitRequest,
+    ExamResultItem,
+    ExamResultStatistics,
 )
-from app.exam_bank.schemas.exam import ExamPreviewResponse
+from app.exam_bank.schemas.exam import ExamPreviewResponse, StudentExamItem
 from app.exam_bank.services import attempt_service, exam_service
 
 router = APIRouter()
+
+
+@router.get("/student/exams", response_model=list[StudentExamItem])
+async def list_student_exams(current_user: UserResponse = Depends(require_student_actor)):
+    return await attempt_service.list_student_exams(get_database(), student_id=current_user.id)
+
+
+@router.get("/exam-results", response_model=list[ExamResultItem])
+async def list_exam_results(
+    class_id: str | None = Query(None),
+    current_user: UserResponse = Depends(require_exam_bank_actor),
+):
+    return await attempt_service.list_exam_results(
+        get_database(), actor_id=current_user.id, is_admin=is_admin_actor(current_user), class_id=class_id
+    )
+
+
+@router.get("/exam-results/statistics", response_model=ExamResultStatistics)
+async def exam_result_statistics(
+    class_id: str | None = Query(None),
+    current_user: UserResponse = Depends(require_exam_bank_actor),
+):
+    return await attempt_service.get_exam_result_statistics(
+        get_database(), actor_id=current_user.id, is_admin=is_admin_actor(current_user), class_id=class_id
+    )
 
 
 @router.post("/exams/{exam_id}/attempts/start", response_model=AttemptStartResponse)

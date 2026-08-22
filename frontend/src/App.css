@@ -2,17 +2,17 @@
   font-size: 16px;
   padding: 5px 10px;
   border-radius: var(--ez-radius-sm);
-  color: var(--ez-primary);
-  background: var(--ez-primary-subtle);
+  color: var(--accent);
+  background: var(--accent-bg);
   border: 2px solid transparent;
   transition: border-color 0.3s;
   margin-bottom: 24px;
 
   &:hover {
-    border-color: var(--ez-primary-border);
+    border-color: var(--accent-border);
   }
   &:focus-visible {
-    outline: 2px solid var(--ez-primary);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 }
@@ -72,7 +72,7 @@
 
 #next-steps {
   display: flex;
-  border-top: 1px solid var(--ez-border);
+  border-top: 1px solid var(--border);
   text-align: left;
 
   & > div {
@@ -96,11 +96,11 @@
 }
 
 #docs {
-  border-right: 1px solid var(--ez-border);
+  border-right: 1px solid var(--border);
 
   @media (max-width: 1024px) {
     border-right: none;
-    border-bottom: 1px solid var(--ez-border);
+    border-bottom: 1px solid var(--border);
   }
 }
 
@@ -116,10 +116,10 @@
   }
 
   a {
-    color: var(--ez-text);
+    color: var(--text-h);
     font-size: 16px;
     border-radius: var(--ez-radius-sm);
-    background: var(--ez-surface-muted);
+    background: var(--social-bg);
     display: flex;
     padding: 6px 12px;
     align-items: center;
@@ -128,7 +128,7 @@
     transition: box-shadow 0.3s;
 
     &:hover {
-      box-shadow: var(--ez-shadow-lg);
+      box-shadow: var(--shadow);
     }
     .button-icon {
       height: 18px;
@@ -155,7 +155,7 @@
 
 #spacer {
   height: 88px;
-  border-top: 1px solid var(--ez-border);
+  border-top: 1px solid var(--border);
   @media (max-width: 1024px) {
     height: 48px;
   }
@@ -175,11 +175,11 @@
 
   &::before {
     left: 0;
-    border-left-color: var(--ez-border);
+    border-left-color: var(--border);
   }
   &::after {
     right: 0;
-    border-right-color: var(--ez-border);
+    border-right-color: var(--border);
   }
 }
 
@@ -190,11 +190,11 @@
   gap: 12px;
   padding: 12px 24px;
   border-radius: var(--ez-radius-lg);
-  background: var(--ez-surface-muted);
-  border: 1px solid var(--ez-border);
+  background: var(--social-bg);
+  border: 1px solid var(--border);
   margin: 20px auto;
   max-width: 600px;
-  box-shadow: var(--ez-shadow-lg);
+  box-shadow: var(--shadow);
   transition: all 0.3s ease;
   font-size: 15px;
 }

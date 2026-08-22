@@ -39,11 +39,14 @@ export function StatTile({
   );
 }
 
-export type StatGridProps = ComponentPropsWithoutRef<'div'>;
+export type StatGridProps = ComponentPropsWithoutRef<'div'> & {
+  cols?: number;
+};
 
-export function StatGrid({ children, className, ...rest }: StatGridProps) {
+export function StatGrid({ children, className, cols, style, ...rest }: StatGridProps) {
+  const gridStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, ...style } : style;
   return (
-    <div className={cx('ez-stat-grid', className)} {...rest}>
+    <div className={cx('ez-stat-grid', className)} style={gridStyle} {...rest}>
       {children}
     </div>
   );

@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { webKnowledgeApi } from '../api/webKnowledgeApi';
 import type { ExploreResult, WebKnowledgeSource, WebKnowledgeSourceStatus } from '../api/webKnowledgeApi';
 import { curriculumKbApi } from '../api/curriculumKbApi';
@@ -16,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  FeatureDisabledState,
   Input,
   PageHeader,
   SkeletonText,
@@ -61,14 +58,12 @@ const NEXT_LABEL: Partial<Record<WebKnowledgeSourceStatus, string>> = {
 };
 
 /**
- * Khám phá kiến thức Internet có kiểm chứng — dùng Gemini Grounding with
- * Google Search (KHÔNG scrape HTML kết quả Google). Học sinh và giáo viên
- * đều dùng được; chỉ giáo viên lưu kết quả thành học liệu chờ duyệt.
+ * Khám phá kiến thức Internet có kiểm chứng — dùng Claude Web Search.
+ * Học sinh và giáo viên đều dùng được; chỉ giáo viên lưu kết quả thành học
+ * liệu chờ duyệt.
  */
 export default function WebKnowledgePage() {
   const { area } = useAuth();
-  const navigate = useNavigate();
-  const { isEnabled, loading: flagsLoading } = useFeatureFlags();
   const isTeacher = area === 'teacher';
 
   const [query, setQuery] = useState('');
@@ -96,12 +91,10 @@ export default function WebKnowledgePage() {
   }
 
   useEffect(() => {
-    // Phân hệ tắt thì mọi lời gọi chắc chắn 403 — đừng bắn request vô ích.
-    if (flagsLoading || !isEnabled('enable_web_knowledge')) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMySources();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTeacher, flagsLoading, isEnabled]);
+  }, [isTeacher]);
 
   async function handleExplore() {
     if (!query.trim()) return;
@@ -161,26 +154,6 @@ export default function WebKnowledgePage() {
     } finally {
       setReviewingId(null);
     }
-  }
-
-  // Hai phân hệ này bật/tắt bằng biến môi trường phía backend. Nếu đang tắt thì
-  // mọi lời gọi trả 403; trước đây trang vẫn render đủ form và danh sách rỗng
-  // nên người dùng tưởng chưa có dữ liệu, bấm gì cũng thất bại không rõ lý do.
-  if (!flagsLoading && !isEnabled('enable_web_knowledge')) {
-    return (
-      <FeatureDisabledState
-        title="Khám phá kiến thức Internet đang tắt"
-        description="Quản trị viên chưa bật phân hệ này nên chưa tra cứu hay lưu được học liệu Internet. Bạn vẫn dùng kho học liệu và các công cụ khác như bình thường."
-        actions={
-          <>
-            <Button onClick={() => navigate('/documents')}>Tới kho học liệu</Button>
-            <Button variant="outline" onClick={() => navigate('/dashboard')}>
-              Về tổng quan
-            </Button>
-          </>
-        }
-      />
-    );
   }
 
   return (

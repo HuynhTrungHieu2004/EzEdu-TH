@@ -5,14 +5,11 @@ import './styles/tokens.css'
 import './styles/base.css'
 import App from './App.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
-import { MotionProvider } from './motion/MotionProvider.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <MotionProvider>
-        <App />
-      </MotionProvider>
+      <App />
     </ThemeProvider>
   </StrictMode>,
 )

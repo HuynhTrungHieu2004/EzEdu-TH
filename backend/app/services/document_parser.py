@@ -1,4 +1,5 @@
 import os
+from typing import Iterable
 
 import docx
 import fitz  # PyMuPDF
@@ -22,6 +23,33 @@ def extract_text_from_pdf(file_path: str) -> str:
         return _normalize_text(parts)
     except Exception as exc:  # pragma: no cover - library-specific parsing failures
         raise ValueError("Could not read text from the PDF file.") from exc
+
+
+def extract_text_pages_from_pdf_bytes(
+    content: bytes,
+    page_ranges: Iterable[tuple[int, int]] | None = None,
+) -> list[tuple[int, str]]:
+    """Extract selected one-based PDF pages while preserving page references."""
+    try:
+        selected = None
+        if page_ranges is not None:
+            selected = {
+                page_number
+                for start, end in page_ranges
+                for page_number in range(start, end + 1)
+            }
+        pages: list[tuple[int, str]] = []
+        with fitz.open(stream=content, filetype="pdf") as pdf_document:
+            for index, page in enumerate(pdf_document):
+                page_number = index + 1
+                if selected is not None and page_number not in selected:
+                    continue
+                text = _normalize_text([page.get_text("text")])
+                if text:
+                    pages.append((page_number, text))
+        return pages
+    except Exception as exc:  # pragma: no cover - library-specific parsing failures
+        raise ValueError("Could not read text from the PDF content.") from exc
 
 
 def extract_text_from_docx(file_path: str) -> str:

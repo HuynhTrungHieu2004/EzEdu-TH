@@ -48,7 +48,7 @@ export default function AdminSubjectsPage() {
   }, []);
 
   useEffect(() => {
-    void nap();
+    queueMicrotask(() => void nap());
   }, [nap]);
 
   /** Bọc mọi thao tác ghi: cùng một cách báo lỗi và cùng một lần nạp lại. */

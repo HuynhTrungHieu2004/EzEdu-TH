@@ -20,7 +20,6 @@ import {
   PageHeader,
   SkeletonText,
 } from '../../components/ui';
-import { StaggerGroup } from '../../motion';
 import '../question-set.css';
 
 /**
@@ -95,7 +94,7 @@ export default function SubjectCatalogPage() {
           description="Khi giáo viên công bố bài luyện tập, chúng sẽ xuất hiện ở đây theo từng môn."
         />
       ) : (
-        <StaggerGroup className="ez-stack">
+        <div className="ez-stack">
           {subjects.map((mon) => (
             <Card key={mon.id} data-motion-item data-subject-card>
               <CardHeader>
@@ -127,7 +126,7 @@ export default function SubjectCatalogPage() {
               </CardBody>
             </Card>
           ))}
-        </StaggerGroup>
+        </div>
       )}
 
       {monDangMo && (
@@ -150,7 +149,7 @@ export default function SubjectCatalogPage() {
             ) : items.length === 0 ? (
               <EmptyState title="Chưa có bài luyện tập trong mục này" />
             ) : (
-              <StaggerGroup className="ez-stack">
+              <div className="ez-stack">
                 {items.map((item) => (
                   <Link
                     key={item.id}
@@ -167,7 +166,7 @@ export default function SubjectCatalogPage() {
                     </span>
                   </Link>
                 ))}
-              </StaggerGroup>
+              </div>
             )}
           </CardBody>
         </Card>

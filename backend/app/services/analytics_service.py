@@ -68,10 +68,10 @@ def _safe_ratio(numerator: int | float, denominator: int | float) -> Optional[fl
 # Write event (fire-and-forget, never fails the caller)
 # ──────────────────────────────────────────────────────────────────────
 
-async def record_event(event: UsageEventCreate) -> None:
+async def record_event(event: UsageEventCreate, *, database: Any = None) -> None:
     """Persist a usage event; logs a warning on failure but never raises."""
     try:
-        db = get_database()
+        db = database if database is not None else get_database()
         doc = event.model_dump()
         doc["feature"] = doc.get("feature") or doc.get("operation_type")
         doc["model"] = doc.get("model") or doc.get("model_name")

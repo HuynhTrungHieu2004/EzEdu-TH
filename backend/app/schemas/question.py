@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, Optional, Dict, List, Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
+
+from app.services.language_policy_service import resolve_output_language
 
 
 QuestionWorkflowStatus = Literal["draft", "review_pending", "approved", "published"]
@@ -12,6 +14,27 @@ class QuestionGenerateRequest(BaseModel):
     difficulty: str = Field("medium", pattern="^(easy|medium|hard)$")
     question_type: str = Field("multiple_choice", pattern="^(multiple_choice|true_false|short_answer)$")
     bloom_level: Optional[str] = Field(None, pattern="^(remember|understand|apply|analyze)$")
+    subject_id: Optional[str] = Field(None, min_length=1, max_length=100)
+    grade: Optional[int] = Field(None, ge=6, le=12)
+    topic_id: Optional[str] = Field(None, max_length=100)
+    output_language: Optional[Literal["vi", "en"]] = None
+
+    @model_validator(mode="after")
+    def require_subject_and_grade_together(self) -> "QuestionGenerateRequest":
+        if (self.subject_id is None) != (self.grade is None):
+            raise ValueError("subject_id and grade must be supplied together")
+        return self
+
+    @computed_field
+    @property
+    def resolved_output_language(self) -> Literal["vi", "en"]:
+        if self.subject_id is None or self.grade is None:
+            return self.output_language or "vi"
+        return resolve_output_language(
+            subject_id=self.subject_id,
+            grade=self.grade,
+            explicit=self.output_language,
+        )
 
 
 class QuestionItem(BaseModel):
@@ -27,6 +50,9 @@ class QuestionItem(BaseModel):
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
+    language: Optional[Literal["vi", "en"]] = None
+    source_chunk_ids: List[str] = Field(default_factory=list)
+    grounding_excerpt: Optional[str] = None
 
 
 class QuestionItemUpdateRequest(BaseModel):
@@ -153,6 +179,9 @@ class QuestionSetResponse(BaseModel):
     subject_name: Optional[str] = None
     chapter_id: Optional[str] = None
     chapter_name: Optional[str] = None
+    grade: Optional[int] = None
+    topic_id: Optional[str] = None
+    output_language: Optional[Literal["vi", "en"]] = None
     created_at: datetime
     updated_at: datetime
 

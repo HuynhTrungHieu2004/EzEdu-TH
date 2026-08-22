@@ -160,6 +160,38 @@ class AdminAITests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(log)
         self.assertEqual(log["metadata"]["quota_key"], "requests_per_day")
 
+    async def test_global_claude_token_budget_blocks_new_ai_requests(self):
+        from app.core.config import settings
+        from app.services.ai_quota_service import enforce_ai_quota
+
+        await self.db["ai_usage_events"].insert_one({
+            "event_id": "evt-claude-budget",
+            "logical_request_id": "req-claude-budget",
+            "attempt_id": "att-claude-budget",
+            "attempt_number": 1,
+            "is_final": True,
+            "event_kind": "logical_operation",
+            "user_id": str(self.user_id),
+            "operation_type": "advanced_chat",
+            "provider": "anthropic",
+            "model_name": "claude-haiku-test",
+            "status": "success",
+            "latency_ms": 1,
+            "total_tokens": 100,
+            "created_at": self.now,
+        })
+        with patch.object(settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(settings, "CLAUDE_TOTAL_TOKEN_BUDGET", 100), \
+             self.assertRaises(HTTPException) as ctx:
+            await enforce_ai_quota(
+                user_id=str(self.user_id),
+                role="admin",
+                feature="advanced_chat",
+                database=self.db,
+            )
+
+        self.assertEqual(ctx.exception.detail["quota_key"], "claude_total_tokens")
+
     async def test_quota_view_update_reset_and_history(self):
         from app.routers.admin_ai import (
             AIQuotaResetRequest,

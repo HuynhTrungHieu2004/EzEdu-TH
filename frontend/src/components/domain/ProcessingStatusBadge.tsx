@@ -25,6 +25,7 @@ const LABELS: Record<string, { text: string; variant: BadgeVariant }> = {
   transcribed: { text: 'Đã chuyển lời video', variant: 'secondary' },
   indexing: { text: 'Đang chuẩn bị để hỏi đáp', variant: 'info' },
   indexed: { text: 'Sẵn sàng dùng', variant: 'success' },
+  ready: { text: 'Sẵn sàng dùng', variant: 'success' },
   failed: { text: 'Xử lý không thành công', variant: 'error' },
   index_failed: { text: 'Chuẩn bị không thành công', variant: 'error' },
 };

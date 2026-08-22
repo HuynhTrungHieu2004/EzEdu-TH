@@ -1,0 +1,512 @@
+/* ── STYLES DÀNH RIÊNG CHO LỘ TRÌNH HỌC (LEARNING ROADMAP) ── */
+
+.ez-roadmap-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ez-space-6, 1.5rem);
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-bottom: 3rem;
+  animation: ezFadeIn 0.35s ease-out;
+}
+
+@keyframes ezFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── BANNER TIẾN TRÌNH TỔNG ──────────────────────────────────────────────── */
+.ez-roadmap-hero {
+  position: relative;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(99, 102, 241, 0.12) 100%);
+  border: 1px solid var(--ez-border-subtle, rgba(226, 232, 240, 0.8));
+  border-radius: var(--ez-radius-xl, 20px);
+  padding: 1.75rem 2rem;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme='dark'] .ez-roadmap-hero {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.3) 0%, rgba(67, 56, 202, 0.35) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.ez-roadmap-hero-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ez-roadmap-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.ez-roadmap-progress-large {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.ez-roadmap-progress-number {
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='dark'] .ez-roadmap-progress-number {
+  background: linear-gradient(135deg, #60a5fa, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ez-roadmap-progress-bar-wrap {
+  width: 100%;
+  height: 14px;
+  background-color: var(--ez-surface-muted, rgba(226, 232, 240, 0.8));
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ez-roadmap-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #4f46e5 50%, #10b981 100%);
+  border-radius: 999px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+}
+
+.ez-roadmap-hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--ez-text-secondary, #475569);
+}
+
+.ez-roadmap-hero-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.ez-dot-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ez-dot-completed { background-color: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.5); }
+.ez-dot-learning { background-color: #2563eb; box-shadow: 0 0 6px rgba(37, 99, 235, 0.5); }
+.ez-dot-notstarted { background-color: #94a3b8; }
+
+/* ── GRID CARD LỚP HỌC ────────────────────────────────────────────────────── */
+.ez-grade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.ez-grade-card {
+  background: var(--ez-surface, #ffffff);
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  border-radius: var(--ez-radius-xl, 20px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='dark'] .ez-grade-card {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ez-grade-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  border-color: var(--ez-primary, #2563eb);
+}
+
+.ez-grade-card-header-box {
+  transition: background-color 0.25s ease;
+}
+
+.ez-grade-card-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+}
+
+.ez-grade-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ez-text, #0f172a);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ez-grade-card-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--ez-text-secondary, #64748b);
+}
+
+.ez-grade-card-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ez-grade-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+/* ── CARD MÔN HỌC (SUBJECT CARD) ───────────────────────────────────────── */
+.ez-subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.ez-subject-card {
+  background: var(--ez-surface, #ffffff);
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  border-radius: var(--ez-radius-xl, 20px);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='dark'] .ez-subject-card {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ez-subject-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 30px -10px rgba(37, 99, 235, 0.12);
+  border-color: var(--ez-primary, #2563eb);
+}
+
+.ez-subject-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ez-subject-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(79, 70, 229, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+
+.ez-subject-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.ez-subject-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ez-text, #0f172a);
+}
+
+.ez-subject-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--ez-text-secondary, #64748b);
+  padding: 0.5rem 0.75rem;
+  background: var(--ez-surface-muted, #f8fafc);
+  border-radius: 10px;
+}
+
+[data-theme='dark'] .ez-subject-stats-row {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.ez-ai-remark-box {
+  font-size: 0.82rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.08);
+  border-left: 3px solid #6366f1;
+  color: var(--ez-text-secondary, #475569);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── TIMELINE BÀI HỌC ────────────────────────────────────────────────────── */
+.ez-timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ez-chapter-accordion {
+  background: var(--ez-surface, #ffffff);
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  border-radius: var(--ez-radius-xl, 20px);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .ez-chapter-accordion {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ez-chapter-header {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.ez-chapter-header:hover {
+  background: var(--ez-surface-hover, rgba(241, 245, 249, 0.6));
+}
+
+[data-theme='dark'] .ez-chapter-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ez-chapter-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ez-text, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ez-timeline-list {
+  padding: 0.5rem 1.5rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.ez-timeline-list::before {
+  content: '';
+  position: absolute;
+  top: 1rem;
+  bottom: 1.5rem;
+  left: 2.35rem;
+  width: 2px;
+  background: var(--ez-border-subtle, #e2e8f0);
+  z-index: 1;
+}
+
+[data-theme='dark'] .ez-timeline-list::before {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ez-timeline-item {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem 0.9rem 2.8rem;
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.15s ease;
+}
+
+.ez-timeline-item:hover {
+  background: var(--ez-surface-hover, rgba(241, 245, 249, 0.8));
+}
+
+[data-theme='dark'] .ez-timeline-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ez-timeline-icon-node {
+  position: absolute;
+  left: 0.4rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ez-surface, #ffffff);
+  border: 2px solid #cbd5e1;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .ez-timeline-icon-node {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+.ez-timeline-icon-node.status-completed {
+  border-color: #10b981;
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.ez-timeline-icon-node.status-in_progress {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+  animation: ezPulse 2s infinite;
+}
+
+.ez-timeline-icon-node.status-locked {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+@keyframes ezPulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+/* ── CARD AI ĐỀ XUẤT ────────────────────────────────────────────────────── */
+.ez-ai-remark-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--ez-radius-xl, 20px);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+[data-theme='dark'] .ez-ai-remark-card {
+  background: linear-gradient(135deg, rgba(67, 56, 202, 0.25) 0%, rgba(126, 34, 206, 0.25) 100%);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+.ez-ai-recommendation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--ez-surface, #ffffff);
+  border-radius: 12px;
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .ez-ai-recommendation-item {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ez-ai-recommendation-item:hover {
+  border-color: #6366f1;
+  transform: translateX(4px);
+}
+
+/* ── CARD NHẬN XÉT GIÁO VIÊN ───────────────────────────────────────────── */
+.ez-teacher-remark-card {
+  background: var(--ez-surface, #ffffff);
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  border-radius: var(--ez-radius-xl, 20px);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='dark'] .ez-teacher-remark-card {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── CARD LỊCH SỬ MÔN HỌC GẦN ĐÂY ───────────────────────────────────── */
+.ez-recent-history-card {
+  background: var(--ez-surface, #ffffff);
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  border-radius: var(--ez-radius-xl, 20px);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='dark'] .ez-recent-history-card {
+  background: var(--ez-surface-raised, #1e293b);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ez-recent-history-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--ez-surface-muted, #f8fafc);
+  border-radius: 14px;
+  border: 1px solid var(--ez-border-subtle, #e2e8f0);
+  transition: all 0.25s ease;
+}
+
+[data-theme='dark'] .ez-recent-history-item {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.ez-recent-history-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--ez-primary, #2563eb);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, BookOpen, MessagesSquare, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 import { chatApi } from '../api/chatApi';
 import { documentApi } from '../api/documentApi';
@@ -24,8 +24,6 @@ import { CitationPanel } from '../components/chat-advanced/CitationPanel';
 import { FeedbackDialog } from '../components/chat-advanced/feedback/FeedbackDialog';
 import { RenameConversationDialog } from '../components/chat-advanced/RenameConversationDialog';
 import { DeleteConversationDialog } from '../components/chat-advanced/DeleteConversationDialog';
-import { Button, Drawer } from '../components/ui';
-import './advanced-chat.css';
 
 const AdvancedChatPage = () => {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
@@ -42,10 +40,6 @@ const AdvancedChatPage = () => {
   // Interactive panels
   const [focusedCitationId, setFocusedCitationId] = useState<string | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
-  // Chỉ dùng dưới 1024px: hai panel bên hiển thị dạng drawer
-  const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
-  const [citationDrawerOpen, setCitationDrawerOpen] = useState(false);
-  const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
 
   // Status indicators
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -148,7 +142,6 @@ const AdvancedChatPage = () => {
         const mapped: LocalChatMessage[] = res.messages.map((m) => ({
           local_id: m.id,
           message_id: m.id,
-          conversation_id: m.conversation_id,
           role: m.role,
           content: m.content,
           status: m.status,
@@ -157,9 +150,6 @@ const AdvancedChatPage = () => {
           confidence: m.confidence ?? undefined,
           internal_citations: m.internal_citations ?? undefined,
           web_citations: m.web_citations ?? undefined,
-          message_kind: m.message_kind,
-          study_exam_config: m.study_exam_config,
-          study_exam_request: m.study_exam_request,
           created_at: m.created_at,
         }));
         setMessages(mapped);
@@ -274,7 +264,6 @@ const AdvancedChatPage = () => {
       const mapped: LocalChatMessage[] = res.messages.map((m) => ({
         local_id: m.id,
         message_id: m.id,
-        conversation_id: m.conversation_id,
         role: m.role,
         content: m.content,
         status: m.status,
@@ -283,9 +272,6 @@ const AdvancedChatPage = () => {
         confidence: m.confidence ?? undefined,
         internal_citations: m.internal_citations ?? undefined,
         web_citations: m.web_citations ?? undefined,
-        message_kind: m.message_kind,
-        study_exam_config: m.study_exam_config,
-        study_exam_request: m.study_exam_request,
         created_at: m.created_at,
       }));
       setMessages((prev) => {
@@ -404,7 +390,6 @@ const AdvancedChatPage = () => {
             return {
               ...msg,
               message_id: response.message_id,
-              conversation_id: response.conversation_id,
               content: response.answer,
               short_answer: response.short_answer,
               explanation: response.explanation,
@@ -418,9 +403,6 @@ const AdvancedChatPage = () => {
               external_search_status: response.external_search_status,
               follow_up_suggestions: response.follow_up_suggestions || undefined,
               model_name: response.model_name,
-              message_kind: response.message_kind,
-              study_exam_config: response.study_exam_config,
-              study_exam_request: response.study_exam_request,
               status: 'completed' as const,
             };
           }
@@ -517,7 +499,6 @@ const AdvancedChatPage = () => {
             return {
               ...msg,
               message_id: response.message_id,
-              conversation_id: response.conversation_id,
               content: response.answer,
               short_answer: response.short_answer,
               explanation: response.explanation,
@@ -531,9 +512,6 @@ const AdvancedChatPage = () => {
               external_search_status: response.external_search_status,
               follow_up_suggestions: response.follow_up_suggestions || undefined,
               model_name: response.model_name,
-              message_kind: response.message_kind,
-              study_exam_config: response.study_exam_config,
-              study_exam_request: response.study_exam_request,
               status: 'completed' as const,
             };
           }
@@ -568,11 +546,7 @@ const AdvancedChatPage = () => {
   const handleCitationClick = (sourceId: string, msgIndex: number) => {
     setActiveMessageIndex(msgIndex);
     setFocusedCitationId(sourceId);
-    // Dưới 1024px panel nguồn nằm trong drawer nên phải mở ra mới thấy trích dẫn
-    if (window.matchMedia('(max-width: 1023px)').matches) {
-      setCitationDrawerOpen(true);
-    }
-
+    
     // Smooth scroll down to citation card in side drawer
     setTimeout(() => {
       const element = document.getElementById(`cite-${sourceId}`);
@@ -686,104 +660,50 @@ const AdvancedChatPage = () => {
   const activeInternalCitations = activeMsg?.internal_citations || [];
   const activeWebCitations = activeMsg?.web_citations || [];
 
-  const conversationList = (
-    <ConversationSidebar
-      conversations={conversations}
-      currentConversationId={currentConversationId}
-      loading={loadingConversations}
-      error={convsError}
-      onSelect={(id) => {
-        setCurrentConversationId(id);
-        setConversationDrawerOpen(false);
-      }}
-      onNewChat={() => {
-        handleNewChat();
-        setConversationDrawerOpen(false);
-      }}
-      searchValue={searchValue}
-      onSearchChange={handleSearchChange}
-      onSearchClear={handleSearchClear}
-      onPin={handlePinConversation}
-      onRename={setRenameConv}
-      onDelete={setDeleteConvId}
-      hasMoreConversations={hasMoreConversations}
-      onLoadMoreConversations={handleLoadMoreConversations}
-      loadingMoreConversations={loadingMoreConversations}
-    />
-  );
-
-  const scopeControls = (
-    <>
-      <KnowledgeScopeSelector
-        scope={scope}
-        useWebSearch={useWebSearch}
-        onScopeChange={(newScope) => {
-          setScope(newScope);
-          setSelectedDocumentIds([]);
-        }}
-        onWebSearchToggle={setUseWebSearch}
-        disabled={isBusy}
-      />
-
-      <DocumentSelector
-        documents={documents}
-        selectedIds={selectedDocumentIds}
-        scope={scope}
-        loading={loadingDocs}
-        error={docsError}
-        onChange={setSelectedDocumentIds}
-        disabled={isBusy}
-      />
-    </>
-  );
-
-  const citationList = (
-    <CitationPanel
-      internalCitations={activeInternalCitations}
-      webCitations={activeWebCitations}
-      focusedCitationId={focusedCitationId}
-      onReportCitation={handleReportCitation}
-    />
-  );
-
   return (
-    <div className="page ez-page-fill" style={styles.page}>
+    <div className="page" style={styles.page}>
       <div style={styles.workspace}>
         {/* Left Side: History Thread List */}
-        <div className="ez-chat-aside">{conversationList}</div>
+        <ConversationSidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          loading={loadingConversations}
+          error={convsError}
+          onSelect={setCurrentConversationId}
+          onNewChat={handleNewChat}
+          searchValue={searchValue}
+          onSearchChange={handleSearchChange}
+          onSearchClear={handleSearchClear}
+          onPin={handlePinConversation}
+          onRename={setRenameConv}
+          onDelete={setDeleteConvId}
+          hasMoreConversations={hasMoreConversations}
+          onLoadMoreConversations={handleLoadMoreConversations}
+          loadingMoreConversations={loadingMoreConversations}
+        />
 
         {/* Center Panel: Main query stream and settings */}
         <div style={styles.chatArea}>
-          {/* Dưới 1024px các panel phụ nằm trong drawer, mở từ thanh này */}
-          <div className="ez-chat-mobile-bar">
-            <Button
-              variant="outline"
-              size="sm"
-              leadingIcon={<SlidersHorizontal size={16} aria-hidden="true" />}
-              onClick={() => setScopeDrawerOpen(true)}
-            >
-              Phạm vi kiến thức
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leadingIcon={<MessagesSquare size={16} aria-hidden="true" />}
-              onClick={() => setConversationDrawerOpen(true)}
-            >
-              Hội thoại
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leadingIcon={<BookOpen size={16} aria-hidden="true" />}
-              onClick={() => setCitationDrawerOpen(true)}
-            >
-              Nguồn trích dẫn
-            </Button>
-          </div>
+          <KnowledgeScopeSelector
+            scope={scope}
+            useWebSearch={useWebSearch}
+            onScopeChange={(newScope) => {
+              setScope(newScope);
+              setSelectedDocumentIds([]);
+            }}
+            onWebSearchToggle={setUseWebSearch}
+            disabled={isBusy}
+          />
 
-          {/* Ẩn dưới 1024px: hai khối này chiếm gần 280px trước khi tới hội thoại */}
-          <div className="ez-chat-scope">{scopeControls}</div>
+          <DocumentSelector
+            documents={documents}
+            selectedIds={selectedDocumentIds}
+            scope={scope}
+            loading={loadingDocs}
+            error={docsError}
+            onChange={setSelectedDocumentIds}
+            disabled={isBusy}
+          />
 
           {errorMessage && (
             <div style={styles.errorAlert} role="alert">
@@ -812,13 +732,12 @@ const AdvancedChatPage = () => {
             />
           )}
 
-          <div className="chat-style-bar" style={styles.responseStyleBar}>
+          <div style={styles.responseStyleBar}>
             <span style={styles.styleLabel}>Phong cách phản hồi:</span>
             {(['normal', 'concise', 'detailed', 'beginner'] as ResponseStyle[]).map((st) => (
               <button
                 key={st}
                 type="button"
-                className="chat-style-btn"
                 onClick={() => setResponseStyle(st)}
                 style={{
                   ...styles.styleBtn,
@@ -833,39 +752,14 @@ const AdvancedChatPage = () => {
           <ChatComposer onSend={handleSendMessage} disabled={isBusy || loadingHistory} />
         </div>
 
-        {/* Right Side: Citations Details */}
-        <div className="ez-chat-aside">{citationList}</div>
+        {/* Right Side: Citations Details drawer */}
+        <CitationPanel
+          internalCitations={activeInternalCitations}
+          webCitations={activeWebCitations}
+          focusedCitationId={focusedCitationId}
+          onReportCitation={handleReportCitation}
+        />
       </div>
-
-      <Drawer
-        open={conversationDrawerOpen}
-        onClose={() => setConversationDrawerOpen(false)}
-        side="left"
-        title="Hội thoại"
-        className="ez-chat-drawer-panel"
-      >
-        {conversationList}
-      </Drawer>
-
-      <Drawer
-        open={scopeDrawerOpen}
-        onClose={() => setScopeDrawerOpen(false)}
-        side="bottom"
-        title="Phạm vi kiến thức"
-        className="ez-chat-drawer-panel"
-      >
-        {scopeControls}
-      </Drawer>
-
-      <Drawer
-        open={citationDrawerOpen}
-        onClose={() => setCitationDrawerOpen(false)}
-        side="bottom"
-        title="Nguồn trích dẫn"
-        className="ez-chat-drawer-panel"
-      >
-        {citationList}
-      </Drawer>
 
       {activeFeedbackMessage && (
         <FeedbackDialog
@@ -899,31 +793,24 @@ const AdvancedChatPage = () => {
 
 const styles = {
   page: {
-    // Chiều cao do `.ez-page-fill` trong app-layout.css cấp (phần còn lại của
-    // shell). Đặt 100svh ở đây sẽ cộng thêm topbar/tab bar và đẩy ô nhập câu
-    // hỏi xuống dưới màn hình.
     padding: 0,
-    minHeight: 0,
+    height: '100svh',
+    display: 'flex',
+    flexDirection: 'column' as const,
   },
   workspace: {
     display: 'flex',
     flexDirection: 'row' as const,
     width: '100%',
-    flex: 1,
-    // minHeight: 0 để khối hội thoại co lại được trong khung; thiếu nó thì
-    // min-content của cột chat đẩy cả trang cao hơn viewport.
-    minHeight: 0,
+    height: '100%',
     overflow: 'hidden',
   },
   chatArea: {
     display: 'flex',
     flexDirection: 'column' as const,
     flex: 1,
-    minHeight: 0,
-    // Cùng lý do với minHeight: flex item mặc định không co nhỏ hơn min-content,
-    // nên một hàng nút dài sẽ đẩy cả cột rộng hơn màn hình.
-    minWidth: 0,
-    backgroundColor: 'var(--ez-surface)',
+    height: '100%',
+    backgroundColor: 'var(--surface-strong)',
   },
   loadingHistory: {
     flex: 1,
@@ -932,15 +819,15 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '12px',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
   },
   errorAlert: {
     margin: '12px 20px 0',
     padding: '12px 14px',
     borderRadius: '10px',
-    border: '1px solid var(--ez-border-strong)',
-    backgroundColor: 'var(--ez-error-subtle)',
-    color: 'var(--ez-error)',
+    border: '1px solid var(--border-strong)',
+    backgroundColor: 'var(--danger-bg)',
+    color: 'var(--danger)',
     fontSize: '13px',
     display: 'flex',
     alignItems: 'center',
@@ -951,30 +838,30 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '8px 20px',
-    borderTop: '1px solid var(--ez-border)',
-    backgroundColor: 'var(--ez-surface)',
+    borderTop: '1px solid var(--border)',
+    backgroundColor: 'var(--surface)',
   },
   styleLabel: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: '700',
-    color: 'var(--ez-text-muted)',
+    color: 'var(--muted)',
     textTransform: 'uppercase' as const,
   },
   styleBtn: {
     padding: '4px 10px',
     borderRadius: '6px',
-    border: '1px solid var(--ez-border-strong)',
-    backgroundColor: 'var(--ez-bg)',
-    color: 'var(--ez-text-secondary)',
-    fontSize: '12px',
+    border: '1px solid var(--border-strong)',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text)',
+    fontSize: '11px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
   styleBtnActive: {
-    backgroundColor: 'var(--ez-primary)',
-    color: 'var(--ez-text-on-brand)',
-    borderColor: 'var(--ez-primary)',
+    backgroundColor: 'var(--accent)',
+    color: '#fff',
+    borderColor: 'var(--accent)',
   },
 };
 

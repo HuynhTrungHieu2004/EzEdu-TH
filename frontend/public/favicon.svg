@@ -1,16 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none" role="img" aria-labelledby="title desc">
   <title id="title">EzEdu AI</title>
-  <desc id="desc">Hai dòng học liệu biến thành một dấu tích</desc>
-  <defs>
-    <linearGradient id="ez-favicon-gradient" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#8341FA"/>
-      <stop offset="1" stop-color="#5906EB"/>
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="13" fill="url(#ez-favicon-gradient)"/>
-  <g fill="#FFFFFF">
-    <rect x="12" y="13" width="21" height="4.6" rx="2.3"/>
-    <rect x="12" y="21" width="14" height="4.6" rx="2.3"/>
-  </g>
-  <path d="M14 31.5 19.5 37 34 22.5" stroke="#FFAB43" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <desc id="desc">EzEdu AI document checkmark logo</desc>
+  <rect width="48" height="48" rx="14" fill="#4F46E5"/>
+  <rect x="11" y="8" width="21" height="27" rx="4" fill="white" fill-opacity="0.18"/>
+  <rect x="11" y="8" width="21" height="27" rx="4" stroke="white" stroke-width="2.6"/>
+  <path d="M17 17H26" stroke="white" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M17 23H24" stroke="white" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M17 29H27" stroke="white" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="33" cy="32" r="9" fill="#10B981"/>
+  <circle cx="33" cy="32" r="9" stroke="white" stroke-width="2.2"/>
+  <path d="M28.6 32.2L31.5 35L37.7 28.8" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

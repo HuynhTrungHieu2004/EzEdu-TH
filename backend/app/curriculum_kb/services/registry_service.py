@@ -43,6 +43,18 @@ def _to_response(doc: Dict[str, Any]) -> CurriculumSourceResponse:
         updated_by=doc["updated_by"],
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
+        dataset_key=doc.get("dataset_key"),
+        manifest_version=doc.get("manifest_version"),
+        source_key=doc.get("source_key"),
+        source_checksum=doc.get("source_checksum"),
+        source_language=doc.get("source_language"),
+        canonical_url=doc.get("canonical_url"),
+        license_id=doc.get("license_id"),
+        license_url=doc.get("license_url"),
+        attribution=doc.get("attribution"),
+        upstream_revision=doc.get("upstream_revision"),
+        noncommercial_only=doc.get("noncommercial_only", False),
+        demo_disposal_required=doc.get("demo_disposal_required", False),
     )
 
 

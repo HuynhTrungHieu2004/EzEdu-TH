@@ -1,6 +1,5 @@
 import client from './client';
 import type {
-  ClassAbilityGroupsResponse,
   ClassCreatePayload,
   ClassDetail,
   ClassListResponse,
@@ -57,12 +56,6 @@ export const classesApi = {
 
   removeStudent: async (classId: string, studentId: string): Promise<ClassDetail> => {
     const response = await client.delete<ClassDetail>(`/classes/${classId}/students/${studentId}`);
-    return response.data;
-  },
-
-  /** Phân nhóm năng lực học sinh bằng K-Means (chỉ giáo viên chủ nhiệm). */
-  abilityGroups: async (classId: string): Promise<ClassAbilityGroupsResponse> => {
-    const response = await client.get<ClassAbilityGroupsResponse>(`/classes/${classId}/ability-groups`);
     return response.data;
   },
 };

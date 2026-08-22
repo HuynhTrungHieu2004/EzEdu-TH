@@ -220,7 +220,7 @@ async def _explain_recommendation(
         try:
             from app.services.llm_service import generate_json_with_failover
 
-            generator = generate_json_with_failover
+            generator = lambda value: generate_json_with_failover(value, quality=False)
         except Exception:
             return fallback
     prompt = _build_explanation_prompt(

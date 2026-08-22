@@ -136,7 +136,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             if (!bloom) return null;
             return (
               <span style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 padding: '3px 10px',
                 borderRadius: '12px',
                 background: `${bloom.color}15`,
@@ -173,13 +173,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 });
               }}
               style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 padding: '3px 10px',
                 borderRadius: '12px',
-                background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'var(--ez-primary-subtle)',
-                color: manualReveal ? '#10b981' : 'var(--ez-primary)',
+                background: manualReveal ? 'rgba(16, 185, 129, 0.1)' : 'rgba(139, 124, 248, 0.1)',
+                color: manualReveal ? '#10b981' : 'var(--accent)',
                 fontWeight: 600,
-                border: `1px solid ${manualReveal ? 'rgba(16, 185, 129, 0.3)' : 'var(--ez-primary-border)'}`,
+                border: `1px solid ${manualReveal ? 'rgba(16, 185, 129, 0.3)' : 'var(--accent-border)'}`,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 display: 'inline-flex',
@@ -221,10 +221,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             const hasSelectedAny = selectedAnswer !== null;
 
             // Determine colors and borders dynamically
-            let borderColor = 'var(--ez-border)';
-            let backgroundColor = 'var(--ez-bg)';
-            let badgeBg = 'var(--ez-primary-subtle)';
-            let badgeColor = 'var(--ez-primary)';
+            let borderColor = 'var(--border)';
+            let backgroundColor = 'var(--bg)';
+            let badgeBg = 'var(--accent-bg)';
+            let badgeColor = 'var(--accent)';
             let statusLabel = null;
 
             const shouldShowResult = showAnswerFeedback && hasSelectedAny;
@@ -254,14 +254,14 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 );
               }
             } else if (examMode && isSelected) {
-              borderColor = 'var(--ez-primary)';
-              backgroundColor = 'var(--ez-surface-muted)';
+              borderColor = 'var(--accent)';
+              backgroundColor = 'var(--code-bg)';
             } else {
               // Interactive hover styles when no option is selected yet
               const isHovered = key === hoveredKey;
               if (isHovered) {
-                borderColor = 'var(--ez-primary)';
-                backgroundColor = 'var(--ez-surface-muted)';
+                borderColor = 'var(--accent)';
+                backgroundColor = 'var(--code-bg)';
               }
             }
 
@@ -319,7 +319,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 <span
                   style={{
                     color: examMode && !submittedResult
-                      ? 'var(--ez-text)'
+                      ? 'var(--text-h)'
                       : (submittedResult?.is_correct ?? shortAnswerInput.trim().toLowerCase() === question.correct_answer.trim().toLowerCase())
                         ? '#22c55e'
                         : '#ef4444',
@@ -367,7 +367,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
           backgroundColor: 'rgba(34, 197, 94, 0.06)',
           border: '1px solid rgba(34, 197, 94, 0.2)',
           fontSize: '14px',
-          color: 'var(--ez-text)',
+          color: 'var(--text-h)',
         }}>
           <strong style={{ color: '#22c55e' }}>
             <Check size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom' }} /> Đáp án đúng:
@@ -407,9 +407,9 @@ const cardStyles = {
   card: {
     padding: '24px',
     borderRadius: '12px',
-    border: '1px solid var(--ez-border)',
-    boxShadow: 'var(--ez-shadow-lg)',
-    backgroundColor: 'var(--ez-bg)',
+    border: '1px solid var(--border)',
+    boxShadow: 'var(--shadow)',
+    backgroundColor: 'var(--bg)',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '14px',
@@ -425,21 +425,21 @@ const cardStyles = {
   badge: {
     fontSize: '12px',
     fontWeight: 'bold',
-    backgroundColor: 'var(--ez-primary-subtle)',
-    color: 'var(--ez-primary)',
+    backgroundColor: 'var(--accent-bg)',
+    color: 'var(--accent)',
     padding: '4px 8px',
     borderRadius: '4px',
   },
   typeBadge: {
     fontSize: '12px',
-    color: 'var(--ez-text-secondary)',
-    backgroundColor: 'var(--ez-surface-muted)',
+    color: 'var(--text)',
+    backgroundColor: 'var(--code-bg)',
     padding: '4px 8px',
     borderRadius: '4px',
-    border: '1px solid var(--ez-border)',
+    border: '1px solid var(--border)',
   },
   tagBadge: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#0f766e',
     backgroundColor: 'rgba(20, 184, 166, 0.1)',
     padding: '3px 8px',
@@ -450,7 +450,7 @@ const cardStyles = {
   questionText: {
     fontSize: '16px',
     fontWeight: '600',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     margin: 0,
     lineHeight: '1.5',
   },
@@ -465,7 +465,7 @@ const cardStyles = {
     alignItems: 'center',
     gap: '12px',
     padding: '12px 16px',
-    border: '1px solid var(--ez-border)',
+    border: '1px solid var(--border)',
     borderRadius: '8px',
     fontSize: '14px',
   },
@@ -480,7 +480,7 @@ const cardStyles = {
     fontSize: '12px',
   },
   optionVal: {
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
     flexGrow: 1,
   },
   correctLabel: {
@@ -507,9 +507,9 @@ const cardStyles = {
     padding: '10px 14px',
     fontSize: '14px',
     borderRadius: '8px',
-    border: '1px solid var(--ez-border)',
-    backgroundColor: 'var(--ez-bg)',
-    color: 'var(--ez-text)',
+    border: '1px solid var(--border)',
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text-h)',
     outline: 'none',
   },
   checkButton: {
@@ -517,7 +517,7 @@ const cardStyles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: 'var(--ez-primary)',
+    backgroundColor: 'var(--accent)',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -527,40 +527,40 @@ const cardStyles = {
     flexDirection: 'column' as const,
     gap: '8px',
     padding: '12px 16px',
-    backgroundColor: 'var(--ez-surface-muted)',
+    backgroundColor: 'var(--code-bg)',
     borderRadius: '8px',
-    borderLeft: '4px solid var(--ez-primary)',
+    borderLeft: '4px solid var(--accent)',
   },
   userAnswerBox: {
     fontSize: '14px',
-    color: 'var(--ez-text)',
+    color: 'var(--text-h)',
   },
   shortAnswerExpectedBox: {
     fontSize: '14px',
-    color: 'var(--ez-text)',
-    borderTop: '1px dashed var(--ez-border)',
+    color: 'var(--text-h)',
+    borderTop: '1px dashed var(--border)',
     paddingTop: '8px',
     marginTop: '4px',
   },
   answerText: {
-    color: 'var(--ez-primary)',
+    color: 'var(--accent)',
     fontWeight: 'bold',
   },
   explanationSection: {
     marginTop: '10px',
     paddingTop: '12px',
-    borderTop: '1px solid var(--ez-border)',
+    borderTop: '1px solid var(--border)',
   },
   explanationHeader: {
     fontSize: '13px',
     fontWeight: '600',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     marginBottom: '6px',
   },
   explanationText: {
     fontSize: '14px',
     lineHeight: '1.5',
-    color: 'var(--ez-text-secondary)',
+    color: 'var(--text)',
     margin: 0,
     fontStyle: 'italic',
   },

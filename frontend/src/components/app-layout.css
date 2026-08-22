@@ -6,7 +6,6 @@
 .ez-shell {
   display: flex;
   min-height: 100vh;
-  min-height: 100dvh;
   background-color: var(--ez-bg);
   /* `#root` là flex row: khung phải tự khai báo chiều rộng, nếu không nó co lại
      theo nội dung và để hở dải trắng bên phải trên màn hình rộng. */
@@ -19,8 +18,6 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 100vh;
-  min-height: 100dvh;
   /* min-width: 0 để nội dung rộng (bảng, khối code) không đẩy shell rộng ra */
   min-width: 0;
 }
@@ -28,48 +25,9 @@
 .ez-main {
   flex: 1;
   width: 100%;
-  max-width: 1560px;
+  max-width: var(--ez-container-lg);
   margin-inline: auto;
-  padding: 32px clamp(20px, 3vw, 48px);
-}
-
-/* Trang "chiếm hết khung": chat và các mặt bằng làm việc cần đúng chiều cao còn
-   lại của shell (đã trừ topbar/tab bar) thay vì tự đặt 100svh — nếu tự đặt thì
-   padding của `.ez-main` cộng thêm và ô nhập bị đẩy xuống dưới màn hình.
-   Chỉ trang nào khai báo `.ez-page-fill` mới đổi sang flex, các trang khác giữ
-   nguyên block layout. */
-.ez-shell:has(.ez-page-fill) {
-  /* Khoá chiều cao: `min-height` để shell tự cao theo nội dung, khi đó `flex: 1`
-     của `.ez-main` không có gì để co lại. Sidebar và danh sách tin nhắn đều tự
-     cuộn nên trang không mất nội dung. */
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.ez-shell:has(.ez-page-fill) .ez-shell-main {
-  min-height: 0;
-}
-.ez-main:has(> [data-page-entrance] > .ez-page-fill) {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0;
-  max-width: none;
-}
-
-.ez-main:has(> [data-page-entrance] > .ez-page-fill) > [data-page-entrance] {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.ez-page-fill {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  padding: var(--ez-space-8) var(--ez-space-6);
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -79,16 +37,14 @@
   display: none;
   flex-direction: column;
   flex: none;
-  width: 272px;
+  width: 260px;
   height: 100vh;
-  height: 100dvh;
   position: sticky;
   top: 0;
   z-index: var(--ez-z-sidebar);
-  padding: 20px 16px 16px;
-  background-color: var(--ez-nav-bg);
-  color: var(--ez-nav-text);
-  border-right: 0;
+  padding: var(--ez-space-4) var(--ez-space-3);
+  background-color: var(--ez-surface);
+  border-right: 1px solid var(--ez-border);
 }
 
 @media (min-width: 1024px) {
@@ -100,20 +56,32 @@
   display: flex;
   align-items: center;
   gap: var(--ez-space-3);
-  min-height: 48px;
-  padding: 6px 8px;
-  margin-bottom: var(--ez-space-6);
+  padding: var(--ez-space-2);
+  margin-bottom: var(--ez-space-4);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-nav-text);
+  color: var(--ez-text);
   transition: var(--ez-transition-colors);
 }
 
 .ez-brand:hover {
-  background-color: rgb(255 255 255 / 8%);
+  background-color: var(--ez-surface-hover);
   text-decoration: none;
 }
 
-
+.ez-brand-mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ez-radius-sm);
+  background: var(--ez-gradient-cta);
+  color: var(--ez-text-on-brand);
+  font-size: var(--ez-text-body-sm);
+  font-weight: var(--ez-weight-bold);
+  letter-spacing: var(--ez-tracking-tight);
+}
 
 .ez-brand-text {
   display: flex;
@@ -132,7 +100,7 @@
 .ez-brand-area {
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-semibold);
-  color: var(--ez-nav-text-muted);
+  color: var(--ez-text-muted);
   text-transform: uppercase;
   letter-spacing: var(--ez-tracking-caps);
   line-height: 1.3;
@@ -147,7 +115,6 @@
   min-height: 0;
   overflow-y: auto;
   padding-bottom: var(--ez-space-4);
-  scrollbar-color: rgb(220 234 232 / 28%) transparent;
 }
 
 .ez-nav-group {
@@ -156,24 +123,13 @@
   gap: 2px;
 }
 
-.ez-nav-group-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ez-nav-group-panel[hidden] {
-  display: none;
-}
-
 .ez-nav-group-label {
   padding: var(--ez-space-2) var(--ez-space-3) var(--ez-space-1);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-semibold);
-  color: var(--ez-nav-text-muted);
+  color: var(--ez-text-muted);
   text-transform: uppercase;
   letter-spacing: var(--ez-tracking-caps);
-  text-align: left;
 }
 
 .ez-nav-item {
@@ -181,43 +137,43 @@
   display: flex;
   align-items: center;
   gap: var(--ez-space-3);
-  min-height: 44px;
+  min-height: var(--ez-control-md);
   padding: var(--ez-space-2) var(--ez-space-3);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-nav-text-muted);
+  color: var(--ez-text-secondary);
   font-size: var(--ez-text-body-sm);
   font-weight: var(--ez-weight-medium);
   transition: var(--ez-transition-colors);
 }
 
 .ez-nav-item:hover {
-  background-color: rgb(255 255 255 / 8%);
-  color: var(--ez-nav-text);
+  background-color: var(--ez-surface-hover);
+  color: var(--ez-text);
   text-decoration: none;
 }
 
 /* Trạng thái đang xem: không chỉ dựa vào màu — có thêm thanh dọc bên trái */
 .ez-nav-item-active {
-  background-color: rgb(118 43 250 / 42%);
-  color: #fff;
+  background-color: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
   font-weight: var(--ez-weight-semibold);
 }
 
-.ez-nav-active-indicator {
+.ez-nav-item-active::before {
+  content: '';
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 24px;
-  border-radius: 0 2px 2px 0;
-  background-color: var(--ez-accent);
-  will-change: transform, opacity;
+  height: 20px;
+  border-radius: 0 var(--ez-radius-full) var(--ez-radius-full) 0;
+  background-color: var(--ez-primary);
 }
 
 .ez-nav-item-active:hover {
-  background-color: rgb(118 43 250 / 52%);
-  color: #fff;
+  background-color: var(--ez-primary-subtle);
+  color: var(--ez-primary-text);
 }
 
 .ez-nav-icon {
@@ -241,7 +197,7 @@
 .ez-sidebar-footer {
   flex: none;
   padding-top: var(--ez-space-3);
-  border-top: 1px solid rgb(220 234 232 / 16%);
+  border-top: 1px solid var(--ez-border-subtle);
 }
 
 .ez-user-chip {
@@ -252,12 +208,12 @@
   min-height: var(--ez-control-lg);
   padding: var(--ez-space-2);
   border-radius: var(--ez-radius-md);
-  color: var(--ez-nav-text);
+  color: var(--ez-text);
   text-align: left;
   transition: var(--ez-transition-colors);
 }
 
-.ez-user-chip:hover { background-color: rgb(255 255 255 / 8%); }
+.ez-user-chip:hover { background-color: var(--ez-surface-hover); }
 
 .ez-avatar {
   display: flex;
@@ -267,8 +223,8 @@
   width: 32px;
   height: 32px;
   border-radius: var(--ez-radius-full);
-  background-color: var(--ez-primary-subtle);
-  color: var(--ez-primary-text);
+  background-color: var(--ez-secondary-subtle);
+  color: var(--ez-secondary-text);
   font-size: var(--ez-text-caption);
   font-weight: var(--ez-weight-bold);
 }
@@ -293,7 +249,7 @@
 
 .ez-user-role {
   font-size: var(--ez-text-caption);
-  color: var(--ez-nav-text-muted);
+  color: var(--ez-text-muted);
   line-height: 1.3;
 }
 
@@ -308,12 +264,8 @@
   position: sticky;
   top: 0;
   z-index: var(--ez-z-sticky);
-  min-height: 64px;
-  padding: var(--ez-space-2) clamp(16px, 3vw, 24px);
-  /* Xoay ngang trên máy có tai thỏ: nút ngoài cùng của thanh trên cùng bị che
-     nếu không cộng thêm vùng an toàn hai bên. */
-  padding-left: calc(clamp(16px, 3vw, 24px) + env(safe-area-inset-left));
-  padding-right: calc(clamp(16px, 3vw, 24px) + env(safe-area-inset-right));
+  min-height: 56px;
+  padding: var(--ez-space-2) var(--ez-space-4);
   background-color: var(--ez-surface);
   border-bottom: 1px solid var(--ez-border);
 }
@@ -341,12 +293,8 @@
   z-index: var(--ez-z-sticky);
   background-color: var(--ez-surface);
   border-top: 1px solid var(--ez-border);
-  /* Chừa vùng an toàn dưới màn hình iPhone. Lề trái/phải cần cho lúc xoay
-     ngang: tai thỏ nằm ở cạnh bên, sẽ che mất tab ngoài cùng. */
+  /* Chừa vùng an toàn dưới màn hình iPhone */
   padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  box-shadow: 0 -8px 24px rgb(51 17 111 / 7%);
 }
 
 @media (min-width: 1024px) {
@@ -362,13 +310,10 @@
   justify-content: center;
   gap: 2px;
   /* Touch target tối thiểu 44px */
-  min-width: var(--ez-touch-min);
-  min-height: 60px;
+  min-height: 56px;
   padding: var(--ez-space-1) var(--ez-space-1);
   color: var(--ez-text-muted);
-  /* 12px là mức nhỏ nhất còn đọc thoải mái ngoài nắng; dưới mức đó nhãn tab
-     phải nheo mắt mới thấy. */
-  font-size: 12px;
+  font-size: 11px;
   font-weight: var(--ez-weight-medium);
   text-align: center;
   transition: var(--ez-transition-colors);
@@ -382,7 +327,8 @@
 }
 
 /* Chỉ báo hình dạng cho tab đang mở, không chỉ dựa vào màu */
-.ez-tab-active-indicator {
+.ez-tab-item-active::before {
+  content: '';
   position: absolute;
   top: 0;
   left: 50%;
@@ -390,7 +336,7 @@
   width: 24px;
   height: 3px;
   border-radius: 0 0 var(--ez-radius-full) var(--ez-radius-full);
-  background-color: var(--ez-accent);
+  background-color: var(--ez-primary);
 }
 
 .ez-tab-icon { display: flex; }
@@ -413,46 +359,15 @@
   background-color: var(--ez-error);
 }
 
-.ez-more-drawer .ez-nav-item {
-  color: var(--ez-text-secondary);
-}
-
-.ez-more-drawer .ez-nav-item:hover {
-  background-color: var(--ez-surface-hover);
-  color: var(--ez-text);
-}
-
-.ez-more-drawer .ez-nav-item-active,
-.ez-more-drawer .ez-nav-item-active:hover {
-  background-color: var(--ez-primary-subtle);
-  color: var(--ez-primary-text);
-}
-
 /* ───────────────────────────────────────────────────────────────────────
    Nội dung chính co lại trên màn hình nhỏ
    ─────────────────────────────────────────────────────────────────────── */
-@media (max-width: 1023px) {
-  .ez-main { padding: 28px clamp(16px, 4vw, 32px); }
-
-  .ez-topbar .ez-btn-icon {
-    width: var(--ez-touch-min);
-    min-width: var(--ez-touch-min);
-    min-height: var(--ez-touch-min);
-  }
-
-  .ez-shell-account-menu .ez-dropdown-item {
-    min-height: var(--ez-touch-min);
-  }
-
-  .ez-more-drawer .ez-btn-icon {
-    width: var(--ez-touch-min);
-    min-width: var(--ez-touch-min);
-    min-height: var(--ez-touch-min);
-  }
+@media (max-width: 768px) {
+  .ez-main { padding: var(--ez-space-5) var(--ez-space-4); }
 }
 
-@media (max-width: 639px) {
-  .ez-main { padding: 20px 16px 24px; }
+@media (max-width: 480px) {
+  .ez-main { padding: var(--ez-space-4) var(--ez-space-4); }
 }
 
 /* ───────────────────────────────────────────────────────────────────────
@@ -464,11 +379,18 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ez-space-4);
-  background: var(--ez-gradient-shell);
+  background: var(--ez-gradient-cta);
   border-radius: var(--ez-radius-xl);
   padding: var(--ez-space-6);
   margin-bottom: var(--ez-space-6);
   color: var(--ez-text-on-brand);
+}
+/* Chế độ tối: --ez-gradient-cta mặc định (indigo-500 -> indigo-700) chỉ đạt
+   3.02:1 với chữ gần đen ở điểm dừng indigo-700 — không đủ AA 4.5:1 cho chữ
+   thường. Ghi đè riêng bằng indigo-400 -> indigo-500: 5.42:1 -> 4.67:1, luôn
+   trên ngưỡng AA trong toàn dải gradient. */
+[data-theme='dark'] .ez-dashboard-banner {
+  background: linear-gradient(120deg, var(--ez-indigo-400) 0%, var(--ez-indigo-500) 100%);
 }
 .ez-dashboard-banner h1,
 .ez-dashboard-banner h2,

@@ -105,6 +105,16 @@ class NotificationStatisticsResponse(BaseModel):
     generated_at: datetime
 
 
+class UserNotificationItem(BaseModel):
+    id: str
+    title: str
+    content: str
+    type: NotificationType
+    priority: NotificationPriority
+    created_at: datetime
+    is_read: bool = False
+
+
 ReportType = Literal[
     "users",
     "activity_logs",
