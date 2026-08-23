@@ -172,6 +172,14 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("PRIVATE FOREIGN CHUNK", llm.prompts[0])
         self.assertIn(str(self.subject_id), llm.prompts[0])
 
+    async def test_named_confidence_from_provider_is_normalized(self):
+        classification = await classify_document(
+            self.db, await self._document(), llm=LLMStub(self._response("HIGH"))
+        )
+
+        self.assertEqual(classification["confidence"], 0.85)
+        self.assertEqual(classification["status"], "confirmed")
+
     async def test_confidence_at_confirmation_threshold_needs_confirmation(self):
         classification = await classify_document(
             self.db, await self._document(), llm=LLMStub(self._response(0.60))

@@ -187,8 +187,13 @@ async def classify_document(db, document: dict, llm=None) -> dict:
     if any(str(nodes[topic_id].get("parent_id") or "") != chapter_id for topic_id in topic_ids):
         raise ValueError("Classification topic does not belong to the chapter.")
 
+    raw_confidence = raw.get("confidence")
+    if isinstance(raw_confidence, str):
+        raw_confidence = {"LOW": 0.30, "MEDIUM": 0.60, "HIGH": 0.85}.get(
+            raw_confidence.strip().upper(), raw_confidence
+        )
     try:
-        confidence = float(raw["confidence"])
+        confidence = float(raw_confidence)
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("Classification confidence is invalid.") from exc
     if not math.isfinite(confidence) or not 0 <= confidence <= 1:
