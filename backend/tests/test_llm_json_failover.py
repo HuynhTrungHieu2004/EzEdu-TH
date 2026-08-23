@@ -88,6 +88,17 @@ class GenerateJsonWithFailoverTests(unittest.TestCase):
         gemini.assert_not_called()
         groq.assert_not_called()
 
+    def test_claude_timeout_falls_back_to_groq(self):
+        with patch.object(settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(llm_service, "is_groq_available", return_value=True), \
+             patch.object(llm_service, "claude_generate_json", side_effect=TimeoutError("claude timeout")), \
+             patch.object(llm_service, "generate_json", return_value='{"nguon":"groq"}') as groq:
+
+            result = llm_service.generate_json_with_failover("prompt")
+
+        self.assertEqual(result, '{"nguon":"groq"}')
+        groq.assert_called_once_with("prompt")
+
 
 if __name__ == "__main__":
     unittest.main()

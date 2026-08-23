@@ -1259,6 +1259,58 @@ class StudentReviewGenerationJobTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StudentReviewGeneratorSeamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_student_review_generation_falls_back_when_claude_times_out(self):
+        from app.services import llm_service, question_generation_service
+
+        db = AsyncMongoMockClient().student_review_provider_fallback
+        document_id = ObjectId()
+        await db.documents.insert_one({
+            "_id": document_id,
+            "user_id": "student",
+            "media_kind": "document",
+            "original_filename": "ham-so.pdf",
+            "deleted_at": None,
+        })
+        await db.document_chunks.insert_one({
+            "document_id": str(document_id),
+            "user_id": "student",
+            "chunk_index": 0,
+            "content": "Hàm bậc hai có đồ thị là parabol.",
+        })
+        questions = [{
+            "question": f"Câu hỏi {index}?",
+            "options": {"A": "Một", "B": "Hai", "C": "Ba", "D": "Bốn"},
+            "correct_answer": "A",
+            "explanation": "Theo tài liệu.",
+            "difficulty": "medium",
+            "question_type": "multiple_choice",
+        } for index in range(3)]
+
+        with patch.object(question_generation_service, "get_database", return_value=db), \
+             patch.object(question_generation_service.settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(question_generation_service, "is_claude_available", return_value=True), \
+             patch.object(question_generation_service, "claude_generate_json", side_effect=TimeoutError("claude timeout")), \
+             patch.object(llm_service, "claude_generate_json", side_effect=TimeoutError("claude timeout")), \
+             patch.object(llm_service, "is_groq_available", return_value=True), \
+             patch.object(llm_service, "generate_json", return_value=json.dumps(questions)) as groq, \
+             patch.object(question_generation_service, "extract_keywords", return_value=[]), \
+             patch.object(
+                 question_generation_service,
+                 "select_diverse_questions",
+                 side_effect=lambda items, count: (items[:count], {"applied": False}),
+             ):
+            result = await question_generation_service.generate_questions(
+                document_id=str(document_id),
+                user_id="student",
+                question_count=3,
+                difficulty="medium",
+                question_type="multiple_choice",
+                question_set_metadata={"purpose": "student_review"},
+            )
+
+        self.assertEqual(result["question_count"], 3)
+        groq.assert_called_once()
+
     async def test_student_review_generator_rejects_invalid_multiple_choice_shapes(self):
         from app.services import question_generation_service
 
@@ -1307,7 +1359,7 @@ class StudentReviewGeneratorSeamTests(unittest.IsolatedAsyncioTestCase):
                 ), patch.object(
                     question_generation_service, "is_claude_available", return_value=True
                 ), patch.object(
-                    question_generation_service, "claude_generate_json", return_value=json.dumps([question])
+                    question_generation_service, "generate_json_with_failover", return_value=json.dumps([question])
                 ), patch.object(
                     question_generation_service, "extract_keywords", return_value=[]
                 ):
@@ -1372,7 +1424,7 @@ class StudentReviewGeneratorSeamTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             question_generation_service, "is_claude_available", return_value=True
         ), patch.object(
-            question_generation_service, "claude_generate_json", return_value=json.dumps(questions)
+            question_generation_service, "generate_json_with_failover", return_value=json.dumps(questions)
         ), patch.object(
             question_generation_service, "resolve_context", new=AsyncMock(return_value=[])
         ), patch.object(

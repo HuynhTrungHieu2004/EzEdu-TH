@@ -8,6 +8,7 @@ from app.database.mongodb import get_database
 from app.services.llm_service import (
     claude_generate_json,
     generate_json,
+    generate_json_with_failover,
     gemini_generate_json,
     generate_json_with_file,
     is_gemini_available,
@@ -378,15 +379,16 @@ async def generate_questions(
         if use_claude:
             if not is_claude_available():
                 raise ValueError("Chưa cấu hình ANTHROPIC_API_KEY để sinh câu hỏi.")
-            raw_claude = await asyncio.to_thread(claude_generate_json, prompt, quality=True)
-            claude_usage = {
-                "model": getattr(raw_claude, "model", settings.CLAUDE_QUALITY_MODEL),
-                "input_tokens": getattr(raw_claude, "input_tokens", 0),
-                "output_tokens": getattr(raw_claude, "output_tokens", 0),
-                "total_tokens": getattr(raw_claude, "total_tokens", 0),
-            }
+            raw_claude = await asyncio.to_thread(generate_json_with_failover, prompt, quality=True)
+            if hasattr(raw_claude, "model"):
+                claude_usage = {
+                    "model": raw_claude.model,
+                    "input_tokens": getattr(raw_claude, "input_tokens", 0),
+                    "output_tokens": getattr(raw_claude, "output_tokens", 0),
+                    "total_tokens": getattr(raw_claude, "total_tokens", 0),
+                }
             groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
-            logger.info("Claude generated %s valid question candidates", len(groq_questions))
+            logger.info("Primary AI generated %s valid question candidates", len(groq_questions))
         elif is_groq_available():
             logger.info("🤖 Groq is generating questions...")
             try:

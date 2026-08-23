@@ -293,6 +293,7 @@ test('học sinh tải PDF, xác nhận phân loại, tạo 5 câu, làm bài, x
   await expect(page.getByRole('heading', { name: 'Không thể tạo bộ ôn tập' })).toBeVisible();
   await expect(page.getByText('Không thể sinh bộ câu hỏi. Vui lòng thử lại sau.')).toBeVisible();
   await page.getByRole('button', { name: 'Thử lại tạo bộ đề' }).click();
+  await expect(page.getByRole('img', { name: 'AI đang xử lý học liệu' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Bộ đề đã sẵn sàng' })).toBeVisible();
   await expect(page.getByText('không phải đề thi chính thức', { exact: false })).toBeVisible();
   await expectNoPageOverflow(page);

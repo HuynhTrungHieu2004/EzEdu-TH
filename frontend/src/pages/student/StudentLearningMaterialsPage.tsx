@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, RefreshCw } from 'lucide-react';
+import { BrainCircuit, FileText, RefreshCw } from 'lucide-react';
 import { documentApi } from '../../api/documentApi';
 import { getApiErrorDetail } from '../../api/errors';
 import { studentReviewApi } from '../../api/studentReviewApi';
@@ -637,10 +637,34 @@ export default function StudentLearningMaterialsPage() {
       ) : null}
 
       {reviewStatus === 'generating' || reviewStatus === 'classifying' ? (
-        <Card>
-          <CardBody>
-            <p>{liveStatus}</p>
-            <p className="ez-card-desc">Trang sẽ tự cập nhật khi xử lý xong.</p>
+        <Card className="student-review-ai-card">
+          <CardBody className="student-review-ai-wait">
+            <div
+              className="student-review-ai-visual"
+              role="img"
+              aria-label="AI đang xử lý học liệu"
+            >
+              <span className="student-review-ai-orbit" aria-hidden="true" />
+              <span className="student-review-ai-core" aria-hidden="true">
+                <BrainCircuit size={34} strokeWidth={1.8} />
+              </span>
+              <span className="student-review-ai-spark student-review-ai-spark-one" aria-hidden="true" />
+              <span className="student-review-ai-spark student-review-ai-spark-two" aria-hidden="true" />
+              <span className="student-review-ai-spark student-review-ai-spark-three" aria-hidden="true" />
+            </div>
+            <div className="student-review-ai-copy">
+              <strong>{liveStatus}</strong>
+              <p className="ez-card-desc">Trang sẽ tự cập nhật khi xử lý xong.</p>
+              <div className="student-review-ai-stages" aria-label="Tiến trình AI">
+                <span className="is-done">Đọc học liệu</span>
+                <span className={reviewStatus === 'classifying' ? 'is-active' : 'is-done'}>
+                  Phân tích nội dung
+                </span>
+                <span className={reviewStatus === 'generating' ? 'is-active' : undefined}>
+                  Tạo câu hỏi
+                </span>
+              </div>
+            </div>
           </CardBody>
         </Card>
       ) : null}
