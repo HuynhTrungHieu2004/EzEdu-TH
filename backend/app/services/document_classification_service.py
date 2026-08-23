@@ -38,28 +38,28 @@ def _search_tokens(value: object) -> set[str]:
 def _fallback_classification(taxonomy: list[dict], evidence: dict) -> dict:
     """Suggest an existing taxonomy path when the AI provider is unavailable."""
     evidence_tokens = _search_tokens(f"{evidence.get('title', '')} {' '.join(evidence.get('chunks', []))}")
-
-    def best(nodes: list[dict]) -> dict:
-        return max(nodes, key=lambda node: (len(_search_tokens(node.get("name")) & evidence_tokens), str(node["_id"])))
-
     subjects = [node for node in taxonomy if node.get("node_type") == "subject"]
     if not subjects:
         raise ValueError("Curriculum taxonomy has no subjects.")
-    subject = best(subjects)
-    chapters = [
-        node for node in taxonomy
-        if node.get("node_type") == "chapter" and str(node.get("parent_id") or "") == str(subject["_id"])
+    chapters_by_parent: dict[str, list[dict]] = {}
+    topics_by_parent: dict[str, list[dict]] = {}
+    for node in taxonomy:
+        if node.get("node_type") == "chapter":
+            chapters_by_parent.setdefault(str(node.get("parent_id") or ""), []).append(node)
+        elif node.get("node_type") == "topic":
+            topics_by_parent.setdefault(str(node.get("parent_id") or ""), []).append(node)
+    paths = [
+        (subject, chapter, topic)
+        for subject in subjects
+        for chapter in chapters_by_parent.get(str(subject["_id"]), [])
+        for topic in topics_by_parent.get(str(chapter["_id"]), [])
     ]
-    if not chapters:
-        raise ValueError("Curriculum taxonomy subject has no chapters.")
-    chapter = best(chapters)
-    topics = [
-        node for node in taxonomy
-        if node.get("node_type") == "topic" and str(node.get("parent_id") or "") == str(chapter["_id"])
-    ]
-    if not topics:
-        raise ValueError("Curriculum taxonomy chapter has no topics.")
-    topic = best(topics)
+    if not paths:
+        raise ValueError("Curriculum taxonomy has no complete subject/chapter/topic path.")
+    subject, chapter, topic = max(paths, key=lambda path: (
+        len(_search_tokens(" ".join(str(node.get("name") or "") for node in path)) & evidence_tokens),
+        tuple(str(node["_id"]) for node in path),
+    ))
     grade = next((node.get("grade") for node in (topic, chapter, subject) if node.get("grade") is not None), None)
     version = next(
         (node.get("curriculum_version") for node in (topic, chapter, subject) if node.get("curriculum_version")),

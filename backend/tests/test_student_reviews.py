@@ -197,6 +197,53 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(classification["method"], "heuristic_fallback")
         self.assertEqual(classification["status"], "manual_required")
 
+    async def test_provider_outage_ignores_subjects_without_complete_taxonomy_path(self):
+        await self.db.curriculum_taxonomy.insert_one({
+            "_id": ObjectId(),
+            "node_type": "subject",
+            "name": "ham so pdf",
+            "grade": 10,
+            "curriculum_version": "2018",
+        })
+
+        with patch(
+            "app.services.document_classification_service.generate_json_with_failover",
+            side_effect=TimeoutError("provider timeout"),
+        ):
+            classification = await classify_document(self.db, await self._document())
+
+        self.assertEqual(classification["subject_id"], str(self.subject_id))
+        self.assertEqual(classification["chapter_id"], str(self.chapter_id))
+        self.assertEqual(classification["topic_ids"], [str(self.topic_id)])
+
+    async def test_retry_reuses_persisted_heuristic_classification_without_llm(self):
+        with patch(
+            "app.services.document_classification_service.generate_json_with_failover",
+            side_effect=TimeoutError("provider timeout"),
+        ):
+            first = await classify_student_document_job(
+                self.db,
+                {
+                    "review_id": str(self.review_id),
+                    "document_id": str(self.document_id),
+                    "user_id": self.user_id,
+                },
+            )
+
+        second = await classify_student_document_job(
+            self.db,
+            {
+                "review_id": str(self.review_id),
+                "document_id": str(self.document_id),
+                "user_id": self.user_id,
+            },
+            llm=AsyncMock(side_effect=AssertionError("LLM must not run on retry")),
+        )
+
+        self.assertEqual(first, second)
+        review = await self.db.student_reviews.find_one({"_id": self.review_id})
+        self.assertEqual(review["state"], "needs_confirmation")
+
     async def test_unknown_taxonomy_id_fails_without_writing_taxonomy(self):
         before = [deepcopy(row) async for row in self.db.curriculum_taxonomy.find({})]
         llm = LLMStub(self._response(subject_id=str(ObjectId())))

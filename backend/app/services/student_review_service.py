@@ -357,7 +357,7 @@ def _normalized_classification(value: object) -> bool:
     return (
         isinstance(value, dict)
         and set(value) == CLASSIFICATION_KEYS
-        and value.get("method") in {"ai", "student_corrected"}
+        and value.get("method") in {"ai", "student_corrected", "heuristic_fallback"}
         and value.get("status") in {"confirmed", "needs_confirmation", "manual_required"}
     )
 
