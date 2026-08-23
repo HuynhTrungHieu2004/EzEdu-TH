@@ -4,6 +4,7 @@ import type {
   ReviewStatus,
   TaxonomyNodeType,
   TaxonomyOption,
+  ReviewQuestionStyleCounts,
 } from '../../api/studentReviewApi';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -78,4 +79,18 @@ export function retryLabelForFailedStep(step: ReviewFailedStep | undefined): str
   if (step === 'classification') return 'Thử lại bước phân loại';
   if (step === 'generation') return 'Thử lại tạo bộ đề';
   return null;
+}
+
+export function suggestQuestionStyleCounts(
+  subjectName: string,
+  questionCount: number,
+): ReviewQuestionStyleCounts {
+  const normalized = subjectName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const isCalculationHeavy = /(toan|vat ly|hoa hoc|tin hoc|cong nghe)/.test(normalized);
+  const hasSomeCalculation = /dia ly/.test(normalized);
+  const calculation = isCalculationHeavy
+    ? Math.round(questionCount * 0.5)
+    : hasSomeCalculation ? Math.round(questionCount * 0.2) : 0;
+  const cloze = Math.round(questionCount * (isCalculationHeavy ? 0.2 : 0.3));
+  return { knowledge: questionCount - calculation - cloze, cloze, calculation };
 }

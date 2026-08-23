@@ -85,7 +85,7 @@ class QuestionGenerationGroundingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             question_generation_service, "is_claude_available", return_value=True
         ), patch.object(
-            question_generation_service, "claude_generate_json", return_value=json.dumps([question])
+            question_generation_service, "generate_json_with_failover", return_value=json.dumps([question])
         ), patch.object(
             question_generation_service, "resolve_context", new=AsyncMock(return_value=[_evidence_chunk()])
         ), patch.object(

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import unittest
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
@@ -181,6 +182,19 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         classification = await classify_document(
             self.db, await self._document(), llm=LLMStub(self._response(0.59))
         )
+        self.assertEqual(classification["status"], "manual_required")
+
+    async def test_provider_outage_falls_back_to_manual_taxonomy_suggestion(self):
+        with patch(
+            "app.services.document_classification_service.generate_json_with_failover",
+            side_effect=TimeoutError("provider timeout"),
+        ):
+            classification = await classify_document(self.db, await self._document())
+
+        self.assertEqual(classification["subject_id"], str(self.subject_id))
+        self.assertEqual(classification["chapter_id"], str(self.chapter_id))
+        self.assertEqual(classification["topic_ids"], [str(self.topic_id)])
+        self.assertEqual(classification["method"], "heuristic_fallback")
         self.assertEqual(classification["status"], "manual_required")
 
     async def test_unknown_taxonomy_id_fails_without_writing_taxonomy(self):
@@ -718,6 +732,7 @@ class StudentReviewRouterTests(unittest.IsolatedAsyncioTestCase):
             difficulty="easy",
             question_type="multiple_choice",
             bloom_level="remember",
+            question_style_counts={"knowledge": 1, "cloze": 1, "calculation": 1},
         )
         self.assertEqual(valid.title, "Ôn tập Hàm số")
         for values in (
@@ -729,6 +744,8 @@ class StudentReviewRouterTests(unittest.IsolatedAsyncioTestCase):
             {"title": "Ôn tập", "difficulty": "adaptive"},
             {"title": "Ôn tập", "question_type": "true_false"},
             {"title": "Ôn tập", "bloom_level": "create"},
+            {"title": "Ôn tập", "question_count": 5, "question_style_counts": {"knowledge": 2, "cloze": 1, "calculation": 1}},
+            {"title": "Ôn tập", "question_style_counts": {"knowledge": -1, "cloze": 2, "calculation": 2}},
         ):
             with self.subTest(values=values), self.assertRaises(ValidationError):
                 StudentReviewGenerationRequest(**values)
@@ -761,6 +778,7 @@ class StudentReviewRouterTests(unittest.IsolatedAsyncioTestCase):
             "difficulty": "hard",
             "question_type": "multiple_choice",
             "bloom_level": None,
+            "question_style_counts": None,
         })
         jobs = [item async for item in self.db.background_jobs.find({"job_type": STUDENT_REVIEW_GENERATE_JOB_TYPE})]
         self.assertEqual(len(jobs), 1)
@@ -1259,6 +1277,115 @@ class StudentReviewGenerationJobTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StudentReviewGeneratorSeamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_student_review_restores_requested_count_after_diversity_filtering(self):
+        from app.services import question_generation_service
+
+        db = AsyncMongoMockClient().student_review_exact_count
+        document_id = ObjectId()
+        excerpt = "Đạo hàm xác định chiều biến thiên của hàm số."
+        await db.documents.insert_one({
+            "_id": document_id,
+            "user_id": "student",
+            "media_kind": "document",
+            "original_filename": "ham-so.pdf",
+            "deleted_at": None,
+        })
+        await db.document_chunks.insert_one({
+            "document_id": str(document_id), "user_id": "student", "chunk_index": 0, "content": excerpt,
+        })
+        questions = [{
+            "question": f"Câu hỏi {index}?",
+            "options": {"A": f"Đúng {index}", "B": f"Sai B {index}", "C": f"Sai C {index}", "D": f"Sai D {index}"},
+            "correct_answer": "A",
+            "explanation": excerpt,
+            "difficulty": "medium",
+            "question_type": "multiple_choice",
+            "review_question_style": "knowledge",
+        } for index in range(10)]
+
+        with patch.object(question_generation_service, "get_database", return_value=db), patch.object(
+            question_generation_service.settings, "AI_TEXT_PROVIDER", "claude"
+        ), patch.object(
+            question_generation_service, "is_claude_available", return_value=True
+        ), patch.object(
+            question_generation_service, "generate_json_with_failover", return_value=json.dumps(questions)
+        ), patch.object(
+            question_generation_service, "extract_keywords", return_value=[]
+        ), patch.object(
+            question_generation_service,
+            "select_diverse_questions",
+            side_effect=lambda items, count: (items[:8], {"applied": False}),
+        ):
+            result = await question_generation_service.generate_questions(
+                document_id=str(document_id),
+                user_id="student",
+                question_count=10,
+                difficulty="medium",
+                question_type="multiple_choice",
+                question_style_counts={"knowledge": 10, "cloze": 0, "calculation": 0},
+                question_set_metadata={"purpose": "student_review"},
+            )
+
+        self.assertEqual(result["question_count"], 10)
+
+    async def test_student_review_uses_grounded_extracts_when_every_ai_provider_is_down(self):
+        from app.services import question_generation_service
+
+        db = AsyncMongoMockClient().student_review_extract_fallback
+        document_id = ObjectId()
+        await db.documents.insert_one({
+            "_id": document_id,
+            "user_id": "student",
+            "media_kind": "document",
+            "original_filename": "ham-so.pdf",
+            "deleted_at": None,
+        })
+        await db.document_chunks.insert_one({
+            "document_id": str(document_id),
+            "user_id": "student",
+            "chunk_index": 0,
+            "content": (
+                "EzEdu AI — Học liệu giả lập dùng cho demo\n"
+                "Đạo hàm cho biết tốc độ biến thiên của hàm số. "
+                "Điểm cực đại là nơi hàm số đổi từ tăng sang giảm. "
+                "Điểm cực tiểu là nơi hàm số đổi từ giảm sang tăng. "
+                "Bảng biến thiên giúp mô tả chiều biến đổi của hàm số. "
+                "x + y = z và a + b = c, ta có x = 2 trong ví dụ."
+            ),
+        })
+
+        with patch.object(question_generation_service, "get_database", return_value=db), \
+             patch.object(question_generation_service.settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(question_generation_service, "is_claude_available", return_value=True), \
+             patch.object(
+                 question_generation_service,
+                 "generate_json_with_failover",
+                 side_effect=TimeoutError("all providers down"),
+             ), patch.object(
+                 question_generation_service,
+                 "select_diverse_questions",
+                 side_effect=lambda items, count: (items[:count], {"applied": False}),
+             ):
+            result = await question_generation_service.generate_questions(
+                document_id=str(document_id),
+                user_id="student",
+                question_count=10,
+                difficulty="medium",
+                question_type="multiple_choice",
+                question_style_counts={"knowledge": 3, "cloze": 2, "calculation": 5},
+                question_set_metadata={"purpose": "student_review"},
+            )
+
+        self.assertEqual(result["question_count"], 10)
+        self.assertEqual(result["generation_method"], "extractive_fallback")
+        self.assertEqual(
+            Counter(question["review_question_style"] for question in result["questions"]),
+            Counter({"knowledge": 3, "cloze": 2, "calculation": 5}),
+        )
+        self.assertEqual(len({question["question"] for question in result["questions"]}), 10)
+        self.assertTrue(all(question["grounding_excerpt"] for question in result["questions"]))
+        self.assertTrue(all("demo" not in question["question"].lower() for question in result["questions"]))
+
     async def test_student_review_generation_falls_back_when_claude_times_out(self):
         from app.services import llm_service, question_generation_service
 

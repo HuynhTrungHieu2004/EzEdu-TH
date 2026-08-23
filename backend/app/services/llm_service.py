@@ -85,6 +85,7 @@ def claude_generate(
     quality: bool,
     system: str | None = None,
     tools: list[dict] | None = None,
+    max_retries: int | None = None,
 ) -> ClaudeResult:
     """Call Claude Messages API with the two approved model classes."""
     if not is_claude_available():
@@ -115,7 +116,8 @@ def claude_generate(
         "content-type": "application/json",
     }
     response = None
-    for attempt in range(settings.MAX_RETRIES + 1):
+    retry_count = settings.MAX_RETRIES if max_retries is None else max_retries
+    for attempt in range(retry_count + 1):
         try:
             response = httpx.post(
                 f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages",
@@ -127,12 +129,12 @@ def claude_generate(
             break
         except httpx.HTTPStatusError as exc:
             retryable = exc.response.status_code == 429 or exc.response.status_code >= 500
-            if not retryable or attempt >= settings.MAX_RETRIES:
+            if not retryable or attempt >= retry_count:
                 raise
             delay = float(exc.response.headers.get("retry-after", 2 ** attempt))
             time.sleep(min(max(delay, 0.0), 60.0))
         except httpx.RequestError:
-            if attempt >= settings.MAX_RETRIES:
+            if attempt >= retry_count:
                 raise
             time.sleep(2 ** attempt)
 
@@ -158,11 +160,14 @@ def claude_generate_content(prompt: str, *, quality: bool = False) -> str:
     return ClaudeText(claude_generate(prompt, quality=quality))
 
 
-def claude_generate_json(prompt: str, *, quality: bool = True) -> str:
+def claude_generate_json(
+    prompt: str, *, quality: bool = True, max_retries: int | None = None
+) -> str:
     result = claude_generate(
         prompt,
         quality=quality,
         system="Chỉ trả về JSON hợp lệ, không thêm markdown hoặc nội dung ngoài JSON.",
+        max_retries=max_retries,
     )
     try:
         parsed = json.loads(result.text)
@@ -299,7 +304,9 @@ def generate_json_with_failover(prompt: str, *, quality: bool = True) -> str:
     """
     if settings.AI_TEXT_PROVIDER == "claude":
         try:
-            return claude_generate_json(prompt, quality=quality)
+            # Background jobs already retry. Repeating here multiplied one 25s
+            # provider timeout into minutes before failover could even start.
+            return claude_generate_json(prompt, quality=quality, max_retries=0)
         except Exception as exc:  # noqa: BLE001 - provider lỗi thì dùng fallback đã cấu hình
             if not is_groq_available():
                 raise

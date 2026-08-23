@@ -15,6 +15,7 @@ const {
   reconcileTaxonomySelection,
   retryLabelForFailedStep,
   shouldPollReview,
+  suggestQuestionStyleCounts,
   validateLearningMaterialFile,
 } = workflow;
 
@@ -80,6 +81,13 @@ assert.equal(retryLabelForFailedStep('classification'), 'Thử lại bước ph�
 assert.equal(retryLabelForFailedStep('generation'), 'Thử lại tạo bộ đề');
 assert.equal(retryLabelForFailedStep(undefined), null);
 assert.equal(typeof studentReviewApi.retry, 'function');
+assert.deepEqual(suggestQuestionStyleCounts('Toán học', 10), {
+  knowledge: 3, cloze: 2, calculation: 5,
+});
+assert.deepEqual(suggestQuestionStyleCounts('Ngữ văn', 10), {
+  knowledge: 7, cloze: 3, calculation: 0,
+});
+assert.equal(Object.values(suggestQuestionStyleCounts('Địa lý', 13)).reduce((sum, value) => sum + value, 0), 13);
 
 const review = mapStudentReview({
   id: 'review-1',
@@ -103,6 +111,7 @@ const review = mapStudentReview({
     difficulty: 'medium',
     question_type: 'multiple_choice',
     bloom_level: 'apply',
+    question_style_counts: { knowledge: 4, cloze: 3, calculation: 5 },
   },
   attempt_count: 2,
   latest_score: 0,
@@ -116,6 +125,7 @@ assert.equal(review.latestScore, 0);
 assert.equal(review.bestScore, 80);
 assert.equal(review.classification?.curriculumVersion, '2018');
 assert.equal(review.generationConfig?.questionType, 'multiple_choice');
+assert.deepEqual(review.generationConfig?.questionStyleCounts, { knowledge: 4, cloze: 3, calculation: 5 });
 assert.ok(!('created_at' in review));
 
 const failedReview = mapStudentReview({

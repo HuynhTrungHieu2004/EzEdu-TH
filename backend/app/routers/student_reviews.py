@@ -3,7 +3,7 @@ from typing import Literal
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator, model_validator
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
@@ -44,17 +44,32 @@ class StudentReviewClassificationRequest(BaseModel):
     topic_ids: list[str]
 
 
+class StudentReviewQuestionStyleCounts(BaseModel):
+    knowledge: StrictInt = Field(ge=0, le=50)
+    cloze: StrictInt = Field(ge=0, le=50)
+    calculation: StrictInt = Field(ge=0, le=50)
+
+
 class StudentReviewGenerationRequest(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     question_count: StrictInt = Field(default=10, ge=3, le=50)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     question_type: Literal["multiple_choice"] = "multiple_choice"
     bloom_level: Literal["remember", "understand", "apply", "analyze"] | None = None
+    question_style_counts: StudentReviewQuestionStyleCounts | None = None
 
     @field_validator("title", mode="before")
     @classmethod
     def trim_title(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_style_total(self):
+        if self.question_style_counts is not None:
+            total = sum(self.question_style_counts.model_dump().values())
+            if total != self.question_count:
+                raise ValueError("Tổng số câu theo dạng phải bằng số câu hỏi.")
+        return self
 
 
 class SubmitStudentReviewAttemptRequest(BaseModel):

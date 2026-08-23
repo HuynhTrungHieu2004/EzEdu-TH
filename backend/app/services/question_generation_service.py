@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from bson import ObjectId
 from app.core.config import settings
@@ -69,6 +70,7 @@ def build_question_prompt(
     keywords: list[dict] | None = None,
     output_language: str = "vi",
     require_grounding: bool = False,
+    question_style_counts: dict[str, int] | None = None,
 ) -> str:
     """Builds a structured prompt demanding JSON response matching the question type and difficulty constraints."""
     bloom_instruction = build_bloom_instruction(bloom_level)
@@ -93,6 +95,17 @@ def build_question_prompt(
     "language": "{output_language}",
     "source_chunk_ids": ["CHUNK_ID từ context"],
     "grounding_excerpt": "Đoạn trích nguyên văn từ chunk đã dẫn"'''
+    style_instruction = ""
+    style_schema = ""
+    if question_style_counts:
+        style_instruction = f"""
+10. Phân bổ đúng các dạng câu hỏi sau (tổng cộng đúng {question_count} câu):
+   - knowledge: {question_style_counts.get('knowledge', 0)} câu kiến thức/thông hiểu.
+   - cloze: {question_style_counts.get('cloze', 0)} câu điền khuyết dạng trắc nghiệm.
+   - calculation: {question_style_counts.get('calculation', 0)} câu tính toán; vẫn có 4 đáp án A-D, 1 đúng và 3 kết quả nhiễu hợp lý.
+Mỗi câu phải khai báo `review_question_style` đúng một trong ba giá trị trên.
+"""
+        style_schema = ',\n    "review_question_style": "knowledge | cloze | calculation"'
     
     return f"""
 Bạn là một chuyên gia khảo thí và đánh giá năng lực học sinh/sinh viên. 
@@ -118,7 +131,7 @@ Yêu cầu bắt buộc:
      + Bất kỳ nội dung meta-information nào không phải kiến thức chuyên môn
    - Ví dụ SAI: "Tài liệu khẳng định rằng quá trình quang hợp được giải thích 'từ A đến Z'. Diễn giải ý nghĩa cụm từ này."
    - Ví dụ ĐÚNG: "Pha sáng của quá trình quang hợp diễn ra ở đâu trong lục lạp?"
-{bloom_instruction}{keyword_instruction}
+{bloom_instruction}{keyword_instruction}{style_instruction}
 YÊU CẦU NGÔN NGỮ: {language_instruction}
 {grounding_instruction}
 Định dạng JSON Schema của kết quả trả về như sau:
@@ -135,7 +148,7 @@ YÊU CẦU NGÔN NGỮ: {language_instruction}
     "explanation": "Giải thích tại sao đáp án này đúng dựa trên tài liệu...",
     "difficulty": "{difficulty}",
     "question_type": "{question_type}",
-    "bloom_level": "remember | understand | apply | analyze"{grounding_schema}
+    "bloom_level": "remember | understand | apply | analyze"{grounding_schema}{style_schema}
   }}
 ]
 
@@ -251,6 +264,123 @@ def _valid_question_candidate(question: dict) -> bool:
     return True
 
 
+def _extractive_review_questions(
+    chunk_docs: list[dict],
+    question_count: int,
+    difficulty: str,
+    bloom_level: str | None,
+    output_language: str,
+    document_id: str,
+    keywords: list[dict],
+    question_style_counts: dict[str, int] | None = None,
+) -> list[dict]:
+    """Build grounded MCQs from exact excerpts while external AI is unavailable."""
+    rows: list[tuple[str, str]] = []
+    meta_pattern = re.compile(
+        r"\b(ezedu|demo|trang\s+\d+|mã học liệu|phiên bản|mục đích|đối tượng|lưu ý|học liệu giả lập)\b",
+        re.IGNORECASE,
+    )
+    for index, chunk in enumerate(chunk_docs):
+        chunk_id = f"{document_id}:{chunk.get('chunk_index', index)}"
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(chunk.get("content") or "")):
+            sentence = " ".join(sentence.split()).strip()
+            if 30 <= len(sentence) <= 500 and not meta_pattern.search(sentence):
+                rows.append((chunk_id, sentence))
+
+    preferred = [str(item.get("keyword") or "").strip() for item in keywords]
+    stop = {"trong", "theo", "được", "của", "những", "một", "this", "that", "with", "from", "the"}
+    terms = preferred + [
+        word
+        for _, sentence in rows
+        for word in re.findall(r"[A-Za-zÀ-ỹ0-9]+", sentence)
+        if len(word) >= 4 and word.lower() not in stop
+    ]
+    unique_terms = list(dict.fromkeys(term for term in terms if term))
+    if len(unique_terms) < 4:
+        return []
+
+    style_counts = question_style_counts or {"knowledge": question_count, "cloze": 0, "calculation": 0}
+    style_plan = [style for style in ("knowledge", "cloze", "calculation") for _ in range(style_counts.get(style, 0))]
+    math_rows = [row for row in rows if re.search(r"[=<>+*/]|\d", row[1])] or rows
+    questions: list[dict] = []
+    for index, style in enumerate(style_plan[:question_count]):
+        source_rows = math_rows if style == "calculation" else rows
+        chunk_id, sentence = source_rows[index % len(source_rows)]
+        candidates = sorted(
+            (term for term in unique_terms if re.search(re.escape(term), sentence, re.IGNORECASE)),
+            key=len,
+            reverse=True,
+        )
+        if style == "calculation" and not candidates:
+            candidates = re.findall(r"-?\d+(?:[.,]\d+)?|[A-Za-z]+\([^)]*\)", sentence)
+        if style != "knowledge" and not candidates:
+            for offset in range(1, len(source_rows)):
+                chunk_id, sentence = source_rows[(index + offset) % len(source_rows)]
+                candidates = sorted(
+                    (term for term in unique_terms if re.search(re.escape(term), sentence, re.IGNORECASE)),
+                    key=len,
+                    reverse=True,
+                )
+                if candidates:
+                    break
+        if style == "knowledge":
+            answer = sentence
+            distractors = [text for _, text in rows if text != sentence][:3]
+        else:
+            if not candidates:
+                continue
+            answer = candidates[(index // len(source_rows)) % len(candidates)]
+            distractors = [term for term in unique_terms if term.lower() != answer.lower()][:3]
+        if len(distractors) < 3:
+            continue
+        options_list = [answer, *distractors]
+        shift = len(questions) % 4
+        options_list = options_list[shift:] + options_list[:shift]
+        options = dict(zip(("A", "B", "C", "D"), options_list))
+        if style == "knowledge":
+            cue = candidates[0] if candidates else str(index + 1)
+            question = (
+                f'Question {index + 1}: Which statement about “{cue}” is correct according to the material?'
+                if output_language == "en"
+                else f'Câu {index + 1}: Phát biểu nào về “{cue}” là đúng theo học liệu?'
+            )
+        else:
+            masked = re.sub(re.escape(answer), "____", sentence, count=1, flags=re.IGNORECASE)
+            prefix = (
+                "Which result or expression correctly completes"
+                if style == "calculation"
+                else "Which term correctly completes"
+            ) if output_language == "en" else (
+                "Kết quả hoặc biểu thức nào hoàn thành đúng"
+                if style == "calculation"
+                else "Từ/cụm từ nào hoàn thành đúng"
+            )
+            question = (
+                f'Question {index + 1}: {prefix} this statement: “{masked}”'
+                if output_language == "en"
+                else f'Câu {index + 1}: {prefix} nội dung sau: “{masked}”'
+            )
+        explanation = (
+            f'The material states: “{sentence}”'
+            if output_language == "en"
+            else f'Học liệu nêu: “{sentence}”'
+        )
+        questions.append({
+            "question": question,
+            "options": options,
+            "correct_answer": next(key for key, value in options.items() if value == answer),
+            "explanation": explanation,
+            "difficulty": difficulty,
+            "question_type": "multiple_choice",
+            "review_question_style": style,
+            "bloom_level": bloom_level or "remember",
+            "language": output_language,
+            "source_chunk_ids": [chunk_id],
+            "grounding_excerpt": sentence,
+        })
+    return questions
+
+
 async def generate_questions(
     document_id: str,
     user_id: str,
@@ -262,6 +392,7 @@ async def generate_questions(
     grade: int | None = None,
     topic_id: str | None = None,
     output_language: str | None = None,
+    question_style_counts: dict[str, int] | None = None,
     *,
     question_set_metadata: dict | None = None,
 ) -> dict:
@@ -303,6 +434,8 @@ async def generate_questions(
     chunks_list = []
     supplied_evidence: list[GroundedChunk] = []
     use_claude = settings.AI_TEXT_PROVIDER == "claude"
+    student_review = (question_set_metadata or {}).get("purpose") == "student_review"
+    generation_method = "ai"
     claude_usage = None
     if document.get("media_kind") == "document" or has_transcript:
         cursor = db["document_chunks"].find({
@@ -374,21 +507,32 @@ async def generate_questions(
             keywords=keywords,
             output_language=resolved_language,
             require_grounding=curriculum_scoped,
+            question_style_counts=question_style_counts,
         )
         
         if use_claude:
             if not is_claude_available():
                 raise ValueError("Chưa cấu hình ANTHROPIC_API_KEY để sinh câu hỏi.")
-            raw_claude = await asyncio.to_thread(generate_json_with_failover, prompt, quality=True)
-            if hasattr(raw_claude, "model"):
-                claude_usage = {
-                    "model": raw_claude.model,
-                    "input_tokens": getattr(raw_claude, "input_tokens", 0),
-                    "output_tokens": getattr(raw_claude, "output_tokens", 0),
-                    "total_tokens": getattr(raw_claude, "total_tokens", 0),
-                }
-            groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
-            logger.info("Primary AI generated %s valid question candidates", len(groq_questions))
+            try:
+                raw_claude = await asyncio.to_thread(generate_json_with_failover, prompt, quality=True)
+                if hasattr(raw_claude, "model"):
+                    claude_usage = {
+                        "model": raw_claude.model,
+                        "input_tokens": getattr(raw_claude, "input_tokens", 0),
+                        "output_tokens": getattr(raw_claude, "output_tokens", 0),
+                        "total_tokens": getattr(raw_claude, "total_tokens", 0),
+                    }
+                groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
+                logger.info("Primary AI generated %s valid question candidates", len(groq_questions))
+            except Exception as exc:
+                if not student_review:
+                    raise
+                logger.warning("AI providers unavailable; using grounded extractive review: %s", exc)
+                generation_method = "extractive_fallback"
+                groq_questions = _extractive_review_questions(
+                    chunk_docs, question_count, difficulty, bloom_level,
+                    resolved_language, document_id, keywords, question_style_counts,
+                )
         elif is_groq_available():
             logger.info("🤖 Groq is generating questions...")
             try:
@@ -452,7 +596,6 @@ async def generate_questions(
 
     # Combine pools
     questions_pool = []
-    student_review = (question_set_metadata or {}).get("purpose") == "student_review"
     # Deduplicate basic duplicates (based on question text)
     seen_texts = set()
     for q in (groq_questions + gemini_questions):
@@ -476,7 +619,7 @@ async def generate_questions(
         "invalid_count": 0,
         "fixed_count": 0,
         "replaced_count": 0,
-        "validator": "claude+rules" if use_claude else "groq+gemini",
+        "validator": "extractive_rules" if generation_method == "extractive_fallback" else ("claude+rules" if use_claude else "groq+gemini"),
     }
 
     final_questions = []
@@ -557,6 +700,18 @@ async def generate_questions(
             f"🎯 K-Means chọn {diversity_stats['selected']}/{diversity_stats['pool_size']} câu đa dạng "
             f"(bỏ {diversity_stats['duplicates_dropped']} câu trùng ý, embedding: {diversity_stats.get('embedding_model')})"
         )
+
+    if student_review and len(selected_questions) < question_count:
+        selected_texts = {str(question.get("question") or "").strip().lower() for question in selected_questions}
+        selected_questions.extend(
+            question
+            for question in final_questions
+            if str(question.get("question") or "").strip().lower() not in selected_texts
+        )
+        selected_questions = selected_questions[:question_count]
+
+    if student_review and len(selected_questions) != question_count:
+        raise ValueError("Không thể tạo đủ số câu hỏi ôn tập đã yêu cầu.")
 
     # If we don't have enough questions, fallback to using all questions in pool
     if len(selected_questions) < question_count:
@@ -664,6 +819,8 @@ async def generate_questions(
             "review_pending": 0,
         },
         "published_question_count": 0,
+        "question_style_counts": question_style_counts,
+        "generation_method": generation_method,
         "created_at": now,
         "updated_at": now,
         **(question_set_metadata or {}),

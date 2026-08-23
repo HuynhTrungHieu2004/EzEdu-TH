@@ -8,6 +8,7 @@ import { studentReviewApi } from '../../api/studentReviewApi';
 import type {
   ClassificationInput,
   ReviewDifficulty,
+  ReviewQuestionStyleCounts,
   StudentReview,
   TaxonomyOption,
 } from '../../api/studentReviewApi';
@@ -32,6 +33,7 @@ import {
   reconcileTaxonomySelection,
   retryLabelForFailedStep,
   shouldPollReview,
+  suggestQuestionStyleCounts,
   validateLearningMaterialFile,
 } from './studentLearningMaterialsWorkflow';
 
@@ -93,6 +95,9 @@ export default function StudentLearningMaterialsPage() {
   const [title, setTitle] = useState('');
   const [questionCount, setQuestionCount] = useState(10);
   const [difficulty, setDifficulty] = useState<ReviewDifficulty>('medium');
+  const [questionStyleCounts, setQuestionStyleCounts] = useState<ReviewQuestionStyleCounts>(
+    () => suggestQuestionStyleCounts('', 10),
+  );
   const [generating, setGenerating] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
@@ -144,9 +149,12 @@ export default function StudentLearningMaterialsPage() {
   const classificationForConfirmation = reviewStatus === 'needs_confirmation'
     ? review?.classification
     : undefined;
+  const classificationForSetup = reviewStatus === 'needs_confirmation' || reviewStatus === 'ready_to_generate'
+    ? review?.classification
+    : undefined;
 
   useEffect(() => {
-    if (!reviewId || !classificationForConfirmation) return;
+    if (!reviewId || !classificationForSetup) return;
 
     let active = true;
     void studentReviewApi.taxonomyOptions().then((options) => {
@@ -156,13 +164,21 @@ export default function StudentLearningMaterialsPage() {
         return;
       }
       setTaxonomy(options);
-      setClassification(reconcileTaxonomySelection(options, {
-        subjectId: classificationForConfirmation.subjectId,
-        grade: classificationForConfirmation.grade,
-        curriculumVersion: classificationForConfirmation.curriculumVersion,
-        chapterId: classificationForConfirmation.chapterId,
-        topicIds: [...classificationForConfirmation.topicIds],
-      }));
+      if (reviewStatus === 'ready_to_generate') {
+        const subjectName = options.find(
+          (option) => option.id === classificationForSetup.subjectId && option.nodeType === 'subject',
+        )?.name ?? review?.subjectName ?? '';
+        setQuestionStyleCounts(suggestQuestionStyleCounts(subjectName, questionCount));
+      }
+      if (classificationForConfirmation) {
+        setClassification(reconcileTaxonomySelection(options, {
+          subjectId: classificationForConfirmation.subjectId,
+          grade: classificationForConfirmation.grade,
+          curriculumVersion: classificationForConfirmation.curriculumVersion,
+          chapterId: classificationForConfirmation.chapterId,
+          topicIds: [...classificationForConfirmation.topicIds],
+        }));
+      }
     }).catch((taxonomyError: unknown) => {
       if (active) {
         setError(safeApiError(taxonomyError, 'Không thể tải danh mục phân loại.'));
@@ -172,7 +188,11 @@ export default function StudentLearningMaterialsPage() {
     return () => {
       active = false;
     };
-  }, [classificationForConfirmation, reviewId, taxonomyRestart]);
+  }, [classificationForConfirmation, classificationForSetup, questionCount, review?.subjectName, reviewId, reviewStatus, taxonomyRestart]);
+
+  const suggestedSubjectName = taxonomy.find(
+    (option) => option.id === review?.classification?.subjectId && option.nodeType === 'subject',
+  )?.name ?? review?.subjectName ?? '';
 
   function reset() {
     workflowRunRef.current += 1;
@@ -193,6 +213,7 @@ export default function StudentLearningMaterialsPage() {
     setTitle('');
     setQuestionCount(10);
     setDifficulty('medium');
+    setQuestionStyleCounts(suggestQuestionStyleCounts('', 10));
     setGenerating(false);
     setRetrying(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -310,6 +331,12 @@ export default function StudentLearningMaterialsPage() {
       setError('Số câu hỏi phải từ 3 đến 50.');
       return;
     }
+    const styleTotal = Object.values(questionStyleCounts).reduce((sum, count) => sum + count, 0);
+    if (Object.values(questionStyleCounts).some((count) => !Number.isInteger(count) || count < 0)
+      || styleTotal !== questionCount) {
+      setError(`Tổng số câu theo dạng phải bằng ${questionCount}.`);
+      return;
+    }
 
     generationPendingRef.current = true;
     setGenerating(true);
@@ -320,6 +347,7 @@ export default function StudentLearningMaterialsPage() {
         questionCount,
         difficulty,
         questionType: 'multiple_choice',
+        questionStyleCounts,
       }));
       setTitle(trimmedTitle);
     } catch (generationError: unknown) {
@@ -611,7 +639,11 @@ export default function StudentLearningMaterialsPage() {
                     value={questionCount}
                     required
                     disabled={generating}
-                    onChange={(event) => setQuestionCount(Number(event.target.value))}
+                    onChange={(event) => {
+                      const nextCount = Number(event.target.value);
+                      setQuestionCount(nextCount);
+                      setQuestionStyleCounts(suggestQuestionStyleCounts(suggestedSubjectName, nextCount));
+                    }}
                   />
                 </FormField>
                 <FormField label="Độ khó" required>
@@ -628,6 +660,34 @@ export default function StudentLearningMaterialsPage() {
                 </FormField>
               </div>
               <p><strong>Loại câu hỏi:</strong> Trắc nghiệm nhiều lựa chọn</p>
+              <div>
+                <p style={{ marginTop: 0 }}><strong>Phân bổ dạng câu hỏi</strong></p>
+                <div className="ez-grid ez-grid-2">
+                  {([
+                    ['knowledge', 'Kiến thức / thông hiểu'],
+                    ['cloze', 'Điền khuyết trắc nghiệm'],
+                    ['calculation', 'Tính toán trắc nghiệm'],
+                  ] as const).map(([style, label]) => (
+                    <FormField key={style} label={label}>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={questionCount}
+                        step={1}
+                        value={questionStyleCounts[style]}
+                        disabled={generating}
+                        onChange={(event) => setQuestionStyleCounts((current) => ({
+                          ...current,
+                          [style]: Number(event.target.value),
+                        }))}
+                      />
+                    </FormField>
+                  ))}
+                </div>
+                <p className="ez-card-desc">
+                  Tổng: {Object.values(questionStyleCounts).reduce((sum, count) => sum + count, 0)}/{questionCount} câu.
+                </p>
+              </div>
               <Button type="submit" loading={generating} disabled={generating}>
                 Tạo bộ đề ôn tập
               </Button>
@@ -673,7 +733,6 @@ export default function StudentLearningMaterialsPage() {
         <Card>
           <CardHeader><CardTitle as="h2">Bộ đề đã sẵn sàng</CardTitle></CardHeader>
           <CardBody className="ez-stack">
-            {review.warning ? <Alert tone="warning">{review.warning}</Alert> : null}
             <div className="ez-row ez-row-wrap">
               <Link className="ez-btn ez-btn-outline" to={`/student/reviews/${review.id}`}>
                 Xem chi tiết

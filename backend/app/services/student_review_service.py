@@ -552,6 +552,14 @@ def _validated_generation_config(value: object) -> dict:
         raise ValueError("Student review question_type is invalid.")
     if value.get("bloom_level") not in {None, "remember", "understand", "apply", "analyze"}:
         raise ValueError("Student review bloom_level is invalid.")
+    style_counts = value.get("question_style_counts")
+    if style_counts is not None:
+        if not isinstance(style_counts, dict) or set(style_counts) != {"knowledge", "cloze", "calculation"}:
+            raise ValueError("Student review question_style_counts is invalid.")
+        if any(isinstance(count, bool) or not isinstance(count, int) or count < 0 for count in style_counts.values()):
+            raise ValueError("Student review question_style_counts is invalid.")
+        if sum(style_counts.values()) != question_count:
+            raise ValueError("Student review question_style_counts total is invalid.")
     return value
 
 
@@ -688,6 +696,7 @@ async def generate_student_review_job(db, payload: dict, generator=None) -> dict
                 difficulty=config["difficulty"],
                 question_type=config["question_type"],
                 bloom_level=config.get("bloom_level"),
+                question_style_counts=config.get("question_style_counts"),
                 subject_id=classification["subject_id"],
                 grade=classification["grade"],
                 topic_id=(classification.get("topic_ids") or [None])[0],

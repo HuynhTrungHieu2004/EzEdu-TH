@@ -11,7 +11,10 @@ export type ReviewStatus =
 export type ReviewDifficulty = 'easy' | 'medium' | 'hard';
 export type ReviewFailedStep = 'classification' | 'generation';
 export type ReviewBloomLevel = 'remember' | 'understand' | 'apply' | 'analyze';
+export type ReviewQuestionStyle = 'knowledge' | 'cloze' | 'calculation';
 export type TaxonomyNodeType = 'subject' | 'chapter' | 'topic';
+
+export type ReviewQuestionStyleCounts = Record<ReviewQuestionStyle, number>;
 
 export interface TaxonomyOption {
   id: string;
@@ -41,6 +44,7 @@ export interface GenerateReviewInput {
   difficulty: ReviewDifficulty;
   questionType: 'multiple_choice';
   bloomLevel?: ReviewBloomLevel;
+  questionStyleCounts: ReviewQuestionStyleCounts;
 }
 
 export interface StudentReviewClassification extends ClassificationInput {
@@ -144,6 +148,7 @@ interface GenerationConfigTransport {
   difficulty: ReviewDifficulty;
   question_type: 'multiple_choice';
   bloom_level?: ReviewBloomLevel | null;
+  question_style_counts?: ReviewQuestionStyleCounts | null;
 }
 
 export interface TaxonomyOptionTransport {
@@ -240,6 +245,11 @@ const mapGenerationConfig = (
   difficulty: value.difficulty,
   questionType: value.question_type,
   bloomLevel: value.bloom_level ?? undefined,
+  questionStyleCounts: value.question_style_counts ?? {
+    knowledge: value.question_count,
+    cloze: 0,
+    calculation: 0,
+  },
 } : undefined;
 
 export function mapStudentReview(value: StudentReviewTransport): StudentReview {
@@ -354,6 +364,7 @@ export const studentReviewApi = {
       difficulty: input.difficulty,
       question_type: input.questionType,
       bloom_level: input.bloomLevel,
+      question_style_counts: input.questionStyleCounts,
     })).data,
   ),
 

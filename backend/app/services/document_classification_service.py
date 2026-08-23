@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
 import math
+import re
+import unicodedata
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -24,6 +27,56 @@ CLASSIFICATION_KEYS = frozenset({
     "status",
     "classified_at",
 })
+logger = logging.getLogger(__name__)
+
+
+def _search_tokens(value: object) -> set[str]:
+    plain = unicodedata.normalize("NFKD", str(value or "").lower()).encode("ascii", "ignore").decode()
+    return {token for token in re.findall(r"[a-z0-9]+", plain) if len(token) >= 3}
+
+
+def _fallback_classification(taxonomy: list[dict], evidence: dict) -> dict:
+    """Suggest an existing taxonomy path when the AI provider is unavailable."""
+    evidence_tokens = _search_tokens(f"{evidence.get('title', '')} {' '.join(evidence.get('chunks', []))}")
+
+    def best(nodes: list[dict]) -> dict:
+        return max(nodes, key=lambda node: (len(_search_tokens(node.get("name")) & evidence_tokens), str(node["_id"])))
+
+    subjects = [node for node in taxonomy if node.get("node_type") == "subject"]
+    if not subjects:
+        raise ValueError("Curriculum taxonomy has no subjects.")
+    subject = best(subjects)
+    chapters = [
+        node for node in taxonomy
+        if node.get("node_type") == "chapter" and str(node.get("parent_id") or "") == str(subject["_id"])
+    ]
+    if not chapters:
+        raise ValueError("Curriculum taxonomy subject has no chapters.")
+    chapter = best(chapters)
+    topics = [
+        node for node in taxonomy
+        if node.get("node_type") == "topic" and str(node.get("parent_id") or "") == str(chapter["_id"])
+    ]
+    if not topics:
+        raise ValueError("Curriculum taxonomy chapter has no topics.")
+    topic = best(topics)
+    grade = next((node.get("grade") for node in (topic, chapter, subject) if node.get("grade") is not None), None)
+    version = next(
+        (node.get("curriculum_version") for node in (topic, chapter, subject) if node.get("curriculum_version")),
+        None,
+    )
+    _validate_metadata({"grade": grade, "curriculum_version": version}, [subject, chapter, topic])
+    return {
+        "subject_id": str(subject["_id"]),
+        "grade": grade,
+        "curriculum_version": version,
+        "chapter_id": str(chapter["_id"]),
+        "topic_ids": [str(topic["_id"])],
+        "confidence": 0.0,
+        "method": "heuristic_fallback",
+        "status": "manual_required",
+        "classified_at": datetime.now(timezone.utc),
+    }
 
 
 def classification_status(confidence: float) -> str:
@@ -108,7 +161,13 @@ async def classify_document(db, document: dict, llm=None) -> dict:
         + json.dumps(candidates, ensure_ascii=False, separators=(",", ":"), default=str)
     )
 
-    raw = await _generate(prompt, llm)
+    try:
+        raw = await _generate(prompt, llm)
+    except Exception as exc:
+        if llm is not None:
+            raise
+        logger.warning("AI classification unavailable; using taxonomy suggestion: %s", exc)
+        return _fallback_classification(taxonomy, evidence)
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)

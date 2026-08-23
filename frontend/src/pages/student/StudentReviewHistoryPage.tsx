@@ -84,7 +84,6 @@ function HistoryList({ reviews }: { reviews: StudentReviewSummary[] }) {
                   </>
                 ) : <span>{review.errorMessage ?? status.description}</span>}
               </div>
-              {review.warning ? <p style={{ margin: 'var(--ez-space-2) 0 0', color: 'var(--ez-warning)' }}>{review.warning}</p> : null}
             </div>
             {review.status === 'ready' ? (
               <div className="ez-list-item-actions">
@@ -115,7 +114,6 @@ function ReviewDetail({ review }: { review: StudentReview }) {
         actions={<ReviewStatusBadge status={review.status} />}
       />
 
-      {review.warning ? <Alert tone="warning">{review.warning}</Alert> : null}
       {review.errorMessage || review.status === 'failed' ? (
         <Alert tone="error">{review.errorMessage ?? 'Không thể hoàn tất bộ ôn tập. Vui lòng tạo lại từ học liệu.'}</Alert>
       ) : null}
