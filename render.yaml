@@ -39,7 +39,7 @@ services:
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: AI_TEXT_PROVIDER
-        value: claude
+        value: legacy
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_BASE_URL
