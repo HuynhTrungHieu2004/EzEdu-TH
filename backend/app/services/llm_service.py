@@ -267,16 +267,23 @@ def get_gemini_client():
 
 def gemini_generate_json(prompt: str) -> str:
     """Generates a JSON formatted string using Gemini API."""
-    client = get_gemini_client()
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not configured. Gemini API key is required.")
     model = settings.GEMINI_MODEL or "gemini-2.5-flash"
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-        }
+    response = httpx.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        headers={"x-goog-api-key": settings.GEMINI_API_KEY},
+        json={
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        },
+        timeout=settings.AI_TIMEOUT_SECONDS,
     )
-    return response.text
+    response.raise_for_status()
+    return "".join(
+        part.get("text", "")
+        for part in response.json()["candidates"][0]["content"]["parts"]
+    )
 
 
 def is_gemini_available() -> bool:
