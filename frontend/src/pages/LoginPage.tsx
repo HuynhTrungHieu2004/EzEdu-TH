@@ -248,7 +248,7 @@ const LoginPage: React.FC = () => {
         {pendingSocial && <div className="alert alert-success"><p>{pendingSocial.profile.full_name || pendingSocial.profile.email}, hãy chọn vai trò để hoàn tất đăng ký.</p><div className="ez-social-grid"><button type="button" className="ez-social-btn" onClick={() => void submitSocialToken(pendingSocial.provider, pendingSocial.token, 'student')}>Học sinh</button><button type="button" className="ez-social-btn" onClick={() => void submitSocialToken(pendingSocial.provider, pendingSocial.token, 'lecturer')}>Giáo viên</button></div></div>}
 
         {/* Social Login Grid */}
-        <div className="ez-social-grid">
+        <div className="ez-social-grid ez-social-stack">
           {googleClientId ? <div ref={googleButtonRef} aria-label="Đăng nhập bằng Google" /> : <button type="button" className="ez-social-btn" disabled>Google chưa được cấu hình</button>}
 
           <button

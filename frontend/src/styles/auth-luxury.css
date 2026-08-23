@@ -501,6 +501,15 @@ input[type="checkbox"]:checked + .ez-custom-checkbox {
   gap: 0.75rem;
 }
 
+.ez-social-grid.ez-social-stack {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.ez-social-stack > * {
+  width: min(100%, 260px);
+}
+
 .ez-social-btn {
   height: 46px;
   border-radius: 12px;

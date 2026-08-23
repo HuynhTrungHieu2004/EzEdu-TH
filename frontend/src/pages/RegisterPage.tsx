@@ -371,7 +371,7 @@ const RegisterPage: React.FC = () => {
           <div className="ez-divider-line" />
         </div>
 
-        <div className="ez-social-grid">
+        <div className="ez-social-grid ez-social-stack">
           <button type="button" className="ez-social-btn" onClick={() => navigate('/login')}>
             Đăng ký bằng Google
           </button>

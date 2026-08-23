@@ -1,7 +1,18 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 async function json(route: Route, body: unknown) {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+}
+
+async function expectSocialButtonsStacked(page: Page) {
+  const buttons = page.locator('.ez-social-grid').first().locator(':scope > *');
+  const google = await buttons.nth(0).boundingBox();
+  const facebook = await buttons.nth(1).boundingBox();
+  expect(google).not.toBeNull();
+  expect(facebook).not.toBeNull();
+  expect(Math.abs(google!.x - facebook!.x)).toBeLessThan(2);
+  expect(Math.abs(google!.width - facebook!.width)).toBeLessThan(2);
+  expect(facebook!.y).toBeGreaterThanOrEqual(google!.y + google!.height);
 }
 
 test('Facebook login stays decorative without configuration notes', async ({ page }) => {
@@ -14,12 +25,14 @@ test('Facebook login stays decorative without configuration notes', async ({ pag
   await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Đăng nhập bằng Facebook' })).toBeDisabled();
   await expect(page.getByText(/Facebook chưa được cấu hình|Sắp ra mắt/i)).toHaveCount(0);
+  await expectSocialButtonsStacked(page);
 });
 
 test('registration shows the same decorative Facebook option', async ({ page }) => {
   await page.goto('/register');
   await expect(page.getByRole('button', { name: 'Đăng ký bằng Facebook' })).toBeDisabled();
   await expect(page.getByText(/Facebook chưa được cấu hình|Sắp ra mắt/i)).toHaveCount(0);
+  await expectSocialButtonsStacked(page);
 });
 
 for (const account of [
