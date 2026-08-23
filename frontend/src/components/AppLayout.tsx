@@ -142,7 +142,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             { to: '/student/dashboard', label: 'Tổng quan Dashboard', icon: <LayoutDashboard size={ICON} /> },
             { to: '/student/courses', label: 'Khóa học của tôi', icon: <BookOpen size={ICON} /> },
             { to: '/student/online-schedules', label: 'Lịch học Online', icon: <Video size={ICON} /> },
-            { to: '/student/learning-materials', label: 'Học liệu số', icon: <Library size={ICON} /> },
+            { to: '/student/learning-materials', label: 'Ôn tập nhanh', icon: <Library size={ICON} /> },
             { to: '/student/review-history', label: 'Lịch sử ôn tập', icon: <ScrollText size={ICON} /> },
             { to: '/hoc-theo-mon', label: 'Học theo môn', icon: <BookOpen size={ICON} /> },
             { to: '/student/practice', label: 'Bài luyện tập', icon: <ClipboardList size={ICON} /> },
