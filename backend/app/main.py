@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
-from app.routers import db_test, auth, documents, questions, chat, verification, admin, admin_users, admin_activity_logs, my_activity, admin_audit_logs, admin_content, admin_ai, admin_notifications, notifications, admin_reports, website_content, system_settings, assignments, classes, courses, schedules, favorites, teacher_history
+from app.routers import db_test, auth, documents, questions, student_reviews, chat, verification, admin, admin_users, admin_activity_logs, my_activity, admin_audit_logs, admin_content, admin_ai, admin_notifications, notifications, admin_reports, website_content, system_settings, assignments, classes, courses, schedules, favorites, teacher_history
 from app.personalization.api import router as personalization_router, onboarding_router as personalization_onboarding_router
 from app.exam_bank.api import router as exam_bank_router
 from app.web_knowledge.api import router as web_knowledge_router
@@ -40,18 +40,24 @@ async def lifespan(app: FastAPI):
     # Khởi động kết nối MongoDB khi startup
     await connect_to_mongo()
 
-    # Tạo index cho hạ tầng dùng chung (idempotency-key, hàng đợi job nền) —
-    # idempotent, an toàn gọi lại mỗi lần khởi động.
-    try:
-        from app.database.mongodb import get_database
-        from app.core.idempotency import ensure_idempotency_index
-        from app.services.background_job_service import ensure_background_job_indexes
+    # Hai unique index dưới đây là correctness boundary cho create/enqueue.
+    # Không được báo app sẵn sàng nếu một trong hai không tạo được.
+    from app.database.mongodb import get_database
+    from app.services.background_job_service import ensure_background_job_indexes
+    from app.services.student_review_service import ensure_student_review_indexes
 
-        _db = get_database()
+    _db = get_database()
+    await ensure_background_job_indexes(_db)
+    await ensure_student_review_indexes(_db)
+
+    # Core request-id index is useful but unrelated to the two feature
+    # idempotency guarantees above, so retain its existing optional behavior.
+    try:
+        from app.core.idempotency import ensure_idempotency_index
+
         await ensure_idempotency_index(_db)
-        await ensure_background_job_indexes(_db)
     except Exception as e:
-        logger.error(f"Lỗi khi tạo index cho hạ tầng dùng chung (idempotency/background_jobs): {e}")
+        logger.error(f"Lỗi khi tạo index idempotency dùng chung: {e}")
 
     try:
         from app.services.course_service import ensure_course_indexes
@@ -283,6 +289,7 @@ app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 app.include_router(db_test.router, prefix=f"{settings.API_V1_STR}/db", tags=["Database"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_STR}/documents", tags=["Documents"])
+app.include_router(student_reviews.router, prefix=f"{settings.API_V1_STR}/student-reviews", tags=["Student Reviews"])
 app.include_router(teacher_history.router, prefix=f"{settings.API_V1_STR}/teacher", tags=["Teacher History"])
 app.include_router(questions.router, prefix=f"{settings.API_V1_STR}/questions", tags=["Questions"])
 app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["Chat & Q&A"])

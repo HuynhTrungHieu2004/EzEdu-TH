@@ -43,6 +43,53 @@ class BackgroundJobServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(job_for_worker_a)
         self.assertIsNone(job_for_worker_b)  # không còn job nào khác để nhận
 
+    async def test_expired_running_job_is_reclaimed_once_without_consuming_another_attempt(self):
+        job_id = await enqueue(self.db, job_type="grade_essay", payload={"attempt_id": "a1"})
+        first = await claim_next(self.db, job_types=["grade_essay"], worker_id="dead-worker")
+        await self.db.background_jobs.update_one(
+            {"_id": first["_id"]},
+            {"$set": {"locked_until": datetime.now(timezone.utc) - timedelta(seconds=1)}},
+        )
+
+        reclaimed = await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-a")
+        loser = await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-b")
+
+        self.assertEqual(str(reclaimed["_id"]), job_id)
+        self.assertEqual(reclaimed["locked_by"], "worker-a")
+        self.assertEqual(reclaimed["attempts"], 1)
+        self.assertIsNone(loser)
+
+    async def test_expired_worker_cannot_complete_reclaimed_job(self):
+        job_id = await enqueue(self.db, job_type="grade_essay", payload={})
+        stale = await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-a")
+        await self.db.background_jobs.update_one(
+            {"_id": stale["_id"]},
+            {"$set": {"locked_until": datetime.now(timezone.utc) - timedelta(seconds=1)}},
+        )
+        current = await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-b")
+
+        stale_write = await mark_succeeded(
+            self.db, job_id, claim_token=stale["claim_token"], result={"worker": "a"}
+        )
+        after_stale_write = await self.db.background_jobs.find_one({"_id": stale["_id"]})
+
+        self.assertFalse(stale_write)
+        self.assertEqual(after_stale_write["status"], "running")
+        self.assertEqual(after_stale_write["locked_by"], "worker-b")
+        self.assertTrue(
+            await mark_succeeded(
+                self.db, job_id, claim_token=current["claim_token"], result={"worker": "b"}
+            )
+        )
+
+    async def test_running_job_with_live_lease_is_not_reclaimed(self):
+        await enqueue(self.db, job_type="grade_essay", payload={"attempt_id": "a1"})
+        await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-a")
+
+        self.assertIsNone(
+            await claim_next(self.db, job_types=["grade_essay"], worker_id="worker-b")
+        )
+
     async def test_claim_ignores_jobs_not_yet_due(self):
         future_time = datetime.now(timezone.utc) + timedelta(hours=1)
         await enqueue(self.db, job_type="retry_upload", payload={}, run_after=future_time)
@@ -52,8 +99,10 @@ class BackgroundJobServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_mark_succeeded(self):
         job_id = await enqueue(self.db, job_type="index_document", payload={"document_id": "d1"})
-        await claim_next(self.db, job_types=["index_document"], worker_id="w1")
-        await mark_succeeded(self.db, job_id, result={"chunk_count": 12})
+        claim = await claim_next(self.db, job_types=["index_document"], worker_id="w1")
+        await mark_succeeded(
+            self.db, job_id, claim_token=claim["claim_token"], result={"chunk_count": 12}
+        )
 
         doc = await self.db["background_jobs"].find_one({"job_type": "index_document"})
         self.assertEqual(doc["status"], "succeeded")
@@ -64,8 +113,10 @@ class BackgroundJobServiceTests(unittest.IsolatedAsyncioTestCase):
         job_id = await enqueue(self.db, job_type="ingest_source", payload={}, max_attempts=2)
 
         # Lần thử 1: thất bại, còn lượt retry (2 attempts cho phép, đã dùng 1).
-        await claim_next(self.db, job_types=["ingest_source"], worker_id="w1")
-        await mark_failed(self.db, job_id, error="Timeout lần 1")
+        first_claim = await claim_next(self.db, job_types=["ingest_source"], worker_id="w1")
+        await mark_failed(
+            self.db, job_id, claim_token=first_claim["claim_token"], error="Timeout lần 1"
+        )
         doc_after_first_failure = await self.db["background_jobs"].find_one({"_id": ObjectId(job_id)})
         self.assertEqual(doc_after_first_failure["status"], "failed")
         # mongomock trả datetime naive (không tzinfo) dù giá trị gốc là UTC-aware —
@@ -82,8 +133,10 @@ class BackgroundJobServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         # Lần thử 2: thất bại tiếp, hết lượt retry (attempts=2=max_attempts) → dead_letter.
-        await claim_next(self.db, job_types=["ingest_source"], worker_id="w1")
-        await mark_failed(self.db, job_id, error="Timeout lần 2")
+        second_claim = await claim_next(self.db, job_types=["ingest_source"], worker_id="w1")
+        await mark_failed(
+            self.db, job_id, claim_token=second_claim["claim_token"], error="Timeout lần 2"
+        )
         doc_final = await self.db["background_jobs"].find_one({"_id": doc_after_first_failure["_id"]})
         self.assertEqual(doc_final["status"], "dead_letter")
         self.assertEqual(doc_final["error"], "Timeout lần 2")

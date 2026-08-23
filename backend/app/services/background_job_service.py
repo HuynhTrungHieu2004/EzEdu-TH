@@ -18,6 +18,7 @@ luận AI, ingest kho tri thức chuẩn, retry Cloudinary).
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
@@ -81,6 +82,7 @@ async def enqueue(
         "next_run_at": run_after or _now(),
         "locked_by": None,
         "locked_until": None,
+        "claim_token": None,
         "result": None,
         "error": None,
         "idempotency_key": idempotency_key,
@@ -105,41 +107,56 @@ async def enqueue(
 async def claim_next(db, *, job_types: list[str], worker_id: str) -> Optional[Dict[str, Any]]:
     """Nhận job tiếp theo sẵn sàng chạy, khoá an toàn cho đúng 1 worker.
 
-    Điều kiện atomic: job phải `status in {"pending","failed"}` (failed vẫn
-    còn lượt retry) VÀ `next_run_at <= now` VÀ (chưa bị khoá HOẶC khoá đã hết
-    hạn `locked_until` — worker cũ có thể đã chết). `find_one_and_update` là
-    thao tác nguyên tử của MongoDB — hai worker gọi đồng thời không bao giờ
-    cùng nhận một job (đúng yêu cầu "hai worker cùng xử lý không được tạo
-    hai kết quả").
+    Điều kiện atomic: job pending/failed đã đến hạn, hoặc job running có lease
+    đã hết hạn. Reclaim tiếp tục cùng logical attempt nên không tăng `attempts`;
+    retry sau lỗi handler vẫn tăng như cũ. `find_one_and_update` bảo đảm chỉ một
+    worker nhận được lease.
     """
     now = _now()
+    claim_token = uuid.uuid4().hex
     result = await db[COLLECTION_NAME].find_one_and_update(
         {
             "job_type": {"$in": job_types},
-            "status": {"$in": ["pending", "failed"]},
-            "next_run_at": {"$lte": now},
-            "$or": [{"locked_until": None}, {"locked_until": {"$lt": now}}],
+            "$or": [
+                {
+                    "status": {"$in": ["pending", "failed"]},
+                    "next_run_at": {"$lte": now},
+                    "$or": [{"locked_until": None}, {"locked_until": {"$lt": now}}],
+                },
+                {
+                    "status": "running",
+                    "$or": [{"locked_until": None}, {"locked_until": {"$lt": now}}],
+                },
+            ],
         },
-        {
+        [{
             "$set": {
+                "attempts": {
+                    "$cond": [
+                        {"$in": ["$status", ["pending", "failed"]]},
+                        {"$add": [{"$ifNull": ["$attempts", 0]}, 1]},
+                        "$attempts",
+                    ]
+                },
                 "status": "running",
                 "locked_by": worker_id,
                 "locked_until": now + timedelta(seconds=DEFAULT_LOCK_SECONDS),
+                "claim_token": claim_token,
+                "claimed_at": now,
                 "updated_at": now,
             },
-            "$inc": {"attempts": 1},
-        },
+        }],
         sort=[("next_run_at", ASCENDING)],
         return_document=True,
     )
     return result
 
 
-async def mark_succeeded(db, job_id: str, *, result: Any = None) -> None:
+async def mark_succeeded(db, job_id: str, *, claim_token: str, result: Any = None) -> bool:
     from bson import ObjectId
 
-    await db[COLLECTION_NAME].update_one(
-        {"_id": ObjectId(job_id)},
+    updated = await db[COLLECTION_NAME].update_one(
+        {"_id": ObjectId(job_id), "status": "running", "claim_token": claim_token},
         {
             "$set": {
                 "status": "succeeded",
@@ -150,25 +167,27 @@ async def mark_succeeded(db, job_id: str, *, result: Any = None) -> None:
             }
         },
     )
+    return getattr(updated, "matched_count", 0) == 1
 
 
-async def mark_failed(db, job_id: str, *, error: str) -> None:
+async def mark_failed(db, job_id: str, *, claim_token: str, error: str) -> bool:
     """Đánh dấu thất bại. Nếu còn lượt retry, quay về `pending` với backoff
     tăng dần theo số lần thử; hết lượt thì chuyển `dead_letter`.
     """
     from bson import ObjectId
 
-    job = await db[COLLECTION_NAME].find_one({"_id": ObjectId(job_id)})
+    claim_query = {"_id": ObjectId(job_id), "status": "running", "claim_token": claim_token}
+    job = await db[COLLECTION_NAME].find_one(claim_query)
     if job is None:  # pragma: no cover
-        return
+        return False
 
     attempts = job.get("attempts", 1)
     max_attempts = job.get("max_attempts", DEFAULT_MAX_ATTEMPTS)
     now = _now()
 
     if attempts >= max_attempts:
-        await db[COLLECTION_NAME].update_one(
-            {"_id": ObjectId(job_id)},
+        updated = await db[COLLECTION_NAME].update_one(
+            claim_query,
             {
                 "$set": {
                     "status": "dead_letter",
@@ -179,15 +198,17 @@ async def mark_failed(db, job_id: str, *, error: str) -> None:
                 }
             },
         )
-        logger.error(
-            "background_job.dead_letter",
-            extra={"job_id": job_id, "job_type": job.get("job_type"), "attempts": attempts, "error": error},
-        )
-        return
+        if getattr(updated, "matched_count", 0) == 1:
+            logger.error(
+                "background_job.dead_letter",
+                extra={"job_id": job_id, "job_type": job.get("job_type"), "attempts": attempts, "error": error},
+            )
+            return True
+        return False
 
     backoff_seconds = DEFAULT_BACKOFF_SECONDS * (2 ** (attempts - 1))
-    await db[COLLECTION_NAME].update_one(
-        {"_id": ObjectId(job_id)},
+    updated = await db[COLLECTION_NAME].update_one(
+        claim_query,
         {
             "$set": {
                 "status": "failed",
@@ -199,6 +220,7 @@ async def mark_failed(db, job_id: str, *, error: str) -> None:
             }
         },
     )
+    return getattr(updated, "matched_count", 0) == 1
 
 
 @dataclass(frozen=True)
@@ -218,15 +240,27 @@ async def process_one(db, *, job_types: list[str], worker_id: str, handlers: Dic
         return False
 
     job_id = str(job["_id"])
+    claim_token = job["claim_token"]
     handler = handlers.get(job["job_type"])
     if handler is None:
-        await mark_failed(db, job_id, error=f"Không có handler đăng ký cho job_type='{job['job_type']}'")
+        await mark_failed(
+            db, job_id, claim_token=claim_token,
+            error=f"Không có handler đăng ký cho job_type='{job['job_type']}'",
+        )
         return True
 
     try:
-        outcome = await handler(job["payload"])
-        await mark_succeeded(db, job_id, result=outcome)
+        handler_payload = {
+            **job["payload"],
+            "_background_job": {
+                "job_id": job_id,
+                "claim_token": claim_token,
+                "claimed_at": job["claimed_at"],
+            },
+        }
+        outcome = await handler(handler_payload)
+        await mark_succeeded(db, job_id, claim_token=claim_token, result=outcome)
     except Exception as exc:  # noqa: BLE001 - job xấu không được làm chết worker
         logger.exception("background_job.handler_failed", extra={"job_id": job_id, "job_type": job["job_type"]})
-        await mark_failed(db, job_id, error=str(exc))
+        await mark_failed(db, job_id, claim_token=claim_token, error=str(exc))
     return True

@@ -95,7 +95,12 @@ class PersonalizationMongoRepository:
     async def list_question_items_for_document(self, document_id: str, user_id: str) -> list[dict]:
         user_id = _require_non_empty(user_id, "user_id")
         cursor = self.db["question_sets"].find(
-            {"document_id": document_id, "user_id": user_id, "deleted_at": None}
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "deleted_at": None,
+                "purpose": {"$ne": "student_review"},
+            }
         )
         items: list[dict] = []
         async for question_set in cursor:
@@ -344,7 +349,11 @@ class PersonalizationMongoRepository:
             question_set_id, raw_index = item_id.rsplit(":", 1)
             if raw_index.isdigit() and ObjectId.is_valid(question_set_id):
                 question_set = await self.db["question_sets"].find_one(
-                    {"_id": ObjectId(question_set_id), "deleted_at": None}
+                    {
+                        "_id": ObjectId(question_set_id),
+                        "deleted_at": None,
+                        "purpose": {"$ne": "student_review"},
+                    }
                 )
                 if not question_set:
                     return None

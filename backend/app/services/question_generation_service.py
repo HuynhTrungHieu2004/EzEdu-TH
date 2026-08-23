@@ -20,12 +20,18 @@ from app.services.llm_service import (
 )
 from app.services.tfidf_service import extract_keywords
 from app.services.question_diversity_service import select_diverse_questions
-from app.curriculum_kb.services.context_service import GroundedChunk, resolve_context, validate_evidence
+from app.curriculum_kb.services.context_service import (
+    GroundedChunk,
+    UngroundedOutputError,
+    resolve_context,
+    validate_evidence,
+)
 from app.services.language_policy_service import (
     LanguageMismatchError,
     resolve_output_language,
     validate_output_language,
 )
+from app.services.student_review_service import is_valid_student_review_question
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +261,8 @@ async def generate_questions(
     grade: int | None = None,
     topic_id: str | None = None,
     output_language: str | None = None,
+    *,
+    question_set_metadata: dict | None = None,
 ) -> dict:
     """
     Dual-Gen & Dual-Val Question Generation pipeline:
@@ -273,13 +281,20 @@ async def generate_questions(
         else output_language or "vi"
     )
     
-    document = await db["documents"].find_one({"_id": ObjectId(document_id)})
+    document = await db["documents"].find_one({
+        "_id": ObjectId(document_id),
+        "user_id": user_id,
+        "deleted_at": None,
+    })
     if not document:
         raise FileNotFoundError("Document not found.")
 
     has_transcript = False
     if document.get("media_kind") == "video":
-        content_doc = await db["document_contents"].find_one({"document_id": document_id})
+        content_doc = await db["document_contents"].find_one({
+            "document_id": document_id,
+            "user_id": user_id,
+        })
         if content_doc and content_doc.get("extracted_text"):
             has_transcript = True
 
@@ -289,11 +304,17 @@ async def generate_questions(
     use_claude = settings.AI_TEXT_PROVIDER == "claude"
     claude_usage = None
     if document.get("media_kind") == "document" or has_transcript:
-        cursor = db["document_chunks"].find({"document_id": document_id}).sort("chunk_index", 1)
+        cursor = db["document_chunks"].find({
+            "document_id": document_id,
+            "user_id": user_id,
+        }).sort("chunk_index", 1)
         chunk_docs = [doc async for doc in cursor]
         chunks_list = [doc["content"] for doc in chunk_docs]
         if not chunks_list:
-            content_doc = await db["document_contents"].find_one({"document_id": document_id})
+            content_doc = await db["document_contents"].find_one({
+                "document_id": document_id,
+                "user_id": user_id,
+            })
             if content_doc:
                 chunks_list = [content_doc["extracted_text"]]
                 chunk_docs = [{"chunk_index": 0, "content": chunks_list[0]}]
@@ -429,9 +450,14 @@ async def generate_questions(
 
     # Combine pools
     questions_pool = []
+    student_review = (question_set_metadata or {}).get("purpose") == "student_review"
     # Deduplicate basic duplicates (based on question text)
     seen_texts = set()
     for q in (groq_questions + gemini_questions):
+        if not _valid_question_candidate(q):
+            continue
+        if student_review and not is_valid_student_review_question(q):
+            continue
         q_text = q.get("question", "").strip().lower()
         if q_text and q_text not in seen_texts:
             seen_texts.add(q_text)
@@ -592,11 +618,16 @@ async def generate_questions(
                 raise LanguageMismatchError(
                     f"Expected question language {resolved_language}, got {q.get('language') or 'missing'}"
                 )
+            grounding_excerpt = q.get("grounding_excerpt")
+            if not isinstance(grounding_excerpt, str) or not grounding_excerpt.strip():
+                raise UngroundedOutputError("AI output has no grounding excerpt")
+            grounding_excerpt = grounding_excerpt.strip()
             validate_evidence(
                 q.get("source_chunk_ids") or [],
                 supplied_evidence,
-                supporting_excerpt=q.get("grounding_excerpt"),
+                supporting_excerpt=grounding_excerpt,
             )
+            q["grounding_excerpt"] = grounding_excerpt[:500]
             validate_output_language(
                 [
                     q.get("question", ""),
@@ -632,7 +663,8 @@ async def generate_questions(
         },
         "published_question_count": 0,
         "created_at": now,
-        "updated_at": now
+        "updated_at": now,
+        **(question_set_metadata or {}),
     }
     
     result = await db["question_sets"].insert_one(question_set)

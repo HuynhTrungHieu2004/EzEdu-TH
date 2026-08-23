@@ -23,6 +23,12 @@ from app.database.mongodb import close_mongo_connection, connect_to_mongo, get_d
 from app.services.background_job_service import ensure_background_job_indexes, process_one
 from app.exam_bank.services.attempt_service import GRADE_ESSAY_JOB_TYPE, grade_essay_answer_job, sweep_expired_attempts
 from app.services.cloudinary_service import CLEANUP_ASSET_JOB_TYPE, cleanup_cloudinary_asset_job
+from app.services.student_review_service import (
+    STUDENT_DOCUMENT_CLASSIFY_JOB_TYPE,
+    STUDENT_REVIEW_GENERATE_JOB_TYPE,
+    classify_student_document_job,
+    generate_student_review_job,
+)
 from app.curriculum_kb.services.ingestion_service import INGEST_JOB_TYPE, ingest_curriculum_source_job
 from app.curriculum_kb.services.crawler_service import CRAWL_JOB_TYPE, crawl_batch_job
 from app.personalization.services.knowledge_extraction_job import (
@@ -49,6 +55,8 @@ HANDLERS: Dict[str, Callable[[dict], Awaitable[object]]] = {
     CLUSTER_ASSIGNMENT_JOB_TYPE: assign_personalization_clusters_job,
     STUDY_EXAM_JOB_TYPE: lambda payload: generate_study_exam_job(get_database(), payload),
     CRAWL_JOB_TYPE: lambda payload: crawl_batch_job(get_database(), payload),
+    STUDENT_DOCUMENT_CLASSIFY_JOB_TYPE: lambda payload: classify_student_document_job(get_database(), payload),
+    STUDENT_REVIEW_GENERATE_JOB_TYPE: lambda payload: generate_student_review_job(get_database(), payload),
 }
 
 POLL_INTERVAL_SECONDS = 3.0

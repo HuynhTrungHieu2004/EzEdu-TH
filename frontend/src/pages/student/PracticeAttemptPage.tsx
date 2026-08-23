@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { questionApi } from '../../api/questionApi';
 import type { QuestionAttemptResponse, QuestionSetResponse } from '../../api/questionApi';
+import { studentReviewApi } from '../../api/studentReviewApi';
+import type {
+  ReviewAttempt,
+  ReviewAttemptQuestion,
+} from '../../api/studentReviewApi';
 import { buildEventIdempotencyKey, getLearningSession, trackLearningEvent } from '../../api/learningEventApi';
 import QuestionCard from '../../components/QuestionCard';
 import { getApiErrorDetail, isUnauthorizedError } from '../../api/errors';
@@ -14,6 +19,7 @@ import {
   CardTitle,
   ErrorState,
   PageHeader,
+  Radio,
   Skeleton,
 } from '../../components/ui';
 import '../question-set.css';
@@ -28,7 +34,28 @@ import '../question-set.css';
  * đề của giáo viên.
  * Xem docs/ui-redesign/01-audit-report.md §6.1 và §6.3 (lỗi M2).
  */
+const pendingInitialReviewAttempts = new Map<string, Promise<ReviewAttempt>>();
+
+function startInitialReviewAttempt(reviewId: string) {
+  const pending = pendingInitialReviewAttempts.get(reviewId);
+  if (pending) return pending;
+  const request = studentReviewApi.startAttempt(reviewId);
+  pendingInitialReviewAttempts.set(reviewId, request);
+  request.then(
+    () => pendingInitialReviewAttempts.delete(reviewId),
+    () => pendingInitialReviewAttempts.delete(reviewId),
+  );
+  return request;
+}
+
 export default function PracticeAttemptPage() {
+  const { reviewId } = useParams<{ reviewId: string }>();
+  return reviewId
+    ? <StudentReviewAttempt key={reviewId} reviewId={reviewId} />
+    : <QuestionSetPracticeAttemptPage />;
+}
+
+function QuestionSetPracticeAttemptPage() {
   const { questionSetId } = useParams<{ questionSetId: string }>();
   const navigate = useNavigate();
 
@@ -287,6 +314,244 @@ export default function PracticeAttemptPage() {
           />
         ))}
       </div>
+    </>
+  );
+}
+
+function optionText(question: ReviewAttemptQuestion, optionId: string) {
+  return question.options.find((option) => option.id === optionId)?.text ?? optionId;
+}
+
+function StudentReviewAttempt({ reviewId }: { reviewId: string }) {
+  const navigate = useNavigate();
+  const [attempt, setAttempt] = useState<ReviewAttempt | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const startInFlightRef = useRef(false);
+  const submitInFlightRef = useRef(false);
+  const requestGenerationRef = useRef(0);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const generation = ++requestGenerationRef.current;
+    let active = true;
+    startInitialReviewAttempt(reviewId)
+      .then((response) => {
+        if (!active || generation !== requestGenerationRef.current) return;
+        setAttempt(response);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active || generation !== requestGenerationRef.current) return;
+        if (isUnauthorizedError(err)) {
+          localStorage.removeItem('access_token');
+          navigate('/login');
+          return;
+        }
+        setError(getApiErrorDetail(err) ?? 'Không thể bắt đầu bộ đề ôn tập.');
+      })
+      .finally(() => {
+        if (active && generation === requestGenerationRef.current) setLoading(false);
+      });
+    return () => {
+      active = false;
+      requestGenerationRef.current += 1;
+    };
+  }, [navigate, reviewId]);
+
+  useEffect(() => {
+    if (error && !loading) errorRef.current?.focus();
+  }, [attempt, error, loading]);
+
+  async function startFreshAttempt() {
+    if (startInFlightRef.current) return;
+    const generation = ++requestGenerationRef.current;
+    startInFlightRef.current = true;
+    setLoading(true);
+    setError(null);
+    setAnswers({});
+    setAttempt(null);
+    try {
+      const response = await studentReviewApi.startAttempt(reviewId);
+      if (generation !== requestGenerationRef.current) return;
+      setAttempt(response);
+    } catch (err: unknown) {
+      if (generation !== requestGenerationRef.current) return;
+      if (isUnauthorizedError(err)) {
+        localStorage.removeItem('access_token');
+        navigate('/login');
+        return;
+      }
+      setError(getApiErrorDetail(err) ?? 'Không thể tạo lượt ôn tập mới.');
+    } finally {
+      if (generation === requestGenerationRef.current) {
+        startInFlightRef.current = false;
+        setLoading(false);
+      }
+    }
+  }
+
+  async function submitReviewAttempt() {
+    if (!attempt || attempt.status !== 'in_progress' || submitInFlightRef.current) return;
+    if (attempt.questions.some((question) => !answers[question.id])) {
+      setError('Bạn cần chọn một đáp án cho tất cả câu hỏi trước khi nộp bài.');
+      return;
+    }
+
+    const generation = ++requestGenerationRef.current;
+    submitInFlightRef.current = true;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await studentReviewApi.submitAttempt(attempt.id, answers);
+      if (generation !== requestGenerationRef.current) return;
+      setAnswers(response.answers);
+      setAttempt(response);
+    } catch (err: unknown) {
+      if (generation !== requestGenerationRef.current) return;
+      if (isUnauthorizedError(err)) {
+        localStorage.removeItem('access_token');
+        navigate('/login');
+        return;
+      }
+      setError(getApiErrorDetail(err) ?? 'Không thể nộp bài ôn tập. Vui lòng thử lại.');
+    } finally {
+      if (generation === requestGenerationRef.current) {
+        submitInFlightRef.current = false;
+        setSubmitting(false);
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="ez-stack" aria-live="polite" aria-busy="true">
+        <Skeleton height="2rem" width="40%" />
+        <Skeleton height="8rem" />
+        <Skeleton height="16rem" />
+        <span className="sr-only">Đang chuẩn bị bộ đề ôn tập</span>
+      </div>
+    );
+  }
+
+  if (!attempt) {
+    return (
+      <div ref={errorRef} tabIndex={-1}>
+        <ErrorState
+          title="Không thể bắt đầu ôn tập"
+          description={error ?? undefined}
+          actions={(
+            <div style={{ display: 'flex', gap: 'var(--ez-space-3)', flexWrap: 'wrap' }}>
+              <Button onClick={startFreshAttempt}>Thử lại</Button>
+              <Button variant="outline" onClick={() => navigate('/student/review-history')}>
+                Về lịch sử ôn tập
+              </Button>
+            </div>
+          )}
+        />
+      </div>
+    );
+  }
+
+  const completed = attempt.status === 'completed' ? attempt : null;
+  const results = new Map(completed?.results.map((result) => [result.questionId, result]));
+
+  return (
+    <>
+      <PageHeader
+        backTo="/student/review-history"
+        backLabel="Về lịch sử ôn tập"
+        eyebrow="Ôn tập từ học liệu"
+        title="Bộ câu hỏi ôn tập"
+        description="Đây là bộ đề ôn tập cá nhân, không phải đề thi chính thức."
+      />
+
+      {error ? (
+        <div ref={errorRef} tabIndex={-1} style={{ marginBottom: 'var(--ez-space-6)' }}>
+          <Alert tone="error">{error}</Alert>
+        </div>
+      ) : null}
+
+      {completed ? (
+        <Alert
+          tone="success"
+          title="Đã chấm xong"
+          role="status"
+          style={{ marginBottom: 'var(--ez-space-6)' }}
+        >
+          Điểm: <strong>{completed.score}%</strong> — đúng {completed.correctCount}/{completed.totalCount} câu.
+        </Alert>
+      ) : (
+        <Alert tone="info" style={{ marginBottom: 'var(--ez-space-6)' }} aria-live="polite">
+          Chọn đúng một đáp án cho mỗi câu, sau đó nộp bài để xem lời giải và nguồn học liệu.
+        </Alert>
+      )}
+
+      <div className="qs-questions-list">
+        {attempt.questions.map((question, index) => {
+          const result = results.get(question.id);
+          const excerpt = result?.source.groundingExcerpt?.trim();
+          return (
+            <Card key={question.id}>
+              <CardHeader>
+                <CardTitle as="h2">Câu {index + 1}</CardTitle>
+              </CardHeader>
+              <CardBody>
+                <fieldset style={{ border: 0, padding: 0, margin: 0, width: '100%' }}>
+                  <legend style={{ fontWeight: 600, marginBottom: 'var(--ez-space-4)' }}>
+                    {question.text}
+                  </legend>
+                  <div className="ez-stack-sm">
+                    {question.options.map((option) => (
+                      <Radio
+                        key={option.id}
+                        name={`review-question-${question.id}`}
+                        value={option.id}
+                        label={`${option.id}. ${option.text}`}
+                        checked={answers[question.id] === option.id}
+                        disabled={Boolean(completed) || submitting}
+                        onChange={() => setAnswers((current) => ({ ...current, [question.id]: option.id }))}
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+
+                {result ? (
+                  <div style={{ marginTop: 'var(--ez-space-5)' }}>
+                    <Alert tone={result.isCorrect ? 'success' : 'error'}>
+                      <strong>{result.isCorrect ? 'Chính xác.' : 'Chưa chính xác.'}</strong>
+                      {' '}Bạn chọn: {optionText(question, result.selectedOptionId)}.
+                      {' '}Đáp án đúng: {optionText(question, result.correctOptionId)}.
+                    </Alert>
+                    <p><strong>Giải thích:</strong> {result.explanation}</p>
+                    <p>
+                      <strong>Nguồn học liệu:</strong>{' '}
+                      {excerpt ? `“${excerpt}”` : 'Đã đối chiếu với học liệu; không có đoạn trích để hiển thị.'}
+                    </p>
+                  </div>
+                ) : null}
+              </CardBody>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card style={{ marginTop: 'var(--ez-space-6)' }}>
+        <CardBody>
+          <div style={{ display: 'flex', gap: 'var(--ez-space-3)', flexWrap: 'wrap' }}>
+            {completed ? (
+              <Button loading={loading} onClick={startFreshAttempt}>Làm lại bộ đề</Button>
+            ) : (
+              <Button loading={submitting} onClick={submitReviewAttempt}>Nộp bài ôn tập</Button>
+            )}
+            <Link className="ez-btn ez-btn-outline" to="/student/review-history">
+              Về lịch sử ôn tập
+            </Link>
+          </div>
+        </CardBody>
+      </Card>
     </>
   );
 }

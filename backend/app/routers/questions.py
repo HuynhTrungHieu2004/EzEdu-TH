@@ -129,7 +129,7 @@ async def _get_owned_active_qs_or_404(
 
     db = get_database()
     question_set = await db["question_sets"].find_one(
-        {"_id": ObjectId(question_set_id)}
+        {"_id": ObjectId(question_set_id), "purpose": {"$ne": "student_review"}}
     )
 
     if not question_set:
@@ -225,7 +225,11 @@ async def _get_visible_qs_or_404(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bộ câu hỏi.")
 
     db = get_database()
-    question_set = await db["question_sets"].find_one({"_id": ObjectId(question_set_id), "deleted_at": None})
+    question_set = await db["question_sets"].find_one({
+        "_id": ObjectId(question_set_id),
+        "deleted_at": None,
+        "purpose": {"$ne": "student_review"},
+    })
     if not question_set:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bộ câu hỏi.")
 
@@ -633,6 +637,7 @@ async def list_my_history(
     mongo_filter: dict = {
         "user_id": current_user.id,
         "deleted_at": None,
+        "purpose": {"$ne": "student_review"},
     }
 
     if question_type:
@@ -772,6 +777,7 @@ async def get_questions_by_document(
                 "document_id": document_id,
                 "user_id": current_user.id,
                 "deleted_at": None,
+                "purpose": {"$ne": "student_review"},
             }
         )
         .sort("created_at", -1)

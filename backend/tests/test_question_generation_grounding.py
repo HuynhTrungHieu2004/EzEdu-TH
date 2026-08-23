@@ -120,6 +120,21 @@ class QuestionGenerationGroundingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(0, await self.db["question_sets"].count_documents({}))
 
+    async def test_missing_grounding_excerpt_is_rejected_before_persistence(self):
+        question = _question()
+        question.pop("grounding_excerpt")
+
+        with self.assertRaises(UngroundedOutputError):
+            await self._generate(question)
+
+        self.assertEqual(0, await self.db["question_sets"].count_documents({}))
+
+    async def test_blank_grounding_excerpt_is_rejected_before_persistence(self):
+        with self.assertRaises(UngroundedOutputError):
+            await self._generate(_question(grounding_excerpt="  \n\t  "))
+
+        self.assertEqual(0, await self.db["question_sets"].count_documents({}))
+
     async def test_vietnamese_question_for_english_subject_is_rejected_before_persistence(self):
         vietnamese = _question(
             question="Thì nào diễn tả một hành động đã hoàn thành trong quá khứ?",

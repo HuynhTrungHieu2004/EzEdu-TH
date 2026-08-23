@@ -100,7 +100,7 @@ async def _document_counts(db, document_id: str, user_id: Optional[str]) -> tupl
         question_query["user_id"] = user_id
     chunk_count = await db["document_chunks"].count_documents(chunk_query)
     question_sets = await db["question_sets"].find(
-        {**question_query, "deleted_at": None},
+        {**question_query, "deleted_at": None, "purpose": {"$ne": "student_review"}},
         {"questions": 1, "question_count": 1},
     ).to_list(None)
     question_count = sum(int(item.get("question_count") or len(item.get("questions") or [])) for item in question_sets)
@@ -474,7 +474,7 @@ async def list_admin_questions(
     current_user: UserResponse = Depends(require_permission(Permission.QUESTIONS_VIEW)),
 ):
     db = get_database()
-    query: dict[str, Any] = {}
+    query: dict[str, Any] = {"purpose": {"$ne": "student_review"}}
     if user_id:
         query["user_id"] = user_id
     if document_id:
@@ -515,7 +515,10 @@ async def list_admin_questions(
 async def _load_question_set_for_admin(question_id: str) -> tuple[dict[str, Any], int]:
     question_set_id, index = _parse_question_id(question_id)
     db = get_database()
-    qs = await db["question_sets"].find_one({"_id": ObjectId(question_set_id)})
+    qs = await db["question_sets"].find_one({
+        "_id": ObjectId(question_set_id),
+        "purpose": {"$ne": "student_review"},
+    })
     if not qs:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu hỏi.")
     if index < 0 or index >= len(qs.get("questions") or []):
@@ -704,7 +707,7 @@ async def list_admin_exams(
     current_user: UserResponse = Depends(require_permission(Permission.QUESTIONS_VIEW)),
 ):
     db = get_database()
-    query: dict[str, Any] = {}
+    query: dict[str, Any] = {"purpose": {"$ne": "student_review"}}
     if status_filter == "active":
         query["deleted_at"] = None
     elif status_filter == "deleted":

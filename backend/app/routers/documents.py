@@ -56,6 +56,8 @@ VIDEO_EXTENSIONS = {"mp4", "mov", "webm", "mkv"}
 ALLOWED_EXTENSIONS = DOCUMENT_EXTENSIONS | VIDEO_EXTENSIONS
 MAX_DOCUMENT_SIZE = 20 * 1024 * 1024  # 20MB
 MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100MB
+STUDENT_REVIEW_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+STUDENT_REVIEW_MAX_BYTES = 20 * 1024 * 1024
 CONTENT_PREVIEW_LENGTH = 1000
 
 
@@ -65,6 +67,14 @@ def ensure_lecturer_or_admin(current_user: UserResponse) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ giảng viên mới được quản lý học liệu.",
         )
+
+
+def ensure_document_actor(user) -> None:
+    role = user.get("role") if isinstance(user, dict) else user.role
+    if role not in {"student", "user", "lecturer", "admin", "super_admin"}:
+        raise HTTPException(status_code=403, detail="Document access denied")
+
+
 DOWNLOAD_TIMEOUT_SECONDS = 60.0
 ALREADY_EXTRACTED_STATUSES = {"processed", "transcribed", "indexed"}
 BUSY_DOCUMENT_STATUSES = {"extracting", "indexing", "transcribing", "deleting"}
@@ -215,18 +225,14 @@ def ensure_not_quarantined(document: dict) -> None:
 async def get_owned_document(document_id: str, current_user: UserResponse) -> dict:
     object_id = ensure_valid_document_id(document_id)
     db = get_database()
-    document = await db["documents"].find_one({"_id": object_id, "deleted_at": None})
+    document = await db["documents"].find_one(
+        {"_id": object_id, "user_id": current_user.id, "deleted_at": None}
+    )
 
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found.",
-        )
-
-    if document["user_id"] != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document.",
         )
 
     return document
@@ -512,28 +518,41 @@ async def upload_document(
     """
     Upload a learning material (document or video), store metadata, and extract text if it is a document.
     """
-    ensure_lecturer_or_admin(current_user)
+    ensure_document_actor(current_user)
     filename = Path(file.filename or "unnamed_file").name
-    file_ext = filename.split(".")[-1].lower() if "." in filename else ""
-    allowed_file_types = set(await get_setting_value("allowed_file_types", sorted(ALLOWED_EXTENSIONS)))
-    if file_ext not in allowed_file_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Định dạng file không được phép: {file_ext}",
-        )
-
-    if file_ext in DOCUMENT_EXTENSIONS:
+    file_suffix = Path(filename).suffix.lower()
+    file_ext = file_suffix.removeprefix(".")
+    actor_role = current_user.role
+    if actor_role in {"student", "user"}:
+        if file_suffix not in STUDENT_REVIEW_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Định dạng file không được phép: {file_ext}",
+            )
         media_kind = "document"
-        max_file_size_mb = int(await get_setting_value("max_file_size_mb", MAX_DOCUMENT_SIZE // (1024 * 1024)))
-        max_size = max_file_size_mb * 1024 * 1024
+        max_size = STUDENT_REVIEW_MAX_BYTES
         resource_type = "auto"
     else:
-        if not bool(await get_setting_value("enable_video_upload", True)):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Upload video đang bị tắt.")
-        await require_feature_enabled_flag("enable_video_upload", user_role=current_user.role, user_id=current_user.id)
-        media_kind = "video"
-        max_size = MAX_VIDEO_SIZE
-        resource_type = "video"
+        allowed_file_types = set(await get_setting_value("allowed_file_types", sorted(ALLOWED_EXTENSIONS)))
+        if file_ext not in allowed_file_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Định dạng file không được phép: {file_ext}",
+            )
+
+        if file_ext in DOCUMENT_EXTENSIONS:
+            media_kind = "document"
+            max_file_size_mb = int(await get_setting_value("max_file_size_mb", MAX_DOCUMENT_SIZE // (1024 * 1024)))
+            max_size = max_file_size_mb * 1024 * 1024
+            resource_type = "auto"
+        else:
+            ensure_lecturer_or_admin(current_user)
+            if not bool(await get_setting_value("enable_video_upload", True)):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Upload video đang bị tắt.")
+            await require_feature_enabled_flag("enable_video_upload", user_role=current_user.role, user_id=current_user.id)
+            media_kind = "video"
+            max_size = MAX_VIDEO_SIZE
+            resource_type = "video"
 
     temp_file_path = build_temp_file_path(filename)
     file_size = 0
@@ -595,7 +614,10 @@ async def upload_document(
             metadata={"file_type": file_ext, "file_size": file_size},
             database=db,
         )
-        content_doc = await db["document_contents"].find_one({"document_id": str(existing["_id"])})
+        content_doc = await db["document_contents"].find_one({
+            "document_id": str(existing["_id"]),
+            "user_id": current_user.id,
+        })
         return DocumentUploadResponse(
             document_id=str(existing["_id"]),
             user_id=existing["user_id"],
@@ -815,6 +837,7 @@ async def get_document(
     """
     Retrieve metadata of a document owned by the authenticated user.
     """
+    ensure_document_actor(current_user)
     document = await get_owned_document(document_id, current_user)
     return serialize_document(document)
 
@@ -829,7 +852,7 @@ async def extract_document_content(
     """
     Download the uploaded file from Cloudinary when needed and extract text for the owner.
     """
-    ensure_lecturer_or_admin(current_user)
+    ensure_document_actor(current_user)
     document = await get_owned_document(document_id, current_user)
     ensure_not_quarantined(document)
     document_before = dict(document)
@@ -1014,7 +1037,10 @@ async def get_document_content(
     """
     document = await get_owned_document(document_id, current_user)
     db = get_database()
-    content_doc = await db["document_contents"].find_one({"document_id": document_id})
+    content_doc = await db["document_contents"].find_one({
+        "document_id": document_id,
+        "user_id": current_user.id,
+    })
 
     if not content_doc or not content_doc.get("extracted_text"):
         if document.get("status") == "failed":
@@ -1041,7 +1067,7 @@ async def index_document_api(
     """
     Split extracted text into chunks, index them into vector storage, and mark the document as indexed.
     """
-    ensure_lecturer_or_admin(current_user)
+    ensure_document_actor(current_user)
     document = await get_owned_document(document_id, current_user)
     ensure_not_quarantined(document)
     document_before = dict(document)
@@ -1259,7 +1285,10 @@ async def get_document_chunks(
     db = get_database()
 
     chunks = []
-    cursor = db["document_chunks"].find({"document_id": document_id}).sort("chunk_index", 1)
+    cursor = db["document_chunks"].find({
+        "document_id": document_id,
+        "user_id": current_user.id,
+    }).sort("chunk_index", 1)
     async for chunk in cursor:
         chunks.append(
             ChunkResponse(
@@ -1403,6 +1432,8 @@ async def transcribe_video_api(
     Start transcription for a video document in the background.
     """
     ensure_lecturer_or_admin(current_user)
+    if current_user.role == "user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Video transcription is lecturer/admin only.")
     document = await get_owned_document(document_id, current_user)
     ensure_not_quarantined(document)
 
@@ -1493,7 +1524,10 @@ async def get_video_transcript(
         )
         
     db = get_database()
-    content_doc = await db["document_contents"].find_one({"document_id": document_id})
+    content_doc = await db["document_contents"].find_one({
+        "document_id": document_id,
+        "user_id": current_user.id,
+    })
     
     if not content_doc or not content_doc.get("extracted_text"):
         if document.get("status") == "failed":
@@ -1519,7 +1553,7 @@ async def delete_document(
     """
     Delete a document and all associated data (content, chunks, vectors, cloud file).
     """
-    ensure_lecturer_or_admin(current_user)
+    ensure_document_actor(current_user)
     document = await get_owned_document(document_id, current_user)
     reason = None
     if _is_admin_actor(current_user):
@@ -1672,10 +1706,16 @@ async def get_document_clusters(
     doc_names = {}
     for doc_id in doc_vectors.keys():
         if ObjectId.is_valid(doc_id):
-            doc = await db["documents"].find_one({"_id": ObjectId(doc_id)})
+            doc = await db["documents"].find_one({
+                "_id": ObjectId(doc_id),
+                "user_id": current_user.id,
+            })
             if doc:
                 doc_names[doc_id] = doc.get("original_filename", "")
-            content = await db["document_contents"].find_one({"document_id": doc_id})
+            content = await db["document_contents"].find_one({
+                "document_id": doc_id,
+                "user_id": current_user.id,
+            })
             if content:
                 doc_previews[doc_id] = (content.get("extracted_text", "") or "")[:200]
 
@@ -1733,7 +1773,10 @@ async def get_similar_documents(
     for item in similar:
         doc_id = item["document_id"]
         if ObjectId.is_valid(doc_id):
-            doc = await db["documents"].find_one({"_id": ObjectId(doc_id)})
+            doc = await db["documents"].find_one({
+                "_id": ObjectId(doc_id),
+                "user_id": current_user.id,
+            })
             if doc:
                 item["document_name"] = doc.get("original_filename", "")
                 item["file_type"] = doc.get("file_type", "")

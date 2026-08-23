@@ -127,6 +127,50 @@ class LearningItemVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(item)
         self.assertIsNone(khong_duoc_xem)
 
+    async def test_review_sets_are_excluded_from_document_question_ingestion(self):
+        review_set_id = str(ObjectId())
+        await self.db["question_sets"].insert_one({
+            "_id": ObjectId(review_set_id),
+            "user_id": TEACHER_ID,
+            "document_id": self.document_id,
+            "purpose": "student_review",
+            "deleted_at": None,
+            "questions": [question("published")],
+        })
+
+        items = await self.repo.list_question_items_for_document(
+            self.document_id, TEACHER_ID
+        )
+        question_set_ids = {item["question_set_id"] for item in items}
+
+        self.assertIn(self.set_all, question_set_ids)
+        self.assertNotIn(review_set_id, question_set_ids)
+
+    async def test_review_set_fallback_is_hidden_even_from_admin_but_legacy_remains(self):
+        review_set_id = str(ObjectId())
+        await self.db["question_sets"].insert_one({
+            "_id": ObjectId(review_set_id),
+            "user_id": STUDENT_ID,
+            "document_id": self.document_id,
+            "purpose": "student_review",
+            "deleted_at": None,
+            "questions": [question("draft")],
+        })
+
+        legacy = await self.repo.resolve_accessible_learning_item(
+            item_id=f"{self.set_draft}:0",
+            user_id="admin-1",
+            user_role="admin",
+        )
+        hidden_review = await self.repo.resolve_accessible_learning_item(
+            item_id=f"{review_set_id}:0",
+            user_id="admin-1",
+            user_role="admin",
+        )
+
+        self.assertIsNotNone(legacy)
+        self.assertIsNone(hidden_review)
+
     async def test_components_by_id_follow_the_same_visibility(self):
         await self.db["knowledge_components"].insert_one({
             "_id": "kc-1", "name": "Hàm số bậc hai", "subject": "Toán",

@@ -28,6 +28,7 @@ async def build_visible_question_set_filter(db, user_id: str) -> Dict[str, Any]:
     class_ids = await student_class_ids(db, user_id)
     return {
         "deleted_at": None,
+        "purpose": {"$ne": "student_review"},
         "published_question_count": {"$gt": 0},
         "$or": [
             {"audience_type": "all"},

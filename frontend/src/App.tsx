@@ -96,6 +96,8 @@ const LearningRoadmapPage = lazy(() => import('./pages/student/LearningRoadmapPa
 const StudentNotificationsPage = lazy(() => import('./pages/student/StudentNotificationsPage'));
 const StudentOnlineSchedulesPage = lazy(() => import('./pages/student/StudentOnlineSchedulesPage'));
 const StudentLearningMaterialsPage = lazy(() => import('./pages/student/StudentLearningMaterialsPage'));
+const StudentReviewHistoryPage = lazy(() => import('./pages/student/StudentReviewHistoryPage'));
+const PracticeAttemptPage = lazy(() => import('./pages/student/PracticeAttemptPage'));
 const StudentCurriculumPage = lazy(() => import('./pages/student/StudentCurriculumPage'));
 const SubjectCatalogPage = lazy(() => import('./pages/student/SubjectCatalogPage'));
 const AttemptReviewPage = lazy(() => import('./pages/student/AttemptReviewPage'));
@@ -330,6 +332,18 @@ function App() {
         <Route
           path="/student/learning-materials"
           element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><StudentLearningMaterialsPage /></RoleRoute></AppLayout>}
+        />
+        <Route
+          path="/student/review-history"
+          element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><StudentReviewHistoryPage /></RoleRoute></AppLayout>}
+        />
+        <Route
+          path="/student/reviews/:reviewId"
+          element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><StudentReviewHistoryPage /></RoleRoute></AppLayout>}
+        />
+        <Route
+          path="/student/reviews/:reviewId/attempt"
+          element={<AppLayout><RoleRoute allow={STUDENT_ONLY}><PracticeAttemptPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/student/curriculum"
