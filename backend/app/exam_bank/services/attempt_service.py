@@ -19,6 +19,7 @@ from app.exam_bank.schemas.attempt import (
 from app.exam_bank.schemas.exam import StudentExamItem
 from app.curriculum_kb.services.context_service import resolve_context
 from app.services.language_policy_service import resolve_output_language
+from app.services.submission_notification_service import upsert_submission_notification
 
 GRADE_ESSAY_JOB_TYPE = "grade_essay_answer"
 
@@ -316,6 +317,15 @@ async def _finalize(db, doc: Dict[str, Any], *, answers: Dict[str, str], auto_su
                 idempotency_key=f"grade:{attempt_id}:{r['question_id']}",
             )
 
+    await upsert_submission_notification(
+        db,
+        teacher_id=exam["owner_id"],
+        attempt_id=str(doc["_id"]),
+        title=f"Học sinh đã nộp đề {exam['code']}",
+        content="Đang chấm câu tự luận" if has_pending_ai else "Đã chấm xong",
+        action_url=f"/exams/{doc['exam_id']}/grading",
+    )
+
     return updated
 
 
@@ -586,4 +596,15 @@ async def grade_essay_answer_job(db, payload: Dict[str, Any]) -> Dict[str, Any]:
         {"_id": ObjectId(attempt_id)},
         {"$set": {"results": results, "total_score": total_score, "status": new_status, "updated_at": _now()}},
     )
+    if all_graded:
+        exam = await db[EXAMS].find_one({"_id": ObjectId(doc["exam_id"])})
+        if exam is not None:
+            await upsert_submission_notification(
+                db,
+                teacher_id=exam["owner_id"],
+                attempt_id=attempt_id,
+                title=f"Đã chấm xong đề {exam['code']}",
+                content="Đã chấm xong — bài làm đã sẵn sàng để xem lại.",
+                action_url=f"/exams/{doc['exam_id']}/grading",
+            )
     return {"score": score, "confidence": confidence}

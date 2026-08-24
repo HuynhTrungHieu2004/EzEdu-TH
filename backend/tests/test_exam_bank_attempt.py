@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from bson import ObjectId
 from fastapi import HTTPException
@@ -195,6 +195,38 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(submitted.max_score, 4.0)
         self.assertEqual(submitted.total_score, 2.0)  # đúng câu 1 (2đ), sai câu 2
 
+    async def test_submit_objective_exam_notifies_owner_as_graded(self):
+        exam = await self._publish_exam()
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+
+        await attempt_service.submit_attempt(
+            self.db, started.id, version=1, answers={}, student_id=self.student_id
+        )
+
+        notice = await self.db["admin_notifications"].find_one(
+            {"dedupe_key": f"submission:{started.id}"}
+        )
+        self.assertIsNotNone(notice)
+        self.assertEqual(notice["target_user_ids"], [self.teacher_id])
+        self.assertIn("Đã chấm xong", notice["content"])
+        self.assertEqual(notice["action_url"], f"/exams/{exam.id}/grading")
+
+    async def test_notification_failure_does_not_fail_saved_submission(self):
+        exam = await self._publish_exam()
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+
+        with patch(
+            "app.exam_bank.services.attempt_service.upsert_submission_notification",
+            new=AsyncMock(return_value=False),
+        ):
+            submitted = await attempt_service.submit_attempt(
+                self.db, started.id, version=1, answers={}, student_id=self.student_id
+            )
+
+        self.assertEqual(submitted.status, "graded")
+        stored = await self.db["exam_attempts"].find_one({"_id": ObjectId(started.id)})
+        self.assertEqual(stored["status"], "graded")
+
     async def test_submit_short_answer_queues_ai_grading_stays_submitted(self):
         exam = await self._publish_exam(question_type="short_answer")
         started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
@@ -234,6 +266,35 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(final.total_score, 3.5)
         graded_q1 = next(r for r in final.results if r.question_id == qids[0])
         self.assertEqual(graded_q1.ai_confidence, 0.8)
+
+    async def test_last_essay_job_updates_existing_notification(self):
+        exam = await self._publish_exam(question_type="short_answer")
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        exam_doc = await self.db[EXAMS].find_one({"_id": ObjectId(exam.id)})
+
+        await attempt_service.submit_attempt(
+            self.db, started.id, version=1, answers={}, student_id=self.student_id
+        )
+        pending = await self.db["admin_notifications"].find_one(
+            {"dedupe_key": f"submission:{started.id}"}
+        )
+        self.assertIsNotNone(pending)
+        self.assertIn("Đang chấm", pending["content"])
+
+        with patch(
+            "app.exam_bank.services.grading_service.grade_short_answer",
+            return_value=(1.0, 0.9, "Tốt"),
+        ):
+            for question_id in exam_doc["question_ids"]:
+                await attempt_service.grade_essay_answer_job(
+                    self.db, {"attempt_id": started.id, "question_id": question_id}
+                )
+
+        notices = await self.db["admin_notifications"].find(
+            {"dedupe_key": f"submission:{started.id}"}
+        ).to_list(None)
+        self.assertEqual(len(notices), 1)
+        self.assertIn("Đã chấm xong", notices[0]["content"])
 
     async def test_teacher_override_replaces_ai_score(self):
         exam = await self._publish_exam(question_type="short_answer")
@@ -334,6 +395,10 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(count, 1)
         final = await attempt_service.get_attempt(self.db, started.id, student_id=self.student_id)
         self.assertTrue(final.auto_submitted)
+        notice = await self.db["admin_notifications"].find_one(
+            {"dedupe_key": f"submission:{started.id}"}
+        )
+        self.assertIsNotNone(notice)
 
     async def test_get_exam_questions_for_student_hides_answers(self):
         exam = await self._publish_exam()
