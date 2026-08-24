@@ -10,7 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 async def ensure_submission_notification_indexes(db) -> None:
-    await db["admin_notifications"].create_index(
+    collection = db["admin_notifications"]
+    indexes = await collection.index_information()
+    if any(
+        index.get("key") == [("dedupe_key", ASCENDING)]
+        and index.get("unique") is True
+        and index.get("sparse") is True
+        for index in indexes.values()
+    ):
+        return
+    await collection.create_index(
         [("dedupe_key", ASCENDING)],
         unique=True,
         sparse=True,

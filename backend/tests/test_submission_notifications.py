@@ -74,6 +74,23 @@ class SubmissionNotificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("dedupe_key_1", indexes)
         self.assertNotIn("submission_dedupe_key_unique", indexes)
 
+    async def test_reuses_custom_dedupe_index_name(self):
+        from app.services.submission_notification_service import ensure_submission_notification_indexes
+
+        collection = self.db["admin_notifications"]
+        await collection.create_index(
+            [("dedupe_key", 1)],
+            name="submission_dedupe_key_unique",
+            unique=True,
+            sparse=True,
+        )
+
+        await ensure_submission_notification_indexes(self.db)
+
+        indexes = await collection.index_information()
+        self.assertIn("submission_dedupe_key_unique", indexes)
+        self.assertNotIn("dedupe_key_1", indexes)
+
 
 if __name__ == "__main__":
     unittest.main()
