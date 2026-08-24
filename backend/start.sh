@@ -16,9 +16,12 @@ fi
 
 if [ "$RUN_WORKER" = "1" ]; then
   echo "[start] bật worker nền (chấm tự luận)"
-  python -m app.worker &
+  while true; do
+    python -m app.worker
+    echo "[start] worker dừng; khởi động lại sau 3 giây" >&2
+    sleep 3
+  done &
 fi
 
 echo "[start] uvicorn cổng $PORT"
-uvicorn app.main:app --host 0.0.0.0 --port "$PORT" &
-wait -n
+exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
