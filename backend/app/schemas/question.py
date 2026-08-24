@@ -141,6 +141,11 @@ class QuestionAttemptResponse(BaseModel):
     created_at: datetime
 
 
+class TeacherQuestionAttemptResponse(QuestionAttemptResponse):
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
+
+
 class KeywordItem(BaseModel):
     keyword: str
     score: float

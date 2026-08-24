@@ -21,6 +21,7 @@ from app.schemas.question import (
     QuestionItemUpdateRequest,
     QuestionSetResponse,
     QuestionSetSummary,
+    TeacherQuestionAttemptResponse,
     QuestionWorkflowRequest,
     SubjectCatalogNode,
     TaxonomyNodeRenameRequest,
@@ -52,6 +53,7 @@ from app.services.admin_audit_service import record_admin_audit, require_reason
 from app.services.ai_quota_service import enforce_ai_quota
 from app.services.analytics_service import new_attempt_id, new_event_id, new_logical_request_id, record_event
 from app.services.system_settings_service import get_setting_value, require_feature_enabled_flag
+from app.services.submission_notification_service import upsert_submission_notification
 from app.schemas.analytics import UsageEventCreate
 from app.utils.cursor import serialize_cursor, deserialize_cursor
 
@@ -1217,6 +1219,15 @@ async def submit_question_attempt(
     result = await db["question_attempts"].insert_one(attempt_doc)
     attempt_doc["_id"] = result.inserted_id
 
+    await upsert_submission_notification(
+        db,
+        teacher_id=attempt_doc["owner_user_id"],
+        attempt_id=str(result.inserted_id),
+        title=f"Học sinh đã nộp {qs['document_name']}",
+        content=f"Đã chấm xong: {score}/{max_score} điểm.",
+        action_url=f"/gv/de-thi/{question_set_id}/bai-lam",
+    )
+
     return QuestionAttemptResponse(
         id=str(result.inserted_id),
         question_set_id=question_set_id,
@@ -1228,6 +1239,63 @@ async def submit_question_attempt(
         answers=answer_results,
         created_at=now,
     )
+
+
+@router.get("/{question_set_id}/attempts", response_model=List[TeacherQuestionAttemptResponse])
+async def list_question_attempts_for_teacher(
+    question_set_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    db = get_database()
+    if _is_admin_actor(current_user):
+        question_set = (
+            await db["question_sets"].find_one(
+                {
+                    "_id": ObjectId(question_set_id),
+                    "deleted_at": None,
+                    "purpose": {"$ne": "student_review"},
+                }
+            )
+            if ObjectId.is_valid(question_set_id)
+            else None
+        )
+        if question_set is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bộ câu hỏi.")
+    else:
+        await _get_owned_active_qs_or_404(question_set_id, current_user)
+
+    docs = await (
+        db["question_attempts"]
+        .find({"question_set_id": question_set_id})
+        .sort("created_at", -1)
+        .limit(100)
+        .to_list(None)
+    )
+    student_oids = [
+        ObjectId(doc["user_id"])
+        for doc in docs
+        if ObjectId.is_valid(doc.get("user_id", ""))
+    ]
+    students = {
+        str(student["_id"]): student
+        for student in await db["users"].find({"_id": {"$in": student_oids}}).to_list(None)
+    }
+    return [
+        TeacherQuestionAttemptResponse(
+            id=str(doc["_id"]),
+            question_set_id=doc["question_set_id"],
+            document_id=doc["document_id"],
+            user_id=doc["user_id"],
+            student_name=students.get(doc["user_id"], {}).get("full_name"),
+            student_email=students.get(doc["user_id"], {}).get("email"),
+            score=doc["score"],
+            max_score=doc["max_score"],
+            percent=doc["percent"],
+            answers=doc.get("answers", []),
+            created_at=doc["created_at"],
+        )
+        for doc in docs
+    ]
 
 
 @router.get("/{question_set_id}/attempts/my", response_model=List[QuestionAttemptResponse])
