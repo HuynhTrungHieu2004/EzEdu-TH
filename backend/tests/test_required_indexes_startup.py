@@ -7,7 +7,7 @@ from mongomock_motor import AsyncMongoMockClient
 
 
 class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
-    async def _start_with(self, failing_index: str | None = None, *, run_worker: bool | None = False):
+    async def _start_with(self, failing_index: str | None = None, *, run_worker: bool | str | None = False):
         from app.main import lifespan
 
         db = AsyncMongoMockClient().required_indexes_startup
@@ -19,7 +19,12 @@ class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
         if failing_index == "reviews":
             reviews.side_effect = RuntimeError("review unique index failed")
 
-        worker_env = {} if run_worker is None else {"RUN_WORKER": "1" if run_worker else "0"}
+        if run_worker is None:
+            worker_env = {}
+        elif isinstance(run_worker, bool):
+            worker_env = {"RUN_WORKER": "1" if run_worker else "0"}
+        else:
+            worker_env = {"RUN_WORKER": run_worker}
         with patch.dict(os.environ, worker_env, clear=run_worker is None), patch(
             "app.main.connect_to_mongo", new=AsyncMock()
         ), patch(
@@ -60,6 +65,10 @@ class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_worker_runs_inside_web_process_by_default(self):
         worker = await self._start_with(run_worker=None)
+        worker.assert_awaited_once()
+
+    async def test_worker_runs_when_render_variable_is_blank(self):
+        worker = await self._start_with(run_worker="")
         worker.assert_awaited_once()
 
     async def test_worker_can_be_disabled_explicitly(self):
