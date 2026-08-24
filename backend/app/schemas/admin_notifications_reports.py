@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 
 NotificationType = Literal[
     "system",
+    "exam",
     "maintenance_banner",
     "new_feature",
     "quota_warning",
@@ -113,6 +114,7 @@ class UserNotificationItem(BaseModel):
     priority: NotificationPriority
     created_at: datetime
     is_read: bool = False
+    action_url: Optional[str] = None
 
 
 ReportType = Literal[

@@ -52,6 +52,7 @@ async def _item(db, doc: dict, user_id: str) -> UserNotificationItem:
         priority=doc.get("priority") or "normal",
         created_at=doc.get("created_at") or datetime.now(timezone.utc),
         is_read=bool(read and read.get("read_at")),
+        action_url=doc.get("action_url"),
     )
 
 

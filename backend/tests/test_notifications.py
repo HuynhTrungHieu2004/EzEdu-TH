@@ -75,6 +75,13 @@ class UserNotificationTests(unittest.IsolatedAsyncioTestCase):
         read = await self.db["notification_reads"].find_one({"notification_id": notification_id, "user_id": self.student.id})
         self.assertIsNotNone(read.get("dismissed_at"))
 
+    async def test_returns_optional_action_url(self):
+        await self._notification(action_url="/exams/exam-1/grading")
+
+        items = await list_my_notifications_route(current_user=self.student)
+
+        self.assertEqual(items[0].action_url, "/exams/exam-1/grading")
+
 
 if __name__ == "__main__":
     unittest.main()
