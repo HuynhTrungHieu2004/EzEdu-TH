@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Check, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { notificationsApi, type UserNotification } from '../api/notificationsApi';
 import { Badge, Button, Card, EmptyState, PageHeader } from '../components/ui';
 
 export default function NotificationsPage({ mode = 'student' }: { mode?: 'student' | 'teacher' }) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'read'>('all');
   const [loading, setLoading] = useState(true);
@@ -57,11 +59,17 @@ export default function NotificationsPage({ mode = 'student' }: { mode?: 'studen
     }
   };
 
+  const openAction = async (item: UserNotification) => {
+    if (!item.action_url?.startsWith('/')) return;
+    if (!item.is_read) await markRead(item.id);
+    navigate(item.action_url);
+  };
+
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
       <PageHeader
         title={mode === 'teacher' ? 'Thông báo Giảng dạy' : 'Thông báo hệ thống'}
-        description="Các thông báo được quản trị viên xuất bản cho tài khoản của bạn."
+        description={mode === 'teacher' ? 'Thông báo hệ thống và bài làm học sinh cần xem lại.' : 'Các thông báo được quản trị viên xuất bản cho tài khoản của bạn.'}
         actions={unreadCount > 0 && <Button variant="outline" onClick={() => void markAllRead()}><Check size={16} /> Đánh dấu tất cả đã đọc</Button>}
       />
 
@@ -91,6 +99,11 @@ export default function NotificationsPage({ mode = 'student' }: { mode?: 'studen
                   <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '0.25rem', alignItems: 'center' }}><Clock size={13} /> {new Date(item.created_at).toLocaleString('vi-VN')}</span>
                 </div>
                 <p style={{ margin: '0.35rem 0 0', color: '#475569' }}>{item.content}</p>
+                {item.action_url?.startsWith('/') && (
+                  <Button size="sm" variant="outline" style={{ marginTop: '0.75rem' }} onClick={() => void openAction(item)}>
+                    Xem bài làm
+                  </Button>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 {!item.is_read && <Button aria-label={`Đánh dấu đã đọc ${item.title}`} variant="ghost" size="sm" onClick={() => void markRead(item.id)}><CheckCircle2 size={16} /></Button>}

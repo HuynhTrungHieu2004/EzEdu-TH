@@ -1,4 +1,4 @@
-export type NotificationType = 'system' | 'maintenance_banner' | 'new_feature' | 'quota_warning' | 'private';
+export type NotificationType = 'system' | 'exam' | 'maintenance_banner' | 'new_feature' | 'quota_warning' | 'private';
 export type NotificationAudienceType = 'all' | 'roles' | 'users';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type NotificationStatus = 'draft' | 'scheduled' | 'published' | 'expired' | 'cancelled';

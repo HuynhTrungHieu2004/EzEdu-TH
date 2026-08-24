@@ -137,6 +137,11 @@ export interface QuestionAttemptResponse {
   created_at: string;
 }
 
+export interface TeacherQuestionAttempt extends QuestionAttemptResponse {
+  student_name: string | null;
+  student_email: string | null;
+}
+
 export interface SubjectChapterNode {
   id: string;
   name: string;
@@ -357,6 +362,11 @@ export const questionApi = {
 
   listMyAttempts: async (id: string): Promise<QuestionAttemptResponse[]> => {
     const response = await client.get<QuestionAttemptResponse[]>(`/questions/${id}/attempts/my`);
+    return response.data;
+  },
+
+  listAttemptsForTeacher: async (id: string): Promise<TeacherQuestionAttempt[]> => {
+    const response = await client.get<TeacherQuestionAttempt[]>(`/questions/${id}/attempts`);
     return response.data;
   },
 

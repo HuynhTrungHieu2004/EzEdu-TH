@@ -89,6 +89,7 @@ const ContentHistoryPage = lazy(() => import('./pages/teacher/ContentHistoryPage
 const TeacherSettingsPage = lazy(() => import('./pages/teacher/TeacherSettingsPage'));
 const ExamBlueprintDetailPage = lazy(() => import('./pages/teacher/ExamBlueprintDetailPage'));
 const ExamGradingPage = lazy(() => import('./pages/teacher/ExamGradingPage'));
+const QuestionSetAttemptsPage = lazy(() => import('./pages/teacher/QuestionSetAttemptsPage'));
 const ExamAttemptPage = lazy(() => import('./pages/student/ExamAttemptPage'));
 const ChatHistoryPage = lazy(() => import('./pages/student/ChatHistoryPage'));
 const StudentActivityPage = lazy(() => import('./pages/student/StudentActivityPage'));
@@ -260,6 +261,10 @@ function App() {
         <Route
           path="/question-sets/:questionSetId"
           element={<AppLayout><RoleRoute allow={STUDENT_AND_TEACHER}><QuestionSetDetailPage /></RoleRoute></AppLayout>}
+        />
+        <Route
+          path="/gv/de-thi/:setId/bai-lam"
+          element={<AppLayout><RoleRoute allow={TEACHER_ONLY}><QuestionSetAttemptsPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/question-history"

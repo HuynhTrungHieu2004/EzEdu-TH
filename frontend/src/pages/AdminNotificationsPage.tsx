@@ -17,6 +17,7 @@ import './AdminContentPages.css';
 
 const TYPE_LABELS: Record<NotificationType, string> = {
   system: 'Toàn hệ thống',
+  exam: 'Bài thi đã nộp',
   maintenance_banner: 'Banner bảo trì',
   new_feature: 'Tính năng mới',
   quota_warning: 'Cảnh báo quota',

@@ -315,6 +315,10 @@ export default function QuestionSetEditorPage() {
         title={questionSet.document_name}
         actions={
           <>
+            <Button variant="outline" onClick={() => navigate(`/gv/de-thi/${questionSet.id}/bai-lam`)}>
+              <BarChart3 size={16} aria-hidden="true" style={{ marginRight: 6 }} />
+              Xem bài làm
+            </Button>
             <Button variant="outline" onClick={() => navigate(`/documents/${questionSet.document_id}`)}>
               <FileText size={16} aria-hidden="true" style={{ marginRight: 6 }} />
               Học liệu gốc

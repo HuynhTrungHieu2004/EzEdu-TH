@@ -9,6 +9,7 @@ export interface UserNotification {
   priority: NotificationPriority;
   created_at: string;
   is_read: boolean;
+  action_url?: string | null;
 }
 
 export const notificationsApi = {
