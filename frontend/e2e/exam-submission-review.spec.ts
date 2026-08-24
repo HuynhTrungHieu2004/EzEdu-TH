@@ -1,5 +1,5 @@
 import { expect, test, type Route } from '@playwright/test';
-import { TEACHER_USER, stubApi } from './helpers';
+import { ADMIN_USER, TEACHER_USER, stubApi } from './helpers';
 
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -47,4 +47,14 @@ test('teacher opens a submitted class exam from its notification', async ({ page
   await expect(page.getByText('Nguyễn Minh Anh')).toBeVisible();
   await expect(page.getByText('1 / 1 điểm')).toBeVisible();
   await expect(page.getByText('Đáp án đúng: A')).toBeVisible();
+});
+
+test('admin can open the teacher review route', async ({ page }) => {
+  await stubApi(page, ADMIN_USER);
+  await page.route('**/api/v1/questions/set-1/attempts', (route) => json(route, []));
+
+  await page.goto('/gv/de-thi/set-1/bai-lam');
+
+  await expect(page.getByRole('heading', { name: 'Bài làm của học sinh' })).toBeVisible();
+  await expect(page.getByText('Chưa có học sinh nộp bài')).toBeVisible();
 });

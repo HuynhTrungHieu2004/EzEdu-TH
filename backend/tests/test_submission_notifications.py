@@ -54,6 +54,14 @@ class SubmissionNotificationTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
 
+    async def test_ensures_unique_dedupe_index(self):
+        from app.services.submission_notification_service import ensure_submission_notification_indexes
+
+        await ensure_submission_notification_indexes(self.db)
+
+        indexes = await self.db["admin_notifications"].index_information()
+        self.assertTrue(indexes["submission_dedupe_key_unique"]["unique"])
+
 
 if __name__ == "__main__":
     unittest.main()

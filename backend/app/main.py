@@ -45,10 +45,12 @@ async def lifespan(app: FastAPI):
     from app.database.mongodb import get_database
     from app.services.background_job_service import ensure_background_job_indexes
     from app.services.student_review_service import ensure_student_review_indexes
+    from app.services.submission_notification_service import ensure_submission_notification_indexes
 
     _db = get_database()
     await ensure_background_job_indexes(_db)
     await ensure_student_review_indexes(_db)
+    await ensure_submission_notification_indexes(_db)
 
     # Core request-id index is useful but unrelated to the two feature
     # idempotency guarantees above, so retain its existing optional behavior.

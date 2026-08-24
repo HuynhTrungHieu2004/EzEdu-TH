@@ -305,6 +305,15 @@ async def _finalize(db, doc: Dict[str, Any], *, answers: Dict[str, str], auto_su
         # Đã bị 1 request khác (autosave/sweeper) chốt nộp trước — đọc lại bản mới nhất.
         return await db[EXAM_ATTEMPTS].find_one({"_id": doc["_id"]})
 
+    await upsert_submission_notification(
+        db,
+        teacher_id=exam["owner_id"],
+        attempt_id=str(doc["_id"]),
+        title=f"Học sinh đã nộp đề {exam['code']}",
+        content="Đang chấm câu tự luận" if has_pending_ai else "Đã chấm xong",
+        action_url=f"/exams/{doc['exam_id']}/grading",
+    )
+
     if has_pending_ai:
         attempt_id = str(doc["_id"])
         for r in results:
@@ -316,15 +325,6 @@ async def _finalize(db, doc: Dict[str, Any], *, answers: Dict[str, str], auto_su
                 payload={"attempt_id": attempt_id, "question_id": r["question_id"]},
                 idempotency_key=f"grade:{attempt_id}:{r['question_id']}",
             )
-
-    await upsert_submission_notification(
-        db,
-        teacher_id=exam["owner_id"],
-        attempt_id=str(doc["_id"]),
-        title=f"Học sinh đã nộp đề {exam['code']}",
-        content="Đang chấm câu tự luận" if has_pending_ai else "Đã chấm xong",
-        action_url=f"/exams/{doc['exam_id']}/grading",
-    )
 
     return updated
 
@@ -581,21 +581,44 @@ async def grade_essay_answer_job(db, payload: Dict[str, Any]) -> Dict[str, Any]:
         evidence_context=evidence_context,
         output_language=output_language,
     )
-    target["ai_score"] = score
-    target["ai_confidence"] = confidence
-    target["ai_feedback"] = feedback
-    if target.get("teacher_score") is None:
-        target["final_score"] = score
-    target["is_correct"] = score >= target["points_possible"] * 0.5
-
-    total_score = sum(r["final_score"] for r in results)
-    all_graded = all(r.get("ai_score") is not None or r["question_type"] != "short_answer" for r in results)
-    new_status = "graded" if all_graded else doc["status"]
-
-    await db[EXAM_ATTEMPTS].update_one(
-        {"_id": ObjectId(attempt_id)},
-        {"$set": {"results": results, "total_score": total_score, "status": new_status, "updated_at": _now()}},
-    )
+    while True:
+        current = await db[EXAM_ATTEMPTS].find_one({"_id": ObjectId(attempt_id)})
+        current_target = next(
+            (r for r in current.get("results", []) if r["question_id"] == question_id),
+            None,
+        )
+        if current_target is None or current_target.get("ai_score") is not None:
+            return {"skipped": "already_graded_or_missing"}
+        current_target["ai_score"] = score
+        current_target["ai_confidence"] = confidence
+        current_target["ai_feedback"] = feedback
+        if current_target.get("teacher_score") is None:
+            current_target["final_score"] = score
+        current_target["is_correct"] = score >= current_target["points_possible"] * 0.5
+        current_results = current["results"]
+        total_score = sum(r["final_score"] for r in current_results)
+        all_graded = all(
+            r.get("ai_score") is not None or r["question_type"] != "short_answer"
+            for r in current_results
+        )
+        new_status = "graded" if all_graded else current["status"]
+        try:
+            await compare_and_set(
+                db[EXAM_ATTEMPTS],
+                filter_query={"_id": ObjectId(attempt_id)},
+                expected_version=current["version"],
+                update={
+                    "$set": {
+                        "results": current_results,
+                        "total_score": total_score,
+                        "status": new_status,
+                        "updated_at": _now(),
+                    }
+                },
+            )
+            break
+        except VersionConflict:
+            continue
     if all_graded:
         exam = await db[EXAMS].find_one({"_id": ObjectId(doc["exam_id"])})
         if exam is not None:

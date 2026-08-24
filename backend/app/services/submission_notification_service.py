@@ -3,8 +3,19 @@
 import logging
 from datetime import datetime, timezone
 
+from pymongo import ASCENDING
+
 
 logger = logging.getLogger(__name__)
+
+
+async def ensure_submission_notification_indexes(db) -> None:
+    await db["admin_notifications"].create_index(
+        [("dedupe_key", ASCENDING)],
+        name="submission_dedupe_key_unique",
+        unique=True,
+        sparse=True,
+    )
 
 
 async def upsert_submission_notification(

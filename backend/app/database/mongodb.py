@@ -263,7 +263,6 @@ async def create_database_indexes():
         await db["admin_notifications"].create_index([("target_roles", 1), ("starts_at", -1)])
         await db["admin_notifications"].create_index([("target_user_ids", 1), ("starts_at", -1)])
         await db["admin_notifications"].create_index([("expires_at", 1)])
-        await db["admin_notifications"].create_index([("dedupe_key", 1)], unique=True, sparse=True)
         await db["notification_reads"].create_index([("notification_id", 1), ("user_id", 1)], unique=True)
         await db["notification_reads"].create_index([("user_id", 1), ("read_at", -1)])
 
@@ -307,6 +306,10 @@ async def create_database_indexes():
         await db["question_attempts"].create_index([
             ("question_set_id", 1),
             ("user_id", 1),
+            ("created_at", -1),
+        ])
+        await db["question_attempts"].create_index([
+            ("question_set_id", 1),
             ("created_at", -1),
         ])
         await db["question_attempts"].create_index([

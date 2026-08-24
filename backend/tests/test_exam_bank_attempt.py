@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
@@ -295,6 +296,71 @@ class ExamAttemptTests(unittest.IsolatedAsyncioTestCase):
         ).to_list(None)
         self.assertEqual(len(notices), 1)
         self.assertIn("Đã chấm xong", notices[0]["content"])
+
+    async def test_immediate_worker_completion_cannot_be_overwritten_by_pending_notice(self):
+        exam = await self._publish_exam(question_type="short_answer")
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+
+        async def run_immediately(db, *, payload, **_kwargs):
+            await attempt_service.grade_essay_answer_job(db, payload)
+            return "job-id"
+
+        with (
+            patch("app.exam_bank.services.attempt_service.enqueue", side_effect=run_immediately),
+            patch(
+                "app.exam_bank.services.grading_service.grade_short_answer",
+                return_value=(2.0, 0.9, "Tốt"),
+            ),
+        ):
+            await attempt_service.submit_attempt(
+                self.db, started.id, version=1, answers={}, student_id=self.student_id
+            )
+
+        notice = await self.db["admin_notifications"].find_one(
+            {"dedupe_key": f"submission:{started.id}"}
+        )
+        self.assertIn("Đã chấm xong", notice["content"])
+
+    async def test_concurrent_essay_jobs_preserve_both_scores(self):
+        exam = await self._publish_exam(question_type="short_answer")
+        started = await attempt_service.start_attempt(self.db, exam.id, student_id=self.student_id)
+        exam_doc = await self.db[EXAMS].find_one({"_id": ObjectId(exam.id)})
+        question_ids = exam_doc["question_ids"]
+        await attempt_service.submit_attempt(
+            self.db, started.id, version=1, answers={}, student_id=self.student_id
+        )
+        both_started = asyncio.Event()
+        calls = 0
+
+        async def grade_together(**_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                both_started.set()
+            await both_started.wait()
+            return 1.0, 0.9, "Tốt"
+
+        with patch(
+            "app.exam_bank.services.grading_service.grade_short_answer",
+            side_effect=grade_together,
+        ):
+            await asyncio.gather(*[
+                attempt_service.grade_essay_answer_job(
+                    self.db, {"attempt_id": started.id, "question_id": question_id}
+                )
+                for question_id in question_ids
+            ])
+
+        final = await attempt_service.get_attempt(
+            self.db, started.id, student_id=self.student_id
+        )
+        self.assertEqual(final.status, "graded")
+        self.assertEqual(final.total_score, 2.0)
+        self.assertTrue(all(result.ai_score == 1.0 for result in final.results))
+        notice = await self.db["admin_notifications"].find_one(
+            {"dedupe_key": f"submission:{started.id}"}
+        )
+        self.assertIn("Đã chấm xong", notice["content"])
 
     async def test_teacher_override_replaces_ai_score(self):
         exam = await self._publish_exam(question_type="short_answer")

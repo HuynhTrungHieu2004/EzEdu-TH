@@ -128,6 +128,7 @@ function RouteFallback() {
  */
 const STUDENT_ONLY = ['student'];
 const TEACHER_ONLY = ['lecturer', 'user'];
+const REVIEW_ACTORS = [...TEACHER_ONLY, 'admin', 'super_admin'];
 /** Route dùng chung cho cả học sinh và giáo viên (hỏi đáp AI, bộ câu hỏi). */
 const STUDENT_AND_TEACHER = ['student', 'lecturer', 'user'];
 
@@ -264,7 +265,7 @@ function App() {
         />
         <Route
           path="/gv/de-thi/:setId/bai-lam"
-          element={<AppLayout><RoleRoute allow={TEACHER_ONLY}><QuestionSetAttemptsPage /></RoleRoute></AppLayout>}
+          element={<AppLayout><RoleRoute allow={REVIEW_ACTORS}><QuestionSetAttemptsPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/question-history"
@@ -417,7 +418,7 @@ function App() {
         />
         <Route
           path="/exams/:examId/grading"
-          element={<AppLayout><RoleRoute allow={TEACHER_ONLY}><ExamGradingPage /></RoleRoute></AppLayout>}
+          element={<AppLayout><RoleRoute allow={REVIEW_ACTORS}><ExamGradingPage /></RoleRoute></AppLayout>}
         />
         <Route
           path="/take-exam/:examId"
