@@ -3,12 +3,14 @@ import { Clock, FileQuestion, LogIn, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { examBankApi, type StudentExamItem } from '../../api/examBankApi';
 import { classesApi } from '../../api/classesApi';
+import { questionApi, type QuestionSetSummary } from '../../api/questionApi';
 import { apiErrorMessage } from '../../utils/apiError';
 import { Alert, Badge, Button, Card, CardBody, Input, PageHeader } from '../../components/ui';
 
 export default function StudentExamsListPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<StudentExamItem[]>([]);
+  const [publishedPractices, setPublishedPractices] = useState<QuestionSetSummary[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,12 +18,21 @@ export default function StudentExamsListPage() {
   const [joining, setJoining] = useState(false);
   const [joinMessage, setJoinMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const visible = useMemo(() => items.filter((item) => item.code.toLowerCase().includes(search.trim().toLowerCase())), [items, search]);
+  const visiblePractices = useMemo(
+    () => publishedPractices.filter((item) => item.document_name.toLowerCase().includes(search.trim().toLowerCase())),
+    [publishedPractices, search],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      setItems(await examBankApi.listStudentExams());
+      const [exams, practices] = await Promise.all([
+        examBankApi.listStudentExams(),
+        questionApi.listPublished(),
+      ]);
+      setItems(exams);
+      setPublishedPractices(practices.items);
     } catch {
       setError('Không thể tải danh sách đề thi.');
     } finally {
@@ -72,11 +83,23 @@ export default function StudentExamsListPage() {
           </form>
         </CardBody>
       </Card>
-      <Input placeholder="Tìm theo mã đề..." value={search} onChange={(event) => setSearch(event.target.value)} />
+      <Input placeholder="Tìm theo mã đề hoặc tên đề..." value={search} onChange={(event) => setSearch(event.target.value)} />
       {loading ? <Card style={{ padding: '3rem', textAlign: 'center' }}>Đang tải...</Card> : error ? (
         <Card style={{ padding: '3rem', textAlign: 'center', color: '#b91c1c' }}>{error} <Button variant="outline" size="sm" onClick={() => void load()}>Thử lại</Button></Card>
-      ) : visible.length === 0 ? <Card style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Chưa có đề thi phù hợp.</Card> : (
+      ) : visible.length === 0 && visiblePractices.length === 0 ? <Card style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Chưa có đề thi phù hợp.</Card> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+          {visiblePractices.map((item) => (
+            <Card key={`practice-${item.id}`}>
+              <CardBody style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <Badge variant="primary">Đề giáo viên ban hành</Badge>
+                <strong>{item.document_name}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <FileQuestion size={22} /> {item.published_question_count || item.question_count} câu
+                </div>
+                <Button onClick={() => navigate(`/question-sets/${item.id}`)}><Play size={16} /> Làm bài</Button>
+              </CardBody>
+            </Card>
+          ))}
           {visible.map((item) => {
             const completed = item.attempt_status === 'submitted' || item.attempt_status === 'graded';
             return <Card key={item.id}><CardBody style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
