@@ -420,7 +420,13 @@ def generate_json_with_failover(prompt: str, *, quality: bool = True) -> str:
     thuận lợi; chỉ khi Gemini hỏng mới chuyển sang Groq.
     """
     if settings.AI_TEXT_PROVIDER == "claude":
-        return claude_generate_json(prompt, quality=quality)
+        try:
+            return claude_generate_json(prompt, quality=quality)
+        except Exception as exc:  # noqa: BLE001 - 9Router lỗi thì dùng Groq nếu có
+            if not is_groq_available():
+                raise
+            logger.warning("9Router sinh JSON thất bại, thử Groq: %s", exc)
+            return generate_json(prompt)
 
     lastest_error: Exception | None = None
 
