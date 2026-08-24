@@ -199,7 +199,13 @@ async def classify_document(db, document: dict, llm=None) -> dict:
     if not math.isfinite(confidence) or not 0 <= confidence <= 1:
         raise ValueError("Classification confidence is invalid.")
     selected_nodes = [nodes[subject_id], nodes[chapter_id], *(nodes[value] for value in topic_ids)]
-    _validate_metadata(raw, selected_nodes)
+    try:
+        _validate_metadata(raw, selected_nodes)
+    except ValueError as exc:
+        if llm is not None:
+            raise
+        logger.warning("AI classification metadata is invalid; using taxonomy suggestion: %s", exc)
+        return _fallback_classification(taxonomy, evidence)
 
     return {
         "subject_id": subject_id,
