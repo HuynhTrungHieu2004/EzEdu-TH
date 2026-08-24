@@ -8,7 +8,9 @@ class RenderAIConfigTests(unittest.TestCase):
 
         for key, value in {
             "CLAUDE_FAST_MODEL": "ag/gemini-3.7-flash-low",
-            "CLAUDE_QUALITY_MODEL": "ag/gemini-3.1-pro-low",
+            "CLAUDE_QUALITY_MODEL": "ag/gemini-3.7-flash-low",
+            "AI_TIMEOUT_SECONDS": '"45"',
+            "MAX_RETRIES": '"0"',
             "ANTHROPIC_FALLBACK_BASE_URL": '""',
             "ANTHROPIC_FALLBACK_MODEL": '""',
         }.items():

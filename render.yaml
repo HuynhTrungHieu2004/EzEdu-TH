@@ -69,7 +69,11 @@ services:
       - key: CLAUDE_FAST_MODEL
         value: ag/gemini-3.7-flash-low
       - key: CLAUDE_QUALITY_MODEL
-        value: ag/gemini-3.1-pro-low
+        value: ag/gemini-3.7-flash-low
+      - key: AI_TIMEOUT_SECONDS
+        value: "45"
+      - key: MAX_RETRIES
+        value: "0"
       - key: CLAUDE_TOTAL_TOKEN_BUDGET
         value: "10000000"
       - key: GROQ_API_KEY
