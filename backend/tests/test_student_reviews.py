@@ -1332,6 +1332,106 @@ class StudentReviewGenerationJobTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StudentReviewGeneratorSeamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_student_review_uses_extracts_when_ai_returns_no_valid_questions(self):
+        from app.services import question_generation_service
+
+        db = AsyncMongoMockClient().student_review_invalid_ai_fallback
+        document_id = ObjectId()
+        await db.documents.insert_one({
+            "_id": document_id,
+            "user_id": "student",
+            "media_kind": "document",
+            "original_filename": "ham-so.pdf",
+            "deleted_at": None,
+        })
+        await db.document_chunks.insert_one({
+            "document_id": str(document_id),
+            "user_id": "student",
+            "chunk_index": 0,
+            "content": (
+                "Đạo hàm cho biết tốc độ biến thiên của hàm số. "
+                "Điểm cực đại là nơi hàm số đổi từ tăng sang giảm. "
+                "Điểm cực tiểu là nơi hàm số đổi từ giảm sang tăng. "
+                "Bảng biến thiên giúp mô tả chiều biến đổi của hàm số."
+            ),
+        })
+
+        with patch.object(question_generation_service, "get_database", return_value=db), patch.object(
+            question_generation_service.settings, "AI_TEXT_PROVIDER", "claude"
+        ), patch.object(
+            question_generation_service, "is_claude_available", return_value=True
+        ), patch.object(
+            question_generation_service, "generate_json_with_failover", return_value="[]"
+        ), patch.object(
+            question_generation_service,
+            "select_diverse_questions",
+            side_effect=lambda items, count: (items[:count], {"applied": False}),
+        ):
+            result = await question_generation_service.generate_questions(
+                document_id=str(document_id),
+                user_id="student",
+                question_count=10,
+                difficulty="medium",
+                question_type="multiple_choice",
+                question_style_counts={"knowledge": 10, "cloze": 0, "calculation": 0},
+                question_set_metadata={"purpose": "student_review"},
+            )
+
+        self.assertEqual(result["question_count"], 10)
+        self.assertEqual(result["generation_method"], "extractive_fallback")
+
+    async def test_student_review_accepts_three_valid_ai_questions_when_ten_were_requested(self):
+        from app.services import question_generation_service
+
+        db = AsyncMongoMockClient().student_review_partial_ai_result
+        document_id = ObjectId()
+        await db.documents.insert_one({
+            "_id": document_id,
+            "user_id": "student",
+            "media_kind": "document",
+            "original_filename": "ham-so.pdf",
+            "deleted_at": None,
+        })
+        await db.document_chunks.insert_one({
+            "document_id": str(document_id),
+            "user_id": "student",
+            "chunk_index": 0,
+            "content": "Đạo hàm xác định chiều biến thiên của hàm số.",
+        })
+        questions = [{
+            "question": f"Câu hỏi {index}?",
+            "options": {"A": f"Đúng {index}", "B": f"Sai B {index}", "C": f"Sai C {index}", "D": f"Sai D {index}"},
+            "correct_answer": "A",
+            "explanation": "Theo học liệu.",
+            "difficulty": "medium",
+            "question_type": "multiple_choice",
+        } for index in range(3)]
+
+        with patch.object(question_generation_service, "get_database", return_value=db), patch.object(
+            question_generation_service.settings, "AI_TEXT_PROVIDER", "claude"
+        ), patch.object(
+            question_generation_service, "is_claude_available", return_value=True
+        ), patch.object(
+            question_generation_service, "generate_json_with_failover", return_value=json.dumps(questions)
+        ), patch.object(
+            question_generation_service, "extract_keywords", return_value=[]
+        ), patch.object(
+            question_generation_service,
+            "select_diverse_questions",
+            side_effect=lambda items, count: (items[:count], {"applied": False}),
+        ):
+            result = await question_generation_service.generate_questions(
+                document_id=str(document_id),
+                user_id="student",
+                question_count=10,
+                difficulty="medium",
+                question_type="multiple_choice",
+                question_style_counts={"knowledge": 10, "cloze": 0, "calculation": 0},
+                question_set_metadata={"purpose": "student_review"},
+            )
+
+        self.assertEqual(result["question_count"], 3)
+
     async def test_student_review_restores_requested_count_after_diversity_filtering(self):
         from app.services import question_generation_service
 

@@ -523,11 +523,15 @@ async def generate_questions(
                         "total_tokens": getattr(raw_claude, "total_tokens", 0),
                     }
                 groq_questions = [q for q in parse_raw_questions(raw_claude) if _valid_question_candidate(q)]
+                if student_review:
+                    groq_questions = [q for q in groq_questions if is_valid_student_review_question(q)]
+                    if len(groq_questions) < 3:
+                        raise ValueError("AI did not return enough valid student-review questions.")
                 logger.info("Primary AI generated %s valid question candidates", len(groq_questions))
             except Exception as exc:
                 if not student_review:
                     raise
-                logger.warning("AI providers unavailable; using grounded extractive review: %s", exc)
+                logger.warning("AI output unavailable or unusable; using grounded extractive review: %s", exc)
                 generation_method = "extractive_fallback"
                 groq_questions = _extractive_review_questions(
                     chunk_docs, question_count, difficulty, bloom_level,
@@ -710,8 +714,8 @@ async def generate_questions(
         )
         selected_questions = selected_questions[:question_count]
 
-    if student_review and len(selected_questions) != question_count:
-        raise ValueError("Không thể tạo đủ số câu hỏi ôn tập đã yêu cầu.")
+    if student_review and len(selected_questions) < 3:
+        raise ValueError("Không thể tạo tối thiểu 3 câu hỏi ôn tập đạt chất lượng.")
 
     # If we don't have enough questions, fallback to using all questions in pool
     if len(selected_questions) < question_count:
