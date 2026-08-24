@@ -166,6 +166,43 @@ class LearningChatTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(msg)
         self.assertEqual(msg["status"], "completed")
 
+    async def test_ask_advanced_question_falls_back_to_groq_when_9router_dns_fails(self):
+        groq_response = MagicMock()
+        groq_response.choices[0].message.content = """
+[SHORT_ANSWER] Groq vẫn trả lời được. [/SHORT_ANSWER]
+[EXPLANATION] Câu trả lời dự phòng hoạt động. [/EXPLANATION]
+[KEY_POINTS]
+- Dùng Groq khi 9router lỗi
+[/KEY_POINTS]
+[EXAMPLES]
+[/EXAMPLES]
+[CONFIDENCE] 0.80 [/CONFIDENCE]
+[EVIDENCE_STATUS] well_supported [/EVIDENCE_STATUS]
+[FOLLOW_UP]
+[/FOLLOW_UP]
+"""
+        groq_client = MagicMock()
+        groq_client.chat.completions.create.return_value = groq_response
+
+        payload = AdvancedChatAskRequest(
+            question="Giải thích định lý Pythagore",
+            scope="general",
+            use_web_search=False,
+            request_id=str(ObjectId()),
+        )
+
+        with patch.object(settings, "AI_TEXT_PROVIDER", "claude"), \
+             patch.object(settings, "GROQ_API_KEY", "test-key"), \
+             patch.object(learning_chat_service, "claude_generate", side_effect=OSError("Name or service not known")), \
+             patch("app.services.llm_service.get_groq_client", return_value=groq_client):
+            result = await learning_chat_service.ask_advanced_question(
+                user_id=self.user_id,
+                payload=payload,
+            )
+
+        self.assertEqual(result["answer"], "Câu trả lời dự phòng hoạt động.")
+        self.assertEqual(result["model_name"], settings.GROQ_MODEL)
+
     @patch("app.services.learning_chat_service.get_gemini_client")
     @patch("app.services.learning_chat_service.search_user_chunks_advanced")
     async def test_ask_advanced_question_ownership_check(self, mock_search, mock_gemini_client):

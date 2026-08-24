@@ -16,6 +16,8 @@ from app.services.llm_service import (
     generate_content,
     generate_json_with_failover,
     get_gemini_client,
+    groq_generate_content,
+    is_groq_available,
 )
 from app.services.rag_service import search_user_chunks_advanced
 from app.services.system_settings_service import get_setting_value
@@ -668,29 +670,38 @@ Chỉ trích xuất kiến thức để trả lời. Nếu sử dụng thông ti
 
         web_citations = []
         if settings.AI_TEXT_PROVIDER == "claude":
-            result = await asyncio.to_thread(
-                claude_web_search if use_external_search else claude_generate,
-                prompt,
-                **({} if use_external_search else {"quality": False}),
-            )
-            response_text = result.text
-            _model_name_logged = result.model
-            _input_tokens = result.input_tokens
-            _output_tokens = result.output_tokens
-            _total_tokens = result.total_tokens
-            _grounding_count = len(result.citations)
-            seen_urls = set()
-            for citation in result.citations:
-                uri = citation.get("url")
-                if uri and uri not in seen_urls:
-                    seen_urls.add(uri)
-                    web_citations.append(WebCitation(
-                        title=citation.get("title") or uri,
-                        url=uri,
-                        publisher=citation.get("publisher"),
-                        supporting_excerpt=citation.get("cited_text"),
-                        relevance_score=float(get_domain_score(uri)) / 100.0,
-                    ))
+            try:
+                result = await asyncio.to_thread(
+                    claude_web_search if use_external_search else claude_generate,
+                    prompt,
+                    **({} if use_external_search else {"quality": False}),
+                )
+                response_text = result.text
+                _model_name_logged = result.model
+                _input_tokens = result.input_tokens
+                _output_tokens = result.output_tokens
+                _total_tokens = result.total_tokens
+                _grounding_count = len(result.citations)
+                seen_urls = set()
+                for citation in result.citations:
+                    uri = citation.get("url")
+                    if uri and uri not in seen_urls:
+                        seen_urls.add(uri)
+                        web_citations.append(WebCitation(
+                            title=citation.get("title") or uri,
+                            url=uri,
+                            publisher=citation.get("publisher"),
+                            supporting_excerpt=citation.get("cited_text"),
+                            relevance_score=float(get_domain_score(uri)) / 100.0,
+                        ))
+            except Exception as exc:  # noqa: BLE001 - 9router lỗi thì dùng Groq
+                if not is_groq_available():
+                    raise
+                logger.warning("9Router trả lời thất bại, chuyển sang Groq: %s", exc)
+                response_text = await asyncio.to_thread(groq_generate_content, prompt) or ""
+                _model_name_logged = settings.GROQ_MODEL or "openai/gpt-oss-120b"
+                if external_search_status == "success":
+                    external_search_status = "unavailable"
         else:
             client = get_gemini_client()
             model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"

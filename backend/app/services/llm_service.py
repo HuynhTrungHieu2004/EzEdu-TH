@@ -331,17 +331,21 @@ def get_groq_client():
     return _groq_client
 
 
-def generate_content(prompt: str) -> str:
-    """Generate text with Claude, or Groq while the rollback switch is active."""
-    if settings.AI_TEXT_PROVIDER == "claude":
-        return claude_generate_content(prompt, quality=False)
+def groq_generate_content(prompt: str) -> str:
     client = get_groq_client()
     model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": prompt}],
     )
     return response.choices[0].message.content
+
+
+def generate_content(prompt: str) -> str:
+    """Generate text with Claude, or Groq while the rollback switch is active."""
+    if settings.AI_TEXT_PROVIDER == "claude":
+        return claude_generate_content(prompt, quality=False)
+    return groq_generate_content(prompt)
 
 
 def generate_json(prompt: str) -> str:
