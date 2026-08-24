@@ -85,12 +85,15 @@ class Settings(BaseSettings):
 
     # Groq remains the transcription provider; text use is legacy-only.
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     # Claude handles text/JSON/web workloads. Groq remains available for Whisper.
     AI_TEXT_PROVIDER: Literal["claude", "legacy"] = "claude"
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_BASE_URL: str = "https://api.anthropic.com"
+    ANTHROPIC_FALLBACK_API_KEY: str = ""
+    ANTHROPIC_FALLBACK_BASE_URL: str = ""
+    ANTHROPIC_FALLBACK_MODEL: str = ""
     CLAUDE_FAST_MODEL: str = "claude-haiku-4-5-20251001"
     CLAUDE_QUALITY_MODEL: str = "claude-sonnet-5"
     CLAUDE_FAST_MAX_PROMPT_CHARACTERS: int = 10_000

@@ -27,6 +27,8 @@ class ClaudeResult:
     input_tokens: int = 0
     output_tokens: int = 0
     citations: list[dict] = field(default_factory=list)
+    finish_reason: str | None = None
+    tool_calls: list[dict] = field(default_factory=list)
 
     @property
     def total_tokens(self) -> int:
@@ -79,13 +81,54 @@ def limit_prompt(prompt: str, max_characters: int) -> str:
     return prompt[:head] + marker + (prompt[-tail:] if tail else "")
 
 
+def _response_data(response: httpx.Response) -> dict:
+    if "text/event-stream" not in response.headers.get("content-type", ""):
+        return response.json()
+
+    blocks: dict[int, dict] = {}
+    model = ""
+    stop_reason = None
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    for line in response.text.splitlines():
+        if not line.startswith("data: "):
+            continue
+        try:
+            event = json.loads(line[6:])
+        except json.JSONDecodeError:
+            continue
+        event_type = event.get("type")
+        if event_type == "message_start":
+            message = event.get("message") or {}
+            model = message.get("model") or model
+            usage.update(message.get("usage") or {})
+        elif event_type == "content_block_start":
+            block = event.get("content_block") or {}
+            blocks[int(event.get("index") or 0)] = {
+                "type": block.get("type") or "text",
+                "text": block.get("text") or "",
+            }
+        elif event_type == "content_block_delta":
+            index = int(event.get("index") or 0)
+            delta = event.get("delta") or {}
+            if delta.get("type") == "text_delta":
+                blocks.setdefault(index, {"type": "text", "text": ""})["text"] += delta.get("text") or ""
+        elif event_type == "message_delta":
+            stop_reason = (event.get("delta") or {}).get("stop_reason") or stop_reason
+            usage.update(event.get("usage") or {})
+
+    content = [
+        block for _, block in sorted(blocks.items())
+        if block.get("type") != "text" or block.get("text") != ".\u2060"
+    ]
+    return {"model": model, "content": content, "stop_reason": stop_reason, "usage": usage}
+
+
 def claude_generate(
     prompt: str,
     *,
     quality: bool,
     system: str | None = None,
     tools: list[dict] | None = None,
-    max_retries: int | None = None,
 ) -> ClaudeResult:
     """Call Claude Messages API with the two approved model classes."""
     if not is_claude_available():
@@ -101,8 +144,8 @@ def claude_generate(
         if quality else settings.CLAUDE_FAST_MAX_OUTPUT_TOKENS
     )
     payload: dict = {
-        "model": model,
         "max_tokens": max_tokens,
+        "stream": False,
         "messages": [{"role": "user", "content": limit_prompt(prompt, max_prompt_characters)}],
     }
     if system:
@@ -110,45 +153,91 @@ def claude_generate(
     if tools:
         payload["tools"] = tools
 
-    headers = {
-        "x-api-key": settings.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-    response = None
-    retry_count = settings.MAX_RETRIES if max_retries is None else max_retries
-    for attempt in range(retry_count + 1):
-        try:
-            response = httpx.post(
-                f"{settings.ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages",
-                headers=headers,
-                json=payload,
-                timeout=settings.AI_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            break
-        except httpx.HTTPStatusError as exc:
-            retryable = exc.response.status_code == 429 or exc.response.status_code >= 500
-            if not retryable or attempt >= retry_count:
-                raise
-            delay = float(exc.response.headers.get("retry-after", 2 ** attempt))
-            time.sleep(min(max(delay, 0.0), 60.0))
-        except httpx.RequestError:
-            if attempt >= retry_count:
-                raise
-            time.sleep(2 ** attempt)
+    fallback_key = getattr(settings, "ANTHROPIC_FALLBACK_API_KEY", "").strip()
+    fallback_base_url = getattr(settings, "ANTHROPIC_FALLBACK_BASE_URL", "").strip()
+    fallback_model = getattr(settings, "ANTHROPIC_FALLBACK_MODEL", "").strip()
+    fallback_available = bool(
+        fallback_key
+        and not fallback_key.lower().startswith(("your_", "your-"))
+        and fallback_base_url
+        and fallback_model
+    )
+    providers = [(settings.ANTHROPIC_API_KEY, settings.ANTHROPIC_BASE_URL, model)]
+    if fallback_available:
+        providers.append((fallback_key, fallback_base_url, fallback_model))
 
-    data = response.json()
+    response = None
+    selected_model = model
+    last_error: Exception | None = None
+    for provider_index, (api_key, base_url, provider_model) in enumerate(providers):
+        is_nghimmo = urlparse(base_url).hostname == "api.nghimmo.com"
+        if is_nghimmo and not provider_model.startswith("nghi/"):
+            provider_model = f"nghi/{provider_model}"
+        provider_payload = {**payload, "model": provider_model, "stream": is_nghimmo}
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        retry_limit = 0 if provider_index == 0 and fallback_available else settings.MAX_RETRIES
+        for attempt in range(retry_limit + 1):
+            try:
+                candidate = httpx.post(
+                    f"{base_url.rstrip('/')}/v1/messages",
+                    headers=headers,
+                    json=provider_payload,
+                    timeout=settings.AI_TIMEOUT_SECONDS,
+                )
+                candidate.raise_for_status()
+                response = candidate
+                selected_model = provider_model
+                break
+            except httpx.HTTPStatusError as exc:
+                retryable = exc.response.status_code == 429 or exc.response.status_code >= 500
+                if not retryable:
+                    raise
+                last_error = exc
+                if attempt < retry_limit:
+                    delay = float(exc.response.headers.get("retry-after", 2 ** attempt))
+                    time.sleep(min(max(delay, 0.0), 60.0))
+            except httpx.RequestError as exc:
+                last_error = exc
+                if attempt < retry_limit:
+                    time.sleep(2 ** attempt)
+        if response is not None:
+            break
+        if provider_index + 1 < len(providers):
+            logger.warning("Nhà cung cấp AI chính lỗi, chuyển sang endpoint dự phòng: %s", last_error)
+
+    if response is None:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Không có nhà cung cấp Claude nào phản hồi.")
+
+    data = _response_data(response)
     blocks = data.get("content") or []
     text = "\n".join(block.get("text", "") for block in blocks if block.get("type") == "text").strip()
+    tool_calls = [block for block in blocks if block.get("type") in {"tool_use", "server_tool_use"}]
+    finish_reason = data.get("stop_reason")
+    if not blocks:
+        choices = data.get("choices") or []
+        choice = choices[0] if choices else {}
+        message = choice.get("message") or {}
+        text = (message.get("content") or "").strip()
+        tool_calls = message.get("tool_calls") or []
+        finish_reason = choice.get("finish_reason")
+    if not text and not tool_calls:
+        raise ValueError("Dịch vụ AI trả về nội dung rỗng.")
     citations = [citation for block in blocks for citation in (block.get("citations") or [])]
     usage = data.get("usage") or {}
     result = ClaudeResult(
         text=text,
-        model=data.get("model") or model,
-        input_tokens=int(usage.get("input_tokens") or 0),
-        output_tokens=int(usage.get("output_tokens") or 0),
+        model=data.get("model") or selected_model,
+        input_tokens=int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0),
+        output_tokens=int(usage.get("output_tokens") or usage.get("completion_tokens") or 0),
         citations=citations,
+        finish_reason=finish_reason,
+        tool_calls=tool_calls,
     )
     capture = _claude_usage_capture.get()
     if capture is not None:
@@ -160,22 +249,38 @@ def claude_generate_content(prompt: str, *, quality: bool = False) -> str:
     return ClaudeText(claude_generate(prompt, quality=quality))
 
 
-def claude_generate_json(
-    prompt: str, *, quality: bool = True, max_retries: int | None = None
-) -> str:
-    result = claude_generate(
-        prompt,
-        quality=quality,
-        system="Chỉ trả về JSON hợp lệ, không thêm markdown hoặc nội dung ngoài JSON.",
-        max_retries=max_retries,
-    )
-    try:
-        parsed = json.loads(result.text)
-    except json.JSONDecodeError as exc:
-        raise ValueError("Claude không trả về JSON hợp lệ.") from exc
-    if not isinstance(parsed, (dict, list)):
-        raise ValueError("Claude JSON phải là object hoặc array.")
-    return ClaudeText(result)
+def claude_generate_json(prompt: str, *, quality: bool = True) -> str:
+    for attempt in range(2):
+        request_prompt = prompt if attempt == 0 else (
+            prompt + "\n\nPhản hồi trước bị thiếu hoặc không hợp lệ. Hãy tạo lại JSON hoàn chỉnh, ngắn gọn."
+        )
+        result = claude_generate(
+            request_prompt,
+            quality=quality,
+            system="Chỉ trả về JSON hợp lệ, không thêm markdown hoặc nội dung ngoài JSON.",
+        )
+        fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", result.text.strip(), re.DOTALL | re.IGNORECASE)
+        json_text = fenced.group(1) if fenced else result.text
+        if result.finish_reason == "length" and attempt == 0:
+            continue
+        try:
+            parsed = json.loads(json_text)
+        except json.JSONDecodeError as exc:
+            if attempt == 0:
+                continue
+            raise ValueError("Claude không trả về JSON hợp lệ.") from exc
+        if not isinstance(parsed, (dict, list)):
+            raise ValueError("Claude JSON phải là object hoặc array.")
+        break
+    return ClaudeText(ClaudeResult(
+        text=json_text,
+        model=result.model,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        citations=result.citations,
+        finish_reason=result.finish_reason,
+        tool_calls=result.tool_calls,
+    ))
 
 
 def claude_web_search(prompt: str) -> ClaudeResult:
@@ -188,7 +293,7 @@ def claude_web_search(prompt: str) -> ClaudeResult:
         return result
     # ponytail: Nghimmo omits structured citations; remove when its gateway preserves them.
     urls = list(dict.fromkeys(
-        match.rstrip(".,;:!?)]}'\"")
+        match.rstrip(".,;:!?)]}'\"*")
         for match in re.findall(r"https?://[^\s<>\"]+", result.text)
     ))
     return ClaudeResult(
@@ -201,6 +306,8 @@ def claude_web_search(prompt: str) -> ClaudeResult:
             "title": urlparse(url).netloc,
             "cited_text": "",
         } for url in urls],
+        finish_reason=result.finish_reason,
+        tool_calls=result.tool_calls,
     )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -225,7 +332,7 @@ def generate_content(prompt: str) -> str:
     if settings.AI_TEXT_PROVIDER == "claude":
         return claude_generate_content(prompt, quality=False)
     client = get_groq_client()
-    model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+    model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}]
@@ -236,7 +343,7 @@ def generate_content(prompt: str) -> str:
 def generate_json(prompt: str) -> str:
     """Generates a JSON formatted string using Groq API with JSON mode"""
     client = get_groq_client()
-    model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+    model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -280,10 +387,13 @@ def gemini_generate_json(prompt: str) -> str:
         timeout=settings.AI_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
-    return "".join(
-        part.get("text", "")
-        for part in response.json()["candidates"][0]["content"]["parts"]
-    )
+    data = response.json()
+    candidates = data.get("candidates") or []
+    parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
+    text = "".join(part.get("text", "") for part in parts if isinstance(part, dict)).strip()
+    if not text:
+        raise ValueError("Gemini không trả về nội dung JSON.")
+    return text
 
 
 def is_gemini_available() -> bool:
@@ -311,9 +421,7 @@ def generate_json_with_failover(prompt: str, *, quality: bool = True) -> str:
     """
     if settings.AI_TEXT_PROVIDER == "claude":
         try:
-            # Background jobs already retry. Repeating here multiplied one 25s
-            # provider timeout into minutes before failover could even start.
-            return claude_generate_json(prompt, quality=quality, max_retries=0)
+            return claude_generate_json(prompt, quality=quality)
         except Exception as exc:  # noqa: BLE001 - provider lỗi thì dùng fallback đã cấu hình
             if not is_groq_available():
                 raise
@@ -579,7 +687,7 @@ def _extract_audio(video_path: str) -> str:
 def generate_json_with_file(prompt: str, file_path: str) -> str:
     """Extracts audio from video, transcribes with Groq Whisper, then generates JSON based on transcript."""
     client = get_groq_client()
-    model = settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+    model = settings.GROQ_MODEL or "openai/gpt-oss-120b"
     audio_path = None
 
     try:

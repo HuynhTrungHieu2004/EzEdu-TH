@@ -84,7 +84,7 @@ class GenerateJsonWithFailoverTests(unittest.TestCase):
             result = llm_service.generate_json_with_failover("prompt")
 
         self.assertEqual(result, '{"nguon":"claude"}')
-        claude.assert_called_once_with("prompt", quality=True, max_retries=0)
+        claude.assert_called_once_with("prompt", quality=True)
         gemini.assert_not_called()
         groq.assert_not_called()
 

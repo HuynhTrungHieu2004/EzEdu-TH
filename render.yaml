@@ -1,5 +1,21 @@
 services:
   - type: web
+    name: ezedu-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://api.ezedu-ai.mom
+      - key: VITE_GOOGLE_CLIENT_ID
+        value: 454115482184-r4o6majv0kmr6csov3eneqlr68ar2ig2.apps.googleusercontent.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
     name: ezedu-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
@@ -15,9 +31,9 @@ services:
       - key: DEMO_PASSWORD
         sync: false
       - key: BACKEND_CORS_ORIGINS
-        sync: false
+        value: '["https://ezedu-ai.mom","https://www.ezedu-ai.mom","https://ezedu.netlify.app"]'
       - key: FRONTEND_BASE_URL
-        value: https://ezedu.netlify.app
+        value: https://ezedu-ai.mom
       - key: ENABLE_EXAM_BLUEPRINT
         value: "true"
       - key: ENABLE_TIMED_EXAM
@@ -39,21 +55,27 @@ services:
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: AI_TEXT_PROVIDER
-        value: legacy
+        value: claude
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ANTHROPIC_BASE_URL
+        value: https://api.nghimmo.com
+      - key: ANTHROPIC_FALLBACK_API_KEY
         sync: false
+      - key: ANTHROPIC_FALLBACK_BASE_URL
+        value: https://api.nghimmo.com
+      - key: ANTHROPIC_FALLBACK_MODEL
+        value: nghi/claude-sonnet-5
       - key: CLAUDE_FAST_MODEL
-        sync: false
+        value: nghi/claude-sonnet-5
       - key: CLAUDE_QUALITY_MODEL
-        sync: false
+        value: nghi/claude-sonnet-5
       - key: CLAUDE_TOTAL_TOKEN_BUDGET
         value: "10000000"
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-120b
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
