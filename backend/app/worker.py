@@ -12,6 +12,7 @@ chuẩn ở giai đoạn 7, v.v.) — file này chỉ là khung chạy, không c
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import signal
 import uuid
@@ -21,42 +22,36 @@ from app.core.config import settings
 from app.core.logging_config import configure_logging
 from app.database.mongodb import close_mongo_connection, connect_to_mongo, get_database
 from app.services.background_job_service import ensure_background_job_indexes, process_one
-from app.exam_bank.services.attempt_service import GRADE_ESSAY_JOB_TYPE, grade_essay_answer_job, sweep_expired_attempts
-from app.services.cloudinary_service import CLEANUP_ASSET_JOB_TYPE, cleanup_cloudinary_asset_job
-from app.services.student_review_service import (
-    STUDENT_DOCUMENT_CLASSIFY_JOB_TYPE,
-    STUDENT_REVIEW_GENERATE_JOB_TYPE,
-    classify_student_document_job,
-    generate_student_review_job,
-)
-from app.curriculum_kb.services.ingestion_service import INGEST_JOB_TYPE, ingest_curriculum_source_job
-from app.curriculum_kb.services.crawler_service import CRAWL_JOB_TYPE, crawl_batch_job
-from app.personalization.services.knowledge_extraction_job import (
-    CLUSTER_ASSIGNMENT_JOB_TYPE,
-    KNOWLEDGE_EXTRACTION_JOB_TYPE,
-    assign_personalization_clusters_job,
-    extract_document_knowledge_job,
-)
-from app.exam_bank.services.study_exam_service import (
-    STUDY_EXAM_JOB_TYPE,
-    generate_study_exam_job,
-)
 
 logger = logging.getLogger("app.worker")
 
-# Đăng ký handler theo job_type — giai đoạn 4 thêm chấm tự luận AI, giai đoạn
-# 5 thêm xoá asset Cloudinary có retry, giai đoạn 7 thêm nạp kho tri thức chuẩn,
-# giai đoạn 8 thêm trích xuất tri thức để mở đường cho mô hình người học.
+HANDLER_SPECS = {
+    "grade_essay_answer": ("app.exam_bank.services.attempt_service", "grade_essay_answer_job", True),
+    "cleanup_cloudinary_asset": ("app.services.cloudinary_service", "cleanup_cloudinary_asset_job", False),
+    "ingest_curriculum_source": ("app.curriculum_kb.services.ingestion_service", "ingest_curriculum_source_job", True),
+    "extract_document_knowledge": ("app.personalization.services.knowledge_extraction_job", "extract_document_knowledge_job", False),
+    "assign_personalization_clusters": ("app.personalization.services.knowledge_extraction_job", "assign_personalization_clusters_job", False),
+    "generate_study_exam": ("app.exam_bank.services.study_exam_service", "generate_study_exam_job", True),
+    "crawl_curriculum_sources": ("app.curriculum_kb.services.crawler_service", "crawl_batch_job", True),
+    "student_document_classify": ("app.services.student_review_service", "classify_student_document_job", True),
+    "student_review_generate": ("app.services.student_review_service", "generate_student_review_job", True),
+}
+
+
+async def _dispatch_handler(job_type: str, payload: dict) -> object:
+    module_name, function_name, needs_db = HANDLER_SPECS[job_type]
+    handler = getattr(importlib.import_module(module_name), function_name)
+    return await handler(get_database(), payload) if needs_db else await handler(payload)
+
+
+async def _sweep_expired_attempts(db) -> int:
+    module = importlib.import_module("app.exam_bank.services.attempt_service")
+    return await module.sweep_expired_attempts(db)
+
+
 HANDLERS: Dict[str, Callable[[dict], Awaitable[object]]] = {
-    GRADE_ESSAY_JOB_TYPE: lambda payload: grade_essay_answer_job(get_database(), payload),
-    CLEANUP_ASSET_JOB_TYPE: cleanup_cloudinary_asset_job,
-    INGEST_JOB_TYPE: lambda payload: ingest_curriculum_source_job(get_database(), payload),
-    KNOWLEDGE_EXTRACTION_JOB_TYPE: extract_document_knowledge_job,
-    CLUSTER_ASSIGNMENT_JOB_TYPE: assign_personalization_clusters_job,
-    STUDY_EXAM_JOB_TYPE: lambda payload: generate_study_exam_job(get_database(), payload),
-    CRAWL_JOB_TYPE: lambda payload: crawl_batch_job(get_database(), payload),
-    STUDENT_DOCUMENT_CLASSIFY_JOB_TYPE: lambda payload: classify_student_document_job(get_database(), payload),
-    STUDENT_REVIEW_GENERATE_JOB_TYPE: lambda payload: generate_student_review_job(get_database(), payload),
+    job_type: lambda payload, job_type=job_type: _dispatch_handler(job_type, payload)
+    for job_type in HANDLER_SPECS
 }
 
 POLL_INTERVAL_SECONDS = 3.0
@@ -79,7 +74,7 @@ async def run_worker(*, stop_event: asyncio.Event) -> None:
             loop_now = asyncio.get_event_loop().time()
             if loop_now - last_sweep >= SWEEP_INTERVAL_SECONDS:
                 last_sweep = loop_now
-                submitted = await sweep_expired_attempts(db)
+                submitted = await _sweep_expired_attempts(db)
                 if submitted:
                     logger.info("worker.sweep_expired_attempts", extra={"count": submitted})
 
