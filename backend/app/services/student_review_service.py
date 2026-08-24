@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
 import random
@@ -491,7 +492,7 @@ async def classify_student_document_job(db, payload: dict, llm=None) -> dict:
         )
         persisted_review = await db.student_reviews.find_one(review_query, {"classification": 1})
         return persisted_review["classification"]
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         latest_review = await db.student_reviews.find_one(review_query, {"classification": 1})
         if not _normalized_classification((latest_review or {}).get("classification")):
             await _record_step_failure(
@@ -735,7 +736,7 @@ async def generate_student_review_job(db, payload: dict, generator=None) -> dict
         return await _finish_generation(
             db, review_query, question_set_id, generated, config["question_count"]
         )
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         await db.student_reviews.update_one(
             review_query,
             {"$unset": {"question_set_id": "", "warning": ""}},

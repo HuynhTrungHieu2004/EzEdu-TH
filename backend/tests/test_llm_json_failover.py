@@ -14,6 +14,23 @@ from app.services import llm_service
 
 
 class GenerateJsonWithFailoverTests(unittest.TestCase):
+    def tearDown(self):
+        llm_service._groq_client = None
+
+    def test_groq_client_uses_app_timeout_without_hidden_retries(self):
+        client = object()
+        llm_service._groq_client = None
+        with patch.object(settings, "GROQ_API_KEY", "test-key"), \
+             patch.object(llm_service, "Groq", return_value=client) as groq:
+            result = llm_service.get_groq_client()
+
+        self.assertIs(result, client)
+        groq.assert_called_once_with(
+            api_key="test-key",
+            timeout=settings.AI_TIMEOUT_SECONDS,
+            max_retries=0,
+        )
+
     def test_uses_gemini_first_when_available(self):
         with patch.object(settings, "AI_TEXT_PROVIDER", "legacy"), \
              patch.object(llm_service, "is_gemini_available", return_value=True), \

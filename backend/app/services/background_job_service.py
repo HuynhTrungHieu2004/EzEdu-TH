@@ -17,6 +17,7 @@ luận AI, ingest kho tri thức chuẩn, retry Cloudinary).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ JobStatus = str  # "pending" | "running" | "succeeded" | "failed" | "dead_letter
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_BACKOFF_SECONDS = 30
 DEFAULT_LOCK_SECONDS = 300  # nếu worker chết giữa chừng, job được nhận lại sau khoảng thời gian này
+DEFAULT_JOB_TIMEOUT_SECONDS = 180
 
 
 def _now() -> datetime:
@@ -231,7 +233,14 @@ class JobHandlerResult:
 JobHandler = Callable[[Dict[str, Any]], Awaitable[Any]]
 
 
-async def process_one(db, *, job_types: list[str], worker_id: str, handlers: Dict[str, JobHandler]) -> bool:
+async def process_one(
+    db,
+    *,
+    job_types: list[str],
+    worker_id: str,
+    handlers: Dict[str, JobHandler],
+    timeout_seconds: float = DEFAULT_JOB_TIMEOUT_SECONDS,
+) -> bool:
     """Nhận và xử lý đúng 1 job nếu có. Trả về True nếu đã xử lý (kể cả lỗi),
     False nếu hàng đợi hiện không có job nào sẵn sàng.
     """
@@ -258,8 +267,15 @@ async def process_one(db, *, job_types: list[str], worker_id: str, handlers: Dic
                 "claimed_at": job["claimed_at"],
             },
         }
-        outcome = await handler(handler_payload)
+        outcome = await asyncio.wait_for(handler(handler_payload), timeout=timeout_seconds)
         await mark_succeeded(db, job_id, claim_token=claim_token, result=outcome)
+    except asyncio.TimeoutError:
+        error = f"Job quá thời gian {timeout_seconds:g} giây."
+        logger.error(
+            "background_job.handler_timeout",
+            extra={"job_id": job_id, "job_type": job["job_type"], "timeout_seconds": timeout_seconds},
+        )
+        await mark_failed(db, job_id, claim_token=claim_token, error=error)
     except Exception as exc:  # noqa: BLE001 - job xấu không được làm chết worker
         logger.exception("background_job.handler_failed", extra={"job_id": job_id, "job_type": job["job_type"]})
         await mark_failed(db, job_id, claim_token=claim_token, error=str(exc))

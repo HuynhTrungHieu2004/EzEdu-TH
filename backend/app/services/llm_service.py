@@ -323,7 +323,11 @@ def get_groq_client():
         return _groq_client
     if not settings.GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY is not configured in the application environment (.env file).")
-    _groq_client = Groq(api_key=settings.GROQ_API_KEY)
+    _groq_client = Groq(
+        api_key=settings.GROQ_API_KEY,
+        timeout=settings.AI_TIMEOUT_SECONDS,
+        max_retries=0,
+    )
     return _groq_client
 
 

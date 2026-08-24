@@ -1298,6 +1298,38 @@ class StudentReviewGenerationJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("provider secret", review["error_message"])
         self.assertNotIn("question_set_id", review)
 
+    async def test_worker_timeout_marks_generation_failed(self):
+        async def stuck_generator(**_kwargs):
+            await asyncio.Event().wait()
+
+        await self.db.background_jobs.insert_one({
+            "job_type": STUDENT_REVIEW_GENERATE_JOB_TYPE,
+            "payload": {**self.payload(), "job_max_attempts": 1},
+            "status": "pending",
+            "attempts": 0,
+            "max_attempts": 1,
+            "next_run_at": datetime.now(timezone.utc),
+            "locked_by": None,
+            "locked_until": None,
+        })
+        handler = lambda payload: generate_student_review_job(
+            self.db, payload, generator=stuck_generator
+        )
+
+        await process_one(
+            self.db,
+            job_types=[STUDENT_REVIEW_GENERATE_JOB_TYPE],
+            worker_id="worker-1",
+            handlers={STUDENT_REVIEW_GENERATE_JOB_TYPE: handler},
+            timeout_seconds=0.01,
+        )
+
+        review = await self.db.student_reviews.find_one({"_id": self.review_id})
+        job = await self.db.background_jobs.find_one({"job_type": STUDENT_REVIEW_GENERATE_JOB_TYPE})
+        self.assertEqual(review["state"], "failed")
+        self.assertEqual(review["failed_step"], "generation")
+        self.assertEqual(job["status"], "dead_letter")
+
     async def test_generation_failure_stays_active_until_configured_final_attempt(self):
         async def failing_generator(**_kwargs):
             raise RuntimeError("provider secret")

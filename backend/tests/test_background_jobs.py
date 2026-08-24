@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -182,6 +183,25 @@ class BackgroundJobServiceTests(unittest.IsolatedAsyncioTestCase):
         doc = await self.db["background_jobs"].find_one({"job_type": "flaky"})
         self.assertIn(doc["status"], {"failed", "dead_letter"})
         self.assertIn("lỗi giả lập", doc["error"])
+
+    async def test_process_one_times_out_a_stuck_handler(self):
+        await enqueue(self.db, job_type="stuck", payload={}, max_attempts=1)
+
+        async def handler(_payload):
+            await asyncio.Event().wait()
+
+        processed = await process_one(
+            self.db,
+            job_types=["stuck"],
+            worker_id="w1",
+            handlers={"stuck": handler},
+            timeout_seconds=0.01,
+        )
+
+        self.assertTrue(processed)
+        doc = await self.db.background_jobs.find_one({"job_type": "stuck"})
+        self.assertEqual(doc["status"], "dead_letter")
+        self.assertIn("quá thời gian", doc["error"])
 
 
 if __name__ == "__main__":
