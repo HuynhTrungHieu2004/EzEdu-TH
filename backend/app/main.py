@@ -165,7 +165,7 @@ async def lifespan(app: FastAPI):
         
     worker_stop = None
     worker_task = None
-    if os.getenv("RUN_WORKER", "0") == "1":
+    if os.getenv("RUN_WORKER", "1") == "1":
         from app.worker import run_worker
 
         worker_stop = asyncio.Event()
