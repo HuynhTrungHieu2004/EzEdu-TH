@@ -180,6 +180,14 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(classification["confidence"], 0.85)
         self.assertEqual(classification["status"], "confirmed")
 
+    async def test_numeric_string_grade_from_provider_is_normalized(self):
+        classification = await classify_document(
+            self.db, await self._document(), llm=LLMStub(self._response(grade="10"))
+        )
+
+        self.assertEqual(classification["grade"], 10)
+        self.assertEqual(classification["status"], "confirmed")
+
     async def test_confidence_at_confirmation_threshold_needs_confirmation(self):
         classification = await classify_document(
             self.db, await self._document(), llm=LLMStub(self._response(0.60))
@@ -208,7 +216,7 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_provider_metadata_falls_back_to_manual_taxonomy_suggestion(self):
         with patch(
             "app.services.document_classification_service.generate_json_with_failover",
-            return_value=self._response(grade="10"),
+            return_value=self._response(grade="Lớp 10"),
         ):
             classification = await classify_document(self.db, await self._document())
 
@@ -219,7 +227,7 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         await self.db.curriculum_taxonomy.delete_many({"node_type": "topic"})
         with patch(
             "app.services.document_classification_service.generate_json_with_failover",
-            return_value=self._response(grade="10", topic_ids=[]),
+            return_value=self._response(grade="Lớp 10", topic_ids=[]),
         ):
             classification = await classify_document(self.db, await self._document())
 

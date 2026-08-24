@@ -176,6 +176,8 @@ async def classify_document(db, document: dict, llm=None) -> dict:
             raise ValueError("LLM returned malformed classification JSON.") from exc
     if not isinstance(raw, dict):
         raise ValueError("LLM classification must be a JSON object.")
+    if isinstance(raw.get("grade"), str) and raw["grade"].strip().isdigit():
+        raw = {**raw, "grade": int(raw["grade"].strip())}
 
     subject_id = _taxonomy_id(raw.get("subject_id"), nodes, "subject")
     chapter_id = _taxonomy_id(raw.get("chapter_id"), nodes, "chapter")
