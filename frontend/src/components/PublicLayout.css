@@ -47,17 +47,9 @@
 }
 
 .pub-logo-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: var(--ez-radius-md);
-  background: linear-gradient(135deg, #8b7cf8 0%, #6c3fd1 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 

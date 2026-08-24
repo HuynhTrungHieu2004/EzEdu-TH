@@ -4,8 +4,8 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContentBundle = {
   site_identity: {
     site_name: 'EzEdu AI',
     logo_text: 'EzEdu AI',
-    favicon_url: '/favicon.svg',
-    logo_url: '',
+    favicon_url: '/logo-mark.png',
+    logo_url: '/logo-mark.png',
     slogan: 'Biến học liệu thành đề thi dễ dàng',
   },
   header: {

@@ -158,7 +158,7 @@ export default function StudentOnboardingPage() {
       <form className="student-onboarding-card" onSubmit={handleSubmit}>
         <div className="student-onboarding-header">
           <button type="button" className="student-onboarding-brand" onClick={() => navigate('/')}>
-            <span translate="no">Ez</span>
+            <img src="/logo-mark.png" alt="" />
             <strong translate="no">EzEdu AI</strong>
           </button>
           <p className="eyebrow">Thiết lập cho học sinh</p>

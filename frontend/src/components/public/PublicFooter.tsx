@@ -54,9 +54,7 @@ export default function PublicFooter({ identity }: PublicFooterProps) {
         <div className="ezp-footer-grid">
           <div className="ezp-footer-about">
             <Link to="/" className="ezp-brand">
-              <span className="ezp-brand-mark" aria-hidden="true" translate="no">
-                {identity?.logo_text?.slice(0, 2) || 'Ez'}
-              </span>
+              <img className="ezp-brand-mark" src={identity?.logo_url || '/logo-mark.png'} alt="" />
               <span className="ezp-brand-name">{identity?.site_name || 'EzEdu AI'}</span>
             </Link>
             <p className="ezp-footer-slogan">

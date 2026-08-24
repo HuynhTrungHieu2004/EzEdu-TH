@@ -125,6 +125,12 @@
 
 .ezp-brand:hover { text-decoration: none; }
 
+.ezp-brand-mark {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex: none;
+}
 
 .ezp-brand-name {
   font-size: var(--ez-text-h5);

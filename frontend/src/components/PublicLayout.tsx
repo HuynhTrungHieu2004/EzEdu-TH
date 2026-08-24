@@ -39,7 +39,7 @@ export default function PublicLayout({ children }: PublicLayoutProps) {
           onClick={() => navigate('/')}
           aria-label="Về trang chủ EzEdu AI"
         >
-          <span className="pub-logo-mark" translate="no">Ez</span>
+          <img className="pub-logo-mark" src="/logo-mark.png" alt="" />
           <span className="pub-logo-text" translate="no">EzEdu AI</span>
         </button>
 

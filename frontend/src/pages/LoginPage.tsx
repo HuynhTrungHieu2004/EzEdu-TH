@@ -138,9 +138,7 @@ const LoginPage: React.FC = () => {
       <div className="ez-auth-card">
         {/* Header */}
         <div className="ez-auth-header">
-          <div className="ez-auth-logo-badge" translate="no">
-            Ez
-          </div>
+          <img className="ez-auth-logo-badge" src="/logo-mark.png" alt="EzEdu AI" />
           <h1 className="ez-auth-title">Đăng nhập EzEdu AI</h1>
           <p className="ez-auth-subtitle">Biến học liệu thành đề thi dễ dàng & chuẩn hóa AI</p>
         </div>

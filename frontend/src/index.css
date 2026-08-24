@@ -1379,15 +1379,10 @@ code, .counter { font-family: var(--mono); }
   cursor: pointer;
 }
 
-.student-onboarding-brand span {
-  display: inline-grid;
-  place-items: center;
+.student-onboarding-brand img {
   width: 34px;
   height: 34px;
-  border-radius: var(--ez-radius-sm);
-  background: linear-gradient(135deg, #6d5df2 0%, #4f46e5 100%);
-  color: #fff;
-  font-weight: 900;
+  object-fit: contain;
 }
 
 .student-onboarding-brand strong {

@@ -432,9 +432,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <aside className="ez-sidebar">
         <Link to={area === 'admin' ? '/admin/dashboard' : '/dashboard'} className="ez-brand">
-          <span className="ez-brand-mark" aria-hidden="true" translate="no">
-            Ez
-          </span>
+          <img className="ez-brand-mark" src="/logo-mark.png" alt="" />
           <span className="ez-brand-text">
             <span className="ez-brand-name">EzEdu AI</span>
             {area === 'admin' ? <span className="ez-brand-area">Quản trị</span> : null}

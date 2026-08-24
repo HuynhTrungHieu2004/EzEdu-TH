@@ -69,18 +69,10 @@
 }
 
 .ez-brand-mark {
-  display: flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--ez-radius-sm);
-  background: var(--ez-gradient-cta);
-  color: var(--ez-text-on-brand);
-  font-size: var(--ez-text-body-sm);
-  font-weight: var(--ez-weight-bold);
-  letter-spacing: var(--ez-tracking-tight);
+  object-fit: contain;
 }
 
 .ez-brand-text {
