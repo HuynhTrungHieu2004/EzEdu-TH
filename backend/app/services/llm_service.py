@@ -420,13 +420,7 @@ def generate_json_with_failover(prompt: str, *, quality: bool = True) -> str:
     thuận lợi; chỉ khi Gemini hỏng mới chuyển sang Groq.
     """
     if settings.AI_TEXT_PROVIDER == "claude":
-        try:
-            return claude_generate_json(prompt, quality=quality)
-        except Exception as exc:  # noqa: BLE001 - provider lỗi thì dùng fallback đã cấu hình
-            if not is_groq_available():
-                raise
-            logger.warning("Claude sinh JSON thất bại, thử Groq: %s", exc)
-            return generate_json(prompt)
+        return claude_generate_json(prompt, quality=quality)
 
     lastest_error: Exception | None = None
 
