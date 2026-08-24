@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -6,18 +7,21 @@ from mongomock_motor import AsyncMongoMockClient
 
 
 class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
-    async def _start_with(self, failing_index: str | None = None) -> None:
+    async def _start_with(self, failing_index: str | None = None, *, run_worker: bool = False):
         from app.main import lifespan
 
         db = AsyncMongoMockClient().required_indexes_startup
         background = AsyncMock()
         reviews = AsyncMock()
+        worker = AsyncMock()
         if failing_index == "background":
             background.side_effect = RuntimeError("background unique index failed")
         if failing_index == "reviews":
             reviews.side_effect = RuntimeError("review unique index failed")
 
-        with patch("app.main.connect_to_mongo", new=AsyncMock()), patch(
+        with patch.dict(os.environ, {"RUN_WORKER": "1" if run_worker else "0"}), patch(
+            "app.main.connect_to_mongo", new=AsyncMock()
+        ), patch(
             "app.main.close_mongo_connection", new=AsyncMock()
         ), patch("app.database.mongodb.get_database", return_value=db), patch(
             "app.services.background_job_service.ensure_background_job_indexes", background
@@ -29,9 +33,12 @@ class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
         ), patch(
             "app.services.verification_service.recover_interrupted_verification_sessions",
             new=AsyncMock(return_value=0),
+        ), patch(
+            "app.worker.run_worker", worker,
         ):
             async with lifespan(FastAPI()):
                 pass
+        return worker
 
     async def test_background_job_unique_index_failure_aborts_startup(self):
         with self.assertRaisesRegex(RuntimeError, "background unique index failed"):
@@ -43,3 +50,9 @@ class RequiredIndexesStartupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_required_indexes_allow_normal_startup(self):
         await self._start_with()
+
+    async def test_worker_runs_inside_web_process_when_enabled(self):
+        worker = await self._start_with(run_worker=True)
+        worker.assert_awaited_once()
+        self.assertFalse(worker.await_args.kwargs["manage_connection"])
+        self.assertTrue(worker.await_args.kwargs["stop_event"].is_set())

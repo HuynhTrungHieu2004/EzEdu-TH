@@ -60,8 +60,9 @@ POLL_INTERVAL_SECONDS = 3.0
 SWEEP_INTERVAL_SECONDS = 30.0
 
 
-async def run_worker(*, stop_event: asyncio.Event) -> None:
-    await connect_to_mongo()
+async def run_worker(*, stop_event: asyncio.Event, manage_connection: bool = True) -> None:
+    if manage_connection:
+        await connect_to_mongo()
     db = get_database()
     await ensure_background_job_indexes(db)
 
@@ -94,7 +95,8 @@ async def run_worker(*, stop_event: asyncio.Event) -> None:
         pass
     finally:
         logger.info("worker.stopping", extra={"worker_id": worker_id})
-        await close_mongo_connection()
+        if manage_connection:
+            await close_mongo_connection()
 
 
 def main() -> None:

@@ -1,3 +1,5 @@
+import asyncio
+import os
 import sys
 import time
 from pathlib import Path
@@ -161,9 +163,24 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Lỗi khi tự động tạo tài khoản mặc định: {e}")
         
-    yield
-    # Đóng kết nối MongoDB khi shutdown
-    await close_mongo_connection()
+    worker_stop = None
+    worker_task = None
+    if os.getenv("RUN_WORKER", "0") == "1":
+        from app.worker import run_worker
+
+        worker_stop = asyncio.Event()
+        worker_task = asyncio.create_task(
+            run_worker(stop_event=worker_stop, manage_connection=False)
+        )
+
+    try:
+        yield
+    finally:
+        if worker_stop is not None and worker_task is not None:
+            worker_stop.set()
+            await worker_task
+        # Đóng kết nối MongoDB khi shutdown
+        await close_mongo_connection()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

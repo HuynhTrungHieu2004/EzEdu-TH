@@ -2,7 +2,6 @@
 set -euo pipefail
 
 PORT="${PORT:-8000}"
-RUN_WORKER="${RUN_WORKER:-1}"
 
 if [ "${PERSONALIZATION_ENABLED:-false}" = "true" ]; then
   echo "[start] đồng bộ chỉ mục cá nhân hóa"
@@ -12,15 +11,6 @@ fi
 if [ -n "${DEMO_PASSWORD:-}" ]; then
   echo "[start] đồng bộ dữ liệu demo"
   python -m app.services.demo_seed_service
-fi
-
-if [ "$RUN_WORKER" = "1" ]; then
-  echo "[start] bật worker nền (chấm tự luận)"
-  while true; do
-    python -m app.worker
-    echo "[start] worker dừng; khởi động lại sau 3 giây" >&2
-    sleep 3
-  done &
 fi
 
 echo "[start] uvicorn cổng $PORT"
