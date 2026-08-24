@@ -21,10 +21,65 @@ EXAM_ID = ObjectId("000000000000000000000104")
 ATTEMPT_ID = ObjectId("000000000000000000000105")
 PROFILE_ID = ObjectId("000000000000000000000106")
 
+AI_SUGGESTED_COURSES = (
+    {
+        "id": ObjectId("000000000000000000000201"),
+        "code": "AI-TOAN-12",
+        "title": "AI gợi ý · Toán 12",
+        "subject": "Toán học",
+        "description": "Lộ trình lý thuyết trọng tâm lớp 12 do AI gợi ý, bám định hướng CTGDPT 2018.",
+        "goals": ["Nắm chắc kiến thức nền", "Biết vận dụng công thức", "Chuẩn bị cho bài tập tổng hợp"],
+        "syllabus": "Ứng dụng đạo hàm; vectơ và tọa độ trong không gian; xác suất và thống kê.",
+        "lessons": (
+            ("Chương 1: Ứng dụng đạo hàm", "Tính đơn điệu và cực trị", "Đạo hàm cho biết chiều biến thiên của hàm số. Trên khoảng mà f'(x) > 0, hàm số đồng biến; khi f'(x) < 0, hàm số nghịch biến. Điểm cực trị thường xuất hiện nơi đạo hàm đổi dấu. Quy trình cơ bản gồm tìm tập xác định, tính đạo hàm, lập bảng dấu và kết luận."),
+            ("Chương 1: Ứng dụng đạo hàm", "Tiệm cận và khảo sát đồ thị", "Tiệm cận đứng được nhận biết qua giới hạn vô cực tại một giá trị hữu hạn; tiệm cận ngang hoặc xiên được xác định từ giới hạn khi x tiến ra vô cực. Khi khảo sát đồ thị cần phối hợp tập xác định, biến thiên, cực trị, tiệm cận và một số điểm đặc biệt."),
+            ("Chương 2: Vectơ và tọa độ Oxyz", "Vectơ trong không gian", "Vectơ trong không gian có các phép toán cộng, trừ và nhân với một số tương tự trên mặt phẳng. Tích vô hướng giúp tính góc và kiểm tra vuông góc. Trong hệ Oxyz, vectơ được biểu diễn bằng ba tọa độ và độ dài bằng căn bậc hai tổng bình phương các tọa độ."),
+            ("Chương 2: Vectơ và tọa độ Oxyz", "Phương trình mặt phẳng và đường thẳng", "Một mặt phẳng được xác định bởi một điểm và vectơ pháp tuyến. Đường thẳng được mô tả bằng một điểm đi qua cùng vectơ chỉ phương. Quan hệ song song, vuông góc và góc giữa các đối tượng được xét thông qua vectơ pháp tuyến hoặc vectơ chỉ phương."),
+            ("Chương 3: Xác suất và thống kê", "Độ phân tán của mẫu số liệu ghép nhóm", "Khoảng biến thiên, khoảng tứ phân vị, phương sai và độ lệch chuẩn mô tả mức độ phân tán của dữ liệu. Với mẫu ghép nhóm, ta dùng giá trị đại diện của từng lớp để ước lượng. Độ lệch chuẩn nhỏ cho thấy dữ liệu tập trung gần giá trị trung bình hơn."),
+            ("Chương 3: Xác suất và thống kê", "Xác suất có điều kiện", "Xác suất có điều kiện P(A|B) đo khả năng A xảy ra khi biết B đã xảy ra. Công thức nhân là P(A∩B)=P(B)P(A|B). Hai biến cố độc lập khi việc biết một biến cố không làm thay đổi xác suất của biến cố kia; định lí Bayes hỗ trợ suy ngược xác suất."),
+        ),
+    },
+    {
+        "id": ObjectId("000000000000000000000202"),
+        "code": "AI-VATLY-12",
+        "title": "AI gợi ý · Vật lí 12",
+        "subject": "Vật lí",
+        "description": "Các chủ đề nền tảng Vật lí 12 được AI sắp xếp thành lộ trình đọc hiểu ngắn gọn.",
+        "goals": ["Hiểu bản chất hiện tượng", "Sử dụng đúng đại lượng và đơn vị", "Liên hệ thí nghiệm thực tế"],
+        "syllabus": "Vật lí nhiệt; từ trường và cảm ứng điện từ; vật lí hạt nhân.",
+        "lessons": (
+            ("Chương 1: Vật lí nhiệt", "Nội năng và nguyên lí I nhiệt động lực học", "Nội năng là tổng động năng chuyển động nhiệt và thế năng tương tác của các phân tử. Nội năng thay đổi khi hệ nhận nhiệt hoặc khi có công thực hiện lên hệ. Nguyên lí I biểu diễn định luật bảo toàn năng lượng cho quá trình nhiệt động lực học và cần dùng quy ước dấu nhất quán."),
+            ("Chương 1: Vật lí nhiệt", "Khí lí tưởng và phương trình trạng thái", "Mô hình khí lí tưởng coi các phân tử có kích thước rất nhỏ và chỉ tương tác đáng kể khi va chạm. Với một lượng khí xác định, các trạng thái cân bằng liên hệ qua pV/T không đổi. Nhiệt độ trong công thức phải dùng thang Kelvin và áp suất, thể tích dùng cùng hệ đơn vị."),
+            ("Chương 2: Từ trường", "Lực từ và cảm ứng từ", "Từ trường tác dụng lực lên điện tích chuyển động và dây dẫn có dòng điện. Vectơ cảm ứng từ đặc trưng độ mạnh và hướng của từ trường. Độ lớn lực phụ thuộc vào B, dòng điện hoặc điện tích, vận tốc và góc giữa hướng chuyển động với đường sức từ."),
+            ("Chương 2: Từ trường", "Cảm ứng điện từ", "Từ thông qua một mạch phụ thuộc cảm ứng từ, diện tích và góc định hướng của mặt phẳng mạch. Khi từ thông biến thiên, trong mạch xuất hiện suất điện động cảm ứng. Chiều dòng điện cảm ứng tuân theo định luật Lenz, chống lại nguyên nhân gây ra biến thiên."),
+            ("Chương 3: Vật lí hạt nhân", "Cấu tạo và năng lượng liên kết hạt nhân", "Hạt nhân gồm proton và neutron, được đặc trưng bởi số khối và điện tích. Khối lượng hạt nhân nhỏ hơn tổng khối lượng các nuclon tự do; độ hụt khối tương ứng với năng lượng liên kết theo E=mc². Năng lượng liên kết riêng phản ánh mức độ bền vững tương đối."),
+            ("Chương 3: Vật lí hạt nhân", "Phóng xạ và phản ứng hạt nhân", "Phóng xạ là quá trình tự phát của hạt nhân không bền và tuân theo định luật giảm mũ. Chu kì bán rã là thời gian để số hạt chưa phân rã giảm còn một nửa. Trong phản ứng hạt nhân cần bảo toàn điện tích, số nuclon, năng lượng và động lượng."),
+        ),
+    },
+    {
+        "id": ObjectId("000000000000000000000203"),
+        "code": "AI-TIENGANH-12",
+        "title": "AI gợi ý · Tiếng Anh 12",
+        "subject": "Tiếng Anh",
+        "description": "Lộ trình Tiếng Anh 12 tập trung vào từ vựng, ngữ pháp và chiến lược giao tiếp học thuật.",
+        "goals": ["Mở rộng từ vựng theo chủ đề", "Dùng ngữ pháp trong ngữ cảnh", "Cải thiện đọc và viết"],
+        "syllabus": "Life stories and careers; urbanisation and green living; lifelong learning and future skills.",
+        "lessons": (
+            ("Unit 1: Life stories and careers", "Telling a life story", "A clear life story normally follows a timeline: background, turning points, achievements and impact. Use the past simple for completed events and the past continuous for actions in progress. Linking expressions such as afterwards, meanwhile and eventually make the narrative coherent."),
+            ("Unit 1: Life stories and careers", "Relative clauses in context", "Relative clauses add information about people, things, places or times. Who and whom refer to people, which to things, and where to places. Defining clauses identify the noun and do not use commas; non-defining clauses add extra information and are separated by commas."),
+            ("Unit 2: Urbanisation and green living", "Discussing urban change", "Urbanisation describes the movement of people and economic activity toward towns and cities. Useful vocabulary includes infrastructure, housing, public transport, employment and congestion. A balanced discussion should identify both opportunities and pressures, then support each point with an example."),
+            ("Unit 2: Urbanisation and green living", "Writing a problem–solution paragraph", "Begin with a focused topic sentence that names the problem. Explain one or two causes, then propose realistic solutions and expected results. Modal verbs such as should, could and must express different strengths of recommendation. End by restating the main benefit without repeating every detail."),
+            ("Unit 3: Lifelong learning", "Reading for main ideas and evidence", "Preview the title and headings before reading, then identify the main idea of each paragraph. Distinguish claims from supporting evidence and use reference words to follow connections. When answering questions, locate the relevant passage and paraphrase it instead of matching isolated words."),
+            ("Unit 3: Lifelong learning", "Future skills and personal plans", "Future-ready learners combine digital literacy, communication, collaboration and self-management. Use will for predictions or spontaneous decisions, be going to for intentions, and the present continuous for arranged plans. A practical learning plan needs a goal, actions, resources and a review date."),
+        ),
+    },
+)
+
 DEMO_COLLECTIONS = (
     "users",
     "learner_profiles",
     "courses",
+    "course_lessons",
     "course_enrollments",
     "questions",
     "exams",
@@ -98,6 +153,44 @@ async def seed_demo_data(db, *, password: str) -> dict[str, int]:
         "updated_at": now,
         "created_at": now,
     })
+    lesson_number = 0
+    for course in AI_SUGGESTED_COURSES:
+        await _upsert(db["courses"], {"code": course["code"]}, {
+            "_id": course["id"],
+            "code": course["code"],
+            "title": course["title"],
+            "description": course["description"],
+            "thumbnail": "",
+            "subject": course["subject"],
+            "grade": "Lớp 12",
+            "teacher_ids": [str(TEACHER_ID)],
+            "goals": course["goals"],
+            "syllabus_overview": course["syllabus"],
+            "start_date": now.date().isoformat(),
+            "end_date": (now + timedelta(days=120)).date().isoformat(),
+            "status": "published",
+            "deleted_at": None,
+            "updated_at": now,
+            "created_at": now,
+        })
+        for sort_order, (chapter, title, content) in enumerate(course["lessons"], 1):
+            lesson_number += 1
+            lesson_id = ObjectId(f"000000000000000000000{300 + lesson_number:03d}")
+            await _upsert(db["course_lessons"], {"_id": lesson_id}, {
+                "_id": lesson_id,
+                "course_id": str(course["id"]),
+                "chapter_title": chapter,
+                "title": title,
+                "description": content[:180],
+                "content": content,
+                "duration_mins": 25,
+                "sort_order": sort_order,
+                "status": "published",
+                "attachments": [],
+                "deleted_at": None,
+                "updated_at": now,
+                "created_at": now,
+            })
     await _upsert(db["course_enrollments"], {"_id": ENROLLMENT_ID}, {
         "_id": ENROLLMENT_ID,
         "course_id": str(COURSE_ID),

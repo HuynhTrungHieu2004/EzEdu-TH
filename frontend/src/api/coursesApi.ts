@@ -18,6 +18,9 @@ export const coursesApi = {
   getAllCourses: async (): Promise<Course[]> =>
     (await client.get<Course[]>('/courses')).data,
 
+  getRecommendedCourses: async (): Promise<Course[]> =>
+    (await client.get<Course[]>('/courses/recommended')).data,
+
   getCourseById: async (id: string): Promise<Course> =>
     (await client.get<Course>(`/courses/${id}`)).data,
 
@@ -43,6 +46,9 @@ export const coursesApi = {
     (await client.post<CourseEnrollment>(`/courses/${payload.course_id}/enrollments`, {
       student_id: payload.student_id,
     })).data,
+
+  selfEnroll: async (courseId: string): Promise<CourseEnrollment> =>
+    (await client.post<CourseEnrollment>(`/courses/${courseId}/self-enroll`)).data,
 
   removeEnrollment: async (id: string): Promise<void> => {
     await client.delete(`/courses/enrollments/${id}`);

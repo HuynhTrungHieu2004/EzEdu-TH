@@ -23,7 +23,9 @@ from app.routers.courses import (
     create_course_route,
     enroll_student_route,
     get_course_route,
+    list_recommended_courses_route,
     router,
+    self_enroll_recommended_course_route,
     update_course_route,
 )
 
@@ -137,7 +139,37 @@ class CourseRouterTests(unittest.IsolatedAsyncioTestCase):
         paths = [route.path for route in router.routes]
         dynamic = paths.index("/courses/{course_id}")
         self.assertLess(paths.index("/courses/mine"), dynamic)
+        self.assertLess(paths.index("/courses/recommended"), dynamic)
         self.assertLess(paths.index("/courses/statistics"), dynamic)
+
+    async def test_student_lists_and_self_enrolls_ai_recommended_course_idempotently(self):
+        recommended = await create_course(
+            self.db,
+            CourseCreate(
+                code="AI-TOAN-12",
+                title="AI gợi ý · Toán 12",
+                subject="Toán học",
+                status="published",
+            ),
+            actor_id=self.admin.id,
+        )
+        await self._course("published")
+
+        listed = await list_recommended_courses_route(current_user=self.student)
+        first = await self_enroll_recommended_course_route(
+            recommended.id, current_user=self.student
+        )
+        second = await self_enroll_recommended_course_route(
+            recommended.id, current_user=self.student
+        )
+
+        self.assertEqual([course.id for course in listed], [recommended.id])
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(first.status, "learning")
+        self.assertEqual(
+            await self.db.course_enrollments.count_documents({"course_id": recommended.id}),
+            1,
+        )
 
     async def test_only_admin_can_create_and_enroll(self):
         payload = CourseCreate(code="ADMIN-1", title="Khóa admin", subject="Toán")

@@ -134,6 +134,15 @@ async def list_courses(
     return [await _course_read(db, doc) async for doc in cursor]
 
 
+async def list_recommended_courses(db) -> list[CourseRead]:
+    cursor = db["courses"].find({
+        "code": {"$regex": "^AI-"},
+        "status": "published",
+        "deleted_at": None,
+    }).sort("code", 1)
+    return [await _course_read(db, doc) async for doc in cursor]
+
+
 async def get_course(db, course_id: str) -> CourseRead:
     doc = await db["courses"].find_one({"_id": _object_id(course_id), "deleted_at": None})
     if not doc:
@@ -296,6 +305,25 @@ async def enroll_student(db, course_id: str, payload: EnrollmentCreate) -> Enrol
         raise CourseConflict("Học sinh đã được ghi danh vào khóa học.") from exc
     doc["_id"] = result.inserted_id
     return await _enrollment_read(db, doc)
+
+
+async def self_enroll_recommended_course(db, course_id: str, student_id: str) -> EnrollmentRead:
+    course = await get_course(db, course_id)
+    if course.status != "published" or not course.code.startswith("AI-"):
+        raise HTTPException(status_code=403, detail="Khóa học không thuộc danh sách AI gợi ý.")
+    existing = await db["course_enrollments"].find_one({
+        "course_id": course_id,
+        "student_id": student_id,
+    })
+    if existing:
+        if existing.get("status") == "cancelled":
+            await db["course_enrollments"].update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"status": "learning", "last_activity_at": _now()}},
+            )
+            existing["status"] = "learning"
+        return await _enrollment_read(db, existing)
+    return await enroll_student(db, course_id, EnrollmentCreate(student_id=student_id))
 
 
 async def remove_enrollment(db, course_id: str | None, enrollment_id: str) -> bool:

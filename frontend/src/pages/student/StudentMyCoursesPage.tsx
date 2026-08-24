@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Award,
   UserCheck,
+  Sparkles,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -16,26 +17,46 @@ import {
   ProgressBar,
 } from '../../components/ui';
 import { coursesApi } from '../../api/coursesApi';
-import type { CourseEnrollment } from '../../types/courses';
+import type { Course, CourseEnrollment } from '../../types/courses';
 
 export default function StudentMyCoursesPage() {
   const navigate = useNavigate();
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [recommended, setRecommended] = useState<Course[]>([]);
+  const [enrollingCourseId, setEnrollingCourseId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'enrolled' | 'completed' | 'all'>('enrolled');
+  const [tab, setTab] = useState<'enrolled' | 'completed' | 'all' | 'recommended'>('enrolled');
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      setEnrollments(await coursesApi.getStudentEnrollments());
+      const [studentEnrollments, suggestedCourses] = await Promise.all([
+        coursesApi.getStudentEnrollments(),
+        coursesApi.getRecommendedCourses(),
+      ]);
+      setEnrollments(studentEnrollments);
+      setRecommended(suggestedCourses);
     } catch {
       setError('Không thể tải khóa học của bạn.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const openRecommendedCourse = async (courseId: string) => {
+    setEnrollingCourseId(courseId);
+    setError('');
+    try {
+      await coursesApi.selfEnroll(courseId);
+      navigate(`/student/courses/${courseId}`);
+    } catch {
+      setError('Không thể mở khóa học AI gợi ý. Vui lòng thử lại.');
+    } finally {
+      setEnrollingCourseId('');
+    }
+  };
 
   useEffect(() => {
     queueMicrotask(() => void loadData());
@@ -117,6 +138,13 @@ export default function StudentMyCoursesPage() {
         >
           Tất cả khóa học của tôi ({enrollments.length})
         </Button>
+        <Button
+          variant={tab === 'recommended' ? 'primary' : 'ghost'}
+          onClick={() => setTab('recommended')}
+          style={{ borderRadius: '10px', gap: '0.35rem' }}
+        >
+          <Sparkles size={16} /> AI gợi ý ({recommended.length})
+        </Button>
       </div>
 
       {/* Course Cards Grid */}
@@ -126,9 +154,36 @@ export default function StudentMyCoursesPage() {
         <Card style={{ borderRadius: '16px', padding: '3rem', textAlign: 'center', color: '#b91c1c' }}>
           {error} <Button variant="outline" size="sm" onClick={() => void loadData()}>Thử lại</Button>
         </Card>
+      ) : tab === 'recommended' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
+          {recommended.map((course) => (
+            <Card key={course.id} style={{ borderRadius: '20px', overflow: 'hidden', border: '1px solid #ddd6fe', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '1rem 1.2rem', background: '#f5f3ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Badge variant="primary">✨ AI gợi ý</Badge>
+                <span style={{ fontSize: '0.82rem', color: '#6d28d9', fontWeight: 700 }}>{course.grade}</span>
+              </div>
+              <CardBody style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1.2rem', flex: 1 }}>
+                <div>
+                  <Badge variant="success">{course.subject}</Badge>
+                  <h3 style={{ margin: '0.7rem 0 0', fontSize: '1.1rem', color: '#0f172a' }}>{course.title}</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: 1.55 }}>{course.description}</p>
+                </div>
+                <div style={{ color: '#475569', fontSize: '0.85rem' }}><BookOpen size={15} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />{course.lesson_count} bài lý thuyết</div>
+                <Button
+                  variant="primary"
+                  style={{ marginTop: 'auto', width: '100%', borderRadius: '10px', gap: '0.4rem' }}
+                  disabled={enrollingCourseId === course.id}
+                  onClick={() => void openRecommendedCourse(course.id)}
+                >
+                  <Play size={16} /> {enrollingCourseId === course.id ? 'Đang mở...' : 'Xem khóa học'}
+                </Button>
+              </CardBody>
+            </Card>
+          ))}
+        </div>
       ) : tab === 'enrolled' && enrolledList.length === 0 ? (
         <Card style={{ borderRadius: '16px', padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-          Bạn chưa đăng ký khóa học nào. Hãy sang tab "Tất cả khóa học có sẵn" để khám phá nhé!
+          Bạn chưa đăng ký khóa học nào. Hãy sang tab "AI gợi ý" để khám phá nhé!
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.25rem' }}>

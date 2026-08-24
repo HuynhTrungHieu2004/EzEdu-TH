@@ -69,6 +69,15 @@ async def get_statistics_route(current_user: UserResponse = Depends(get_current_
     return await course_service.get_course_statistics(get_database())
 
 
+@router.get("/recommended", response_model=list[CourseRead])
+async def list_recommended_courses_route(
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Chỉ học sinh xem được khóa học AI gợi ý.")
+    return await course_service.list_recommended_courses(get_database())
+
+
 @router.get("", response_model=list[CourseRead])
 async def list_courses_route(
     status_filter: str | None = Query(default=None, alias="status"),
@@ -202,6 +211,18 @@ async def enroll_student_route(
         return await course_service.enroll_student(get_database(), course_id, payload)
     except course_service.CourseConflict as exc:
         _raise_conflict(exc)
+
+
+@router.post("/{course_id}/self-enroll", response_model=EnrollmentRead)
+async def self_enroll_recommended_course_route(
+    course_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Chỉ học sinh được tự ghi danh.")
+    return await course_service.self_enroll_recommended_course(
+        get_database(), course_id, current_user.id
+    )
 
 
 @router.delete("/{course_id}/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)

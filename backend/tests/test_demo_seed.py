@@ -26,6 +26,25 @@ class DemoSeedTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(await self.db["courses"].count_documents({"demo_seed": DEMO_SEED_KEY}), 0)
         self.assertGreater(await self.db["exam_attempts"].count_documents({"demo_seed": DEMO_SEED_KEY}), 0)
 
+    async def test_seed_creates_three_ai_courses_with_published_theory_lessons(self):
+        first = await seed_demo_data(self.db, password="DemoPassword123!")
+        second = await seed_demo_data(self.db, password="DemoPassword123!")
+
+        courses = [
+            course async for course in self.db.courses.find({"code": {"$regex": "^AI-"}})
+        ]
+        course_ids = [str(course["_id"]) for course in courses]
+        lessons = [
+            lesson async for lesson in self.db.course_lessons.find({"course_id": {"$in": course_ids}})
+        ]
+
+        self.assertEqual(len(courses), 3)
+        self.assertTrue(all(course["title"].startswith("AI gợi ý ·") for course in courses))
+        self.assertEqual(len(lessons), 18)
+        self.assertTrue(all(lesson["status"] == "published" for lesson in lessons))
+        self.assertTrue(all(len(lesson["content"]) >= 120 for lesson in lessons))
+        self.assertEqual(second, first)
+
     async def test_rollback_only_removes_demo_records(self):
         await seed_demo_data(self.db, password="DemoPassword123!")
 
