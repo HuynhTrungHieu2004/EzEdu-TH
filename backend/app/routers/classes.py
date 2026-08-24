@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import re
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pymongo.errors import DuplicateKeyError
 
 from app.database.mongodb import get_database
 from app.routers.auth import get_current_user
@@ -18,6 +20,7 @@ from app.schemas.classes import (
     ClassListResponse,
     ClassMemberListResponse,
     ClassMemberView,
+    ClassJoinRequest,
     ClassStudentAddRequest,
     ClassStudentSummary,
     ClassSummary,
@@ -28,6 +31,7 @@ from app.schemas.classes import (
 from app.services.activity_log_service import record_activity
 
 router = APIRouter()
+_CLASS_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def _now() -> datetime:
@@ -42,12 +46,41 @@ def _escape_regex(text: str) -> str:
     return re.escape(text)
 
 
+async def _new_class_code(db) -> str:
+    while True:
+        code = "".join(secrets.choice(_CLASS_CODE_ALPHABET) for _ in range(6))
+        if not await db["classes"].find_one({"class_code": code}, {"_id": 1}):
+            return code
+
+
+async def _ensure_class_code(cls: dict, db) -> str:
+    if cls.get("class_code"):
+        return cls["class_code"]
+    while True:
+        code = await _new_class_code(db)
+        try:
+            result = await db["classes"].update_one(
+                {"_id": cls["_id"], "class_code": {"$exists": False}},
+                {"$set": {"class_code": code}},
+            )
+        except DuplicateKeyError:
+            continue
+        if result.modified_count:
+            cls["class_code"] = code
+            return code
+        stored = await db["classes"].find_one({"_id": cls["_id"]}, {"class_code": 1})
+        if stored and stored.get("class_code"):
+            cls["class_code"] = stored["class_code"]
+            return stored["class_code"]
+
+
 def _class_summary(cls: dict) -> ClassSummary:
     return ClassSummary(
         id=str(cls["_id"]),
         name=cls["name"],
         description=cls.get("description"),
         owner_id=cls["owner_id"],
+        class_code=cls["class_code"],
         student_count=len(cls.get("student_ids") or []),
         created_at=cls["created_at"],
         updated_at=cls.get("updated_at"),
@@ -75,16 +108,22 @@ async def create_class(
     ensure_lecturer_or_admin(current_user)
     db = get_database()
     now = _now()
-    doc = {
-        "name": payload.name.strip(),
-        "description": (payload.description or "").strip() or None,
-        "owner_id": current_user.id,
-        "student_ids": [],
-        "created_at": now,
-        "updated_at": None,
-        "deleted_at": None,
-    }
-    result = await db["classes"].insert_one(doc)
+    while True:
+        doc = {
+            "name": payload.name.strip(),
+            "description": (payload.description or "").strip() or None,
+            "owner_id": current_user.id,
+            "class_code": await _new_class_code(db),
+            "student_ids": [],
+            "created_at": now,
+            "updated_at": None,
+            "deleted_at": None,
+        }
+        try:
+            result = await db["classes"].insert_one(doc)
+            break
+        except DuplicateKeyError:
+            continue
     doc["_id"] = result.inserted_id
     await record_activity(
         action="class_created",
@@ -108,7 +147,10 @@ async def list_my_classes(current_user: UserResponse = Depends(get_current_user)
     cursor = db["classes"].find(
         {"owner_id": current_user.id, "deleted_at": None}
     ).sort("created_at", -1)
-    items = [_class_summary(cls) async for cls in cursor]
+    items = []
+    async for cls in cursor:
+        await _ensure_class_code(cls, db)
+        items.append(_class_summary(cls))
     return ClassListResponse(items=items)
 
 
@@ -128,6 +170,38 @@ async def list_classes_i_belong_to(current_user: UserResponse = Depends(get_curr
         async for cls in cursor
     ]
     return ClassMemberListResponse(items=items)
+
+
+@router.post("/join", response_model=ClassMemberView)
+async def join_class_by_code(
+    payload: ClassJoinRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    request: Request = None,
+):
+    """Student joins a class using the six-character code shared by its teacher."""
+    if getattr(current_user, "role", "user") != "student":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ tài khoản học sinh mới có thể nhập mã lớp.")
+    code = payload.code.strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{6}", code):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mã lớp không đúng hoặc lớp không còn hoạt động.")
+    db = get_database()
+    cls = await db["classes"].find_one({"class_code": code, "deleted_at": None})
+    if not cls:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mã lớp không đúng hoặc lớp không còn hoạt động.")
+    await db["classes"].update_one({"_id": cls["_id"]}, {"$addToSet": {"student_ids": current_user.id}, "$set": {"updated_at": _now()}})
+    cls = await db["classes"].find_one({"_id": cls["_id"]})
+    await record_activity(
+        action="class_student_added",
+        category="exam",
+        status="success",
+        user_id=current_user.id,
+        resource_type="class",
+        resource_id=str(cls["_id"]),
+        request=request,
+        metadata={"joined_by_code": True},
+        database=db,
+    )
+    return ClassMemberView(id=str(cls["_id"]), name=cls["name"], student_count=len(cls.get("student_ids") or []))
 
 
 @router.get("/search-students", response_model=StudentSearchResponse)
@@ -161,6 +235,7 @@ async def search_students(
 async def get_class_detail(class_id: str, current_user: UserResponse = Depends(get_current_user)):
     db = get_database()
     cls = await _get_owned_class_or_404(class_id, current_user, db)
+    await _ensure_class_code(cls, db)
     student_object_ids = [ObjectId(sid) for sid in cls.get("student_ids") or [] if ObjectId.is_valid(sid)]
     students: list[ClassStudentSummary] = []
     if student_object_ids:
@@ -177,6 +252,7 @@ async def get_class_detail(class_id: str, current_user: UserResponse = Depends(g
         name=cls["name"],
         description=cls.get("description"),
         owner_id=cls["owner_id"],
+        class_code=cls["class_code"],
         students=students,
         created_at=cls["created_at"],
         updated_at=cls.get("updated_at"),

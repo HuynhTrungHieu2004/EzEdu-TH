@@ -3,6 +3,7 @@ import type {
   ClassCreatePayload,
   ClassDetail,
   ClassListResponse,
+  ClassMemberView,
   ClassMemberListResponse,
   ClassSummary,
   ClassUpdatePayload,
@@ -19,6 +20,11 @@ export const classesApi = {
   /** Student: classes I belong to. */
   listMine: async (signal?: AbortSignal): Promise<ClassMemberListResponse> => {
     const response = await client.get<ClassMemberListResponse>('/classes/mine', { signal });
+    return response.data;
+  },
+
+  joinByCode: async (code: string): Promise<ClassMemberView> => {
+    const response = await client.post<ClassMemberView>('/classes/join', { code });
     return response.data;
   },
 

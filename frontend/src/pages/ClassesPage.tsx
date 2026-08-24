@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Plus, School, Trash2, Users } from 'lucide-react';
+import { Copy, Pencil, Plus, School, Trash2, Users } from 'lucide-react';
 import { classesApi } from '../api/classesApi';
 import type { ClassSummary } from '../types/classes';
 import { apiErrorMessage } from '../utils/apiError';
@@ -134,6 +134,15 @@ export default function ClassesPage() {
     }
   }
 
+  async function copyClassCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: `Đã sao chép mã lớp ${code}`, tone: 'success' });
+    } catch {
+      toast({ title: 'Không sao chép được mã lớp', description: `Mã lớp: ${code}`, tone: 'error' });
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -220,6 +229,11 @@ export default function ClassesPage() {
                 </span>
               </button>
               <div className="ez-list-item-actions">
+                <Badge variant="primary">Mã lớp: {cls.class_code}</Badge>
+                <Button size="sm" variant="ghost" onClick={() => void copyClassCode(cls.class_code)}>
+                  <Copy size={14} aria-hidden="true" style={{ marginRight: 6 }} />
+                  Sao chép mã
+                </Button>
                 <Badge variant="secondary">{cls.student_count} học sinh</Badge>
                 <Button size="sm" variant="outline" onClick={() => navigate(`/classes/${cls.id}`)}>
                   <Users size={14} aria-hidden="true" style={{ marginRight: 6 }} />

@@ -317,6 +317,7 @@ async def create_database_indexes():
         # Lecturer classes / student groups (exam assignment targeting)
         await db["classes"].create_index([("owner_id", 1), ("deleted_at", 1)])
         await db["classes"].create_index([("student_ids", 1)])
+        await db["classes"].create_index([("class_code", 1)], unique=True, sparse=True)
         await db["classes"].create_index([("deleted_at", 1), ("created_at", -1)])
 
         logger.info("Đã khởi tạo thành công các chỉ mục MongoDB cho hỏi đáp nâng cao.")

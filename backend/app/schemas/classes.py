@@ -20,12 +20,17 @@ class ClassStudentAddRequest(BaseModel):
     student_ids: List[str] = Field(..., min_length=1, max_length=200)
 
 
+class ClassJoinRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=20)
+
+
 class ClassSummary(BaseModel):
     """Lecturer/admin view: a class they own."""
     id: str
     name: str
     description: Optional[str] = None
     owner_id: str
+    class_code: str
     student_count: int
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -49,6 +54,7 @@ class ClassDetail(BaseModel):
     name: str
     description: Optional[str] = None
     owner_id: str
+    class_code: str
     students: List[ClassStudentSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: Optional[datetime] = None

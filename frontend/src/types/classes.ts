@@ -3,6 +3,7 @@ export interface ClassSummary {
   name: string;
   description: string | null;
   owner_id: string;
+  class_code: string;
   student_count: number;
   created_at: string;
   updated_at: string | null;
@@ -25,6 +26,7 @@ export interface ClassDetail {
   name: string;
   description: string | null;
   owner_id: string;
+  class_code: string;
   students: ClassStudentSummary[];
   created_at: string;
   updated_at: string | null;
