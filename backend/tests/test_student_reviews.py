@@ -215,6 +215,19 @@ class StudentDocumentClassificationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(classification["method"], "heuristic_fallback")
         self.assertEqual(classification["status"], "manual_required")
 
+    async def test_metadata_fallback_allows_taxonomy_without_topics(self):
+        await self.db.curriculum_taxonomy.delete_many({"node_type": "topic"})
+        with patch(
+            "app.services.document_classification_service.generate_json_with_failover",
+            return_value=self._response(grade="10", topic_ids=[]),
+        ):
+            classification = await classify_document(self.db, await self._document())
+
+        self.assertEqual(classification["subject_id"], str(self.subject_id))
+        self.assertEqual(classification["chapter_id"], str(self.chapter_id))
+        self.assertEqual(classification["topic_ids"], [])
+        self.assertEqual(classification["status"], "manual_required")
+
     async def test_provider_outage_ignores_subjects_without_complete_taxonomy_path(self):
         await self.db.curriculum_taxonomy.insert_one({
             "_id": ObjectId(),

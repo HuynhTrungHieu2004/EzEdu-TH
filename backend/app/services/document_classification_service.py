@@ -52,26 +52,27 @@ def _fallback_classification(taxonomy: list[dict], evidence: dict) -> dict:
         (subject, chapter, topic)
         for subject in subjects
         for chapter in chapters_by_parent.get(str(subject["_id"]), [])
-        for topic in topics_by_parent.get(str(chapter["_id"]), [])
+        for topic in topics_by_parent.get(str(chapter["_id"]), []) or [None]
     ]
     if not paths:
-        raise ValueError("Curriculum taxonomy has no complete subject/chapter/topic path.")
+        raise ValueError("Curriculum taxonomy has no subject/chapter path.")
     subject, chapter, topic = max(paths, key=lambda path: (
-        len(_search_tokens(" ".join(str(node.get("name") or "") for node in path)) & evidence_tokens),
-        tuple(str(node["_id"]) for node in path),
+        len(_search_tokens(" ".join(str(node.get("name") or "") for node in path if node)) & evidence_tokens),
+        tuple(str(node["_id"]) for node in path if node),
     ))
-    grade = next((node.get("grade") for node in (topic, chapter, subject) if node.get("grade") is not None), None)
+    selected_nodes = [node for node in (topic, chapter, subject) if node]
+    grade = next((node.get("grade") for node in selected_nodes if node.get("grade") is not None), None)
     version = next(
-        (node.get("curriculum_version") for node in (topic, chapter, subject) if node.get("curriculum_version")),
+        (node.get("curriculum_version") for node in selected_nodes if node.get("curriculum_version")),
         None,
     )
-    _validate_metadata({"grade": grade, "curriculum_version": version}, [subject, chapter, topic])
+    _validate_metadata({"grade": grade, "curriculum_version": version}, selected_nodes)
     return {
         "subject_id": str(subject["_id"]),
         "grade": grade,
         "curriculum_version": version,
         "chapter_id": str(chapter["_id"]),
-        "topic_ids": [str(topic["_id"])],
+        "topic_ids": [str(topic["_id"])] if topic else [],
         "confidence": 0.0,
         "method": "heuristic_fallback",
         "status": "manual_required",
